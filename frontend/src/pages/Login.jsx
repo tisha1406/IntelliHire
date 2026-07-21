@@ -10,27 +10,73 @@ import {
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-
+import { apiRequest } from "../api/client";
+import { useAuthContext } from "../context/AuthContext";
 import "../styles/login.css";
 
 export default function Login() {
 
     const navigate = useNavigate();
 
+    const { login } = useAuthContext();
+
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
 
-    const handleLogin = (e) => {
+    const handleLogin = async (e) => {
+
         e.preventDefault();
 
-        /*
-            TODO:
-            Replace this once backend login is ready.
-        */
+        setLoading(true);
 
-        console.log(email, password);
+        setError("");
 
-        navigate("/admin");
+        try {
+
+            const response = await apiRequest(
+                "/api/auth/login",
+                {
+                    method: "POST",
+                    body: JSON.stringify({
+                        email,
+                        password,
+                    }),
+                }
+            );
+
+            login(response.access_token);
+
+            switch (response.role) {
+
+                case "admin":
+                    navigate("/admin");
+                    break;
+
+                case "company":
+                    navigate("/company");
+                    break;
+
+                case "candidate":
+                    navigate("/candidate");
+                    break;
+
+                default:
+                    navigate("/");
+            }
+
+        } catch (err) {
+
+            setError("Invalid email or password.");
+
+        } finally {
+
+            setLoading(false);
+
+        }
+
     };
 
     return (
@@ -178,12 +224,21 @@ export default function Login() {
 
                         </a>
 
+                    {error && (
+                        <p
+                            style={{
+                                color: "#ff6b6b",
+                                marginBottom: "15px",
+                                textAlign: "center",
+                            }}
+                        >
+                            {error}
+                        </p>
+                    )}
                     </div>
 
-                    <button>
-
-                        Sign In
-
+                    <button disabled={loading}>
+                        {loading ? "Signing In..." : "Sign In"}
                     </button>
 
                 </form>
