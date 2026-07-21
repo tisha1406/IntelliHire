@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Optional
 
 from bson import ObjectId
 
@@ -11,8 +11,18 @@ class BaseRepository:
     """
 
     def __init__(self, collection_name: str):
-        self.db = get_database()
-        self.collection = self.db[collection_name]
+        self.collection_name = collection_name
+
+    @property
+    def collection(self):
+        """
+        Lazily fetch the MongoDB collection.
+
+        This ensures the database connection has already been
+        established during FastAPI startup.
+        """
+        db = get_database()
+        return db[self.collection_name]
 
     async def create(self, document: dict) -> str:
         result = await self.collection.insert_one(document)
