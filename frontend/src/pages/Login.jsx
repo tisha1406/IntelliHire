@@ -60,7 +60,7 @@ export default function Login() {
 
                     <p>
 
-                        AI Powered Interview Intelligence Platform
+                        AI-Powered Recruitment & Interview Intelligence Platform
 
                     </p>
 
@@ -193,6 +193,20 @@ export default function Login() {
                     Protected by JWT Authentication
 
                 </small>
+
+                <div className="login-help">
+
+                    <div className="help-card">
+
+                        <h4>🎤 Candidate</h4>
+
+                        <p>
+                            Use the interview invitation link shared by the recruiter.
+                        </p>
+
+                    </div>
+
+                </div>
 
             </motion.div>
 
