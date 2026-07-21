@@ -87,6 +87,20 @@ class Company(MongoBaseModel):
         default_factory=lambda: datetime.now(UTC)
     )
 
+# ==========================================================
+# Strategy Definitions
+# ==========================================================
+
+class Strategy(MongoBaseModel):
+    strategy_id: str
+
+    display_name: str
+
+    description: str
+
+    prompt_template_ref: str
+
+    enabled: bool = True
 
 # ==========================================================
 # Interview Campaign
