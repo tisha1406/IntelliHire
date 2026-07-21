@@ -13,6 +13,10 @@ from app.api.admin.strategies import router as strategies_router
 from app.api.admin.interview_modes import router as interview_modes_router
 from app.api.company.campaigns import router as campaigns_router
 from app.api.auth import router as auth_router
+from app.api.candidates import router as candidates_router
+from app.api.resume import router as resume_router
+from app.api.interview import router as interview_router
+from app.api.ws import router as ws_router
 
 from app.db.indexes import create_indexes
 
@@ -63,7 +67,10 @@ app.include_router(strategies_router)
 app.include_router(interview_modes_router)
 app.include_router(campaigns_router)
 app.include_router(auth_router)
-
+app.include_router(candidates_router)
+app.include_router(resume_router)
+app.include_router(interview_router)
+app.include_router(ws_router)
 
 # Root Endpoint
 @app.get("/")
