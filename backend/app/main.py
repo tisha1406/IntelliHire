@@ -11,6 +11,7 @@ from app.middleware.logging_middleware import LoggingMiddleware
 from app.api.admin.companies import router as companies_router
 from app.api.admin.strategies import router as strategies_router
 from app.api.admin.interview_modes import router as interview_modes_router
+from app.api.auth import router as auth_router
 
 from app.db.indexes import create_indexes
 
@@ -23,6 +24,7 @@ async def lifespan(app: FastAPI):
     # Connect to MongoDB
     await connect_db()
 
+    # Create Database Indexes
     await create_indexes()
 
     yield
@@ -53,10 +55,12 @@ app.add_middleware(
 
 app.add_middleware(LoggingMiddleware)
 
+
 # Register Routers
 app.include_router(companies_router)
 app.include_router(strategies_router)
 app.include_router(interview_modes_router)
+app.include_router(auth_router)
 
 
 # Root Endpoint
