@@ -11,6 +11,7 @@ from app.middleware.logging_middleware import LoggingMiddleware
 from app.api.admin.companies import router as companies_router
 from app.api.admin.strategies import router as strategies_router
 from app.api.admin.interview_modes import router as interview_modes_router
+from app.api.company.campaigns import router as campaigns_router
 from app.api.auth import router as auth_router
 
 from app.db.indexes import create_indexes
@@ -60,6 +61,7 @@ app.add_middleware(LoggingMiddleware)
 app.include_router(companies_router)
 app.include_router(strategies_router)
 app.include_router(interview_modes_router)
+app.include_router(campaigns_router)
 app.include_router(auth_router)
 
 
