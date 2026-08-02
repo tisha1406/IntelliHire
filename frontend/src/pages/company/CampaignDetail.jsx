@@ -1,4 +1,3 @@
-export default function CampaignDetail.jsx() { return null; }
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useParams, Link, useNavigate } from "react-router-dom";

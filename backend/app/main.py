@@ -67,7 +67,7 @@ from app.api.ws import router as ws_router
 # ==========================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("🚀 IntelliHire Backend Starting...")
+    print("[START] IntelliHire Backend Starting...")
 
     await connect_db()
     await create_indexes()
@@ -76,7 +76,7 @@ async def lifespan(app: FastAPI):
 
     await close_db()
 
-    print("🛑 IntelliHire Backend Shutting Down...")
+    print("[STOP] IntelliHire Backend Shutting Down...")
 
 
 # ==========================================================

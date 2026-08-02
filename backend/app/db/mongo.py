@@ -19,7 +19,7 @@ async def connect_db():
     client = AsyncIOMotorClient(settings.MONGO_URI)
     database = client[settings.DATABASE_NAME]
 
-    print("✅ Connected to MongoDB")
+    print("[OK] Connected to MongoDB")
 
 
 async def close_db():
@@ -30,7 +30,7 @@ async def close_db():
 
     if client is not None:
         client.close()
-        print("🛑 MongoDB connection closed")
+        print("[INFO] MongoDB connection closed")
 
 
 def get_database() -> AsyncIOMotorDatabase:

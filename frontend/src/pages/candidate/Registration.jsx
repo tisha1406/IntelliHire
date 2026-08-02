@@ -1,1 +1,3 @@
-export default function Registration.jsx() { return null; }
+export default function Registration() {
+    return null;
+}
