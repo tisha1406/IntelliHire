@@ -1,0 +1,321 @@
+/* =========================================================
+   ANALYTICS PAGE
+========================================================= */
+
+.analytics-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    animation: fadeIn 0.3s ease-out both;
+}
+
+/* KPI Row */
+.analytics-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-2);
+}
+
+/* Filter Bar */
+.analytics-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.filter-chip {
+    padding: 7px 18px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+}
+
+.filter-chip.active,
+.filter-chip:hover {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+}
+
+/* Charts layout */
+.analytics-charts-top {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: var(--space-3);
+}
+
+.analytics-charts-mid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+}
+
+.analytics-charts-bottom {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+}
+
+@media (max-width: 1100px) {
+    .analytics-charts-top,
+    .analytics-charts-mid,
+    .analytics-charts-bottom {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Chart Panel */
+.analytics-chart-panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3);
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.chart-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.chart-panel-header h4 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+}
+
+.chart-panel-header p {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.chart-area {
+    height: 240px;
+    position: relative;
+}
+
+/* Funnel Chart */
+.funnel-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.funnel-stage-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.funnel-label {
+    width: 110px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+    text-align: right;
+}
+
+.funnel-bar-wrap {
+    flex: 1;
+    height: 32px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    position: relative;
+}
+
+.funnel-bar-fill {
+    height: 100%;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    padding-left: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+    transition: width 0.7s ease;
+}
+
+.funnel-count {
+    width: 50px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    text-align: right;
+}
+
+/* Source Legend */
+.source-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.source-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.source-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.source-name {
+    flex: 1;
+    font-size: 13px;
+    color: var(--text);
+}
+
+.source-percent {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.source-bar {
+
+    height: 4px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 999px;
+    margin-top: 4px;
+    overflow: hidden;
+}
+
+.source-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+}
+
+/* Department Table */
+.dept-table {
+
+    border-collapse: collapse;
+}
+
+.dept-table th {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0 0 10px 0;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+.dept-table td {
+    font-size: 13px;
+    color: var(--text);
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.dept-table td:not(:first-child) {
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+/* Recruiter Performance Table */
+.recruiter-table {
+
+    border-collapse: collapse;
+}
+
+.recruiter-table th {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0 0 10px 0;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+.recruiter-table td {
+    font-size: 13px;
+    color: var(--text);
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    vertical-align: middle;
+}
+
+.recruiter-table td:not(:first-child) {
+    text-align: center;
+}
+
+.rec-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.rec-avatar-sm {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.oar-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+}
+
+.oar-track {
+    width: 60px;
+    height: 5px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.oar-fill {
+    height: 100%;
+    background: var(--success);
+    border-radius: 999px;
+}
+
+/* Comparison legend */
+.comparison-legend {
+    display: flex;
+    gap: 18px;
+}
+
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}

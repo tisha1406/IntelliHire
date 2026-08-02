@@ -1,0 +1,117 @@
+/* ==========================
+   QUICK ACTIONS
+========================== */
+
+.quick-actions{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:22px;
+
+}
+
+.quick-actions h2{
+
+    font-size:28px;
+
+    font-weight:700;
+
+    color:var(--text);
+
+}
+
+/* Cards Grid */
+
+.actions-grid{
+
+    display:grid;
+
+    grid-template-columns:
+        repeat(auto-fit,minmax(300px,1fr));
+
+    gap:24px;
+
+}
+
+/* Individual Card */
+
+.action-card{
+
+    background:var(--card);
+
+    border:1px solid var(--border-color);
+
+    border-radius:22px;
+
+    padding:34px;
+
+    cursor:pointer;
+
+    transition:.3s;
+
+}
+
+.action-card:hover{
+
+    transform:translateY(-6px);
+
+    box-shadow:
+        0 20px 40px rgba(37,99,235,.15);
+
+}
+
+.action-card:active{
+
+    transform:scale(.98);
+
+}
+
+/* Icon */
+
+.action-icon{
+
+    width:78px;
+
+    height:78px;
+
+    border-radius:20px;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    color:white;
+
+    font-size:30px;
+
+    margin-bottom:24px;
+
+}
+
+/* Text */
+
+.action-card h3{
+
+    color:var(--text);
+
+    font-size:20px;
+
+    font-weight:700;
+
+    margin-bottom:10px;
+
+}
+
+.action-card p{
+
+    color:var(--text-secondary);
+
+    font-size:18px;
+
+    line-height:1.5;
+
+}

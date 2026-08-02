@@ -1,0 +1,391 @@
+/* =========================================================
+   TEAM PAGE
+========================================================= */
+
+.team-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    animation: fadeIn 0.3s ease-out both;
+}
+
+/* Stats row */
+.team-stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--space-2);
+}
+
+/* View Toggle */
+.team-view-toggle {
+    display: flex;
+    gap: 6px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 4px;
+}
+
+.view-toggle-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.view-toggle-btn.active {
+    background: var(--primary);
+    color: #fff;
+}
+
+/* Team Toolbar */
+.team-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.team-toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    flex-wrap: wrap;
+}
+
+.team-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.team-search-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-width: 220px;
+}
+
+.team-search-icon {
+    position: absolute;
+    left: 12px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    pointer-events: none;
+}
+
+.team-search-input {
+
+    padding: 9px 12px 9px 34px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--card);
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.team-search-input:focus {
+    border-color: var(--primary);
+}
+
+.team-role-filter {
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--card);
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+    appearance: none;
+    min-width: 140px;
+    transition: border-color 0.2s;
+}
+
+.team-role-filter:focus {
+    border-color: var(--primary);
+}
+
+/* =========================================================
+   GRID VIEW
+========================================================= */
+
+.team-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: var(--space-2);
+}
+
+.team-member-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3) var(--space-2);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    text-align: center;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition: all var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.team-member-card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--primary), #6366F1);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.team-member-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--primary);
+    box-shadow: 0 12px 32px rgba(59,130,246,0.12);
+}
+
+.team-member-card:hover::before {
+    opacity: 1;
+}
+
+.team-member-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), #6366F1);
+    color: #fff;
+    font-size: 20px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid var(--card);
+    box-shadow: 0 4px 16px rgba(59,130,246,0.25);
+    position: relative;
+}
+
+.team-member-status-dot {
+    position: absolute;
+    bottom: 3px;
+    right: 3px;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    border: 2px solid var(--card);
+}
+
+.team-member-status-dot.active { background: #10B981; }
+.team-member-status-dot.inactive { background: #EF4444; }
+
+.team-member-info h4 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+}
+
+.team-member-info p {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.team-member-dept {
+    font-size: 11px;
+    color: var(--text-secondary);
+    padding: 3px 10px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 999px;
+    border: 1px solid var(--border);
+}
+
+.team-member-role-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 999px;
+}
+
+.team-member-contact {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+}
+
+.contact-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11.5px;
+    color: var(--text-secondary);
+    justify-content: center;
+}
+
+.contact-row svg {
+    flex-shrink: 0;
+    color: var(--primary);
+}
+
+.team-card-actions {
+    display: flex;
+    gap: 8px;
+
+}
+
+/* =========================================================
+   LIST / TABLE VIEW
+========================================================= */
+
+.team-list-table-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+.team-list-table {
+
+    border-collapse: collapse;
+}
+
+.team-list-table th {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 12px var(--space-2);
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    background: var(--surface);
+}
+
+.team-list-table td {
+    font-size: 13px;
+    color: var(--text);
+    padding: 14px var(--space-2);
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+}
+
+.team-list-table tr:last-child td {
+    border-bottom: none;
+}
+
+.team-list-table tr:hover td {
+    background: var(--card-hover);
+}
+
+.tl-member-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.tl-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), #6366F1);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.tl-info strong {
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 600;
+    display: block;
+}
+
+.tl-info span {
+    font-size: 11.5px;
+    color: var(--text-secondary);
+}
+
+.tl-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.tl-icon-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.tl-icon-btn:hover {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+}
+
+/* Invite Modal Overlay */
+.team-invite-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.team-invite-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.team-invite-form-group label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.team-invite-form-group input,
+.team-invite-form-group select {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: rgba(255,255,255,0.04);
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.team-invite-form-group input:focus,
+.team-invite-form-group select:focus {
+    border-color: var(--primary);
+}

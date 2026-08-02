@@ -22,7 +22,7 @@ python-dotenv==1.1.1
 # ==========================
 python-jose[cryptography]==3.5.0
 passlib[bcrypt]==1.7.4
-bcrypt==4.3.0
+bcrypt==4.0.1
 
 # ==========================
 # Request Validation
@@ -60,6 +60,7 @@ requests==2.32.4
 # ==========================
 orjson==3.11.1
 python-dateutil==2.9.0.post0
+psutil==7.0.2
 
 # ==========================
 # Logging
@@ -71,5 +72,3 @@ loguru==0.7.3
 # ==========================
 pytest==8.4.1
 pytest-asyncio==1.1.0
-
-python-multipart

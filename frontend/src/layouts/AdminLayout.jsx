@@ -1,17 +1,39 @@
-import { Outlet } from "react-router-dom";
+import Sidebar from "../components/admin/Sidebar";
+import Topbar from "../components/admin/Topbar";
+
+import AdminRoutes from "../routes/AdminRoutes";
+
+import useSidebar from "../hooks/useSidebar";
+
+import "../styles/admin/layout.css";
+import "../styles/admin/responsive.css";
 
 export default function AdminLayout() {
-    return (
-        <div
-            style={{
-                minHeight: "100vh",
-                background: "#f8fafc",
-                padding: "40px",
-            }}
-        >
-            <h1>Admin Dashboard</h1>
 
-            <Outlet />
+    const { collapsed } = useSidebar();
+
+    return (
+
+        <div className="admin-layout">
+
+            <Sidebar />
+
+            <section
+                className={`admin-main ${collapsed ? "collapsed" : ""}`}
+            >
+
+                <Topbar />
+
+                <main className="admin-content">
+
+                    <AdminRoutes />
+
+                </main>
+
+            </section>
+
         </div>
+
     );
+
 }
