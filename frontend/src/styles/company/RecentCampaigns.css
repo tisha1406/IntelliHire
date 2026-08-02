@@ -1,0 +1,145 @@
+.recent-campaigns{
+
+    background:var(--card);
+
+    border:1px solid var(--border-color);
+
+    border-radius:22px;
+
+    padding:28px;
+
+    display:flex;
+
+    flex-direction:column;
+
+    height:100%;
+
+    min-height:520px;
+
+}
+
+.section-header{
+
+    margin-bottom:24px;
+
+}
+
+.section-header h2{
+
+    color:var(--text);
+
+    font-size:24px;
+
+    font-weight:700;
+
+    line-height:1.2;
+
+}
+
+.campaign-table{
+
+    flex:unset;
+
+}
+
+.table-head{
+
+    display:grid;
+
+    grid-template-columns:2fr 1.5fr 1fr;
+
+    padding-bottom:14px;
+
+    color:var(--text-secondary);
+
+    font-weight:600;
+
+    border-bottom:1px solid var(--border-color);
+
+}
+
+.table-row{
+
+    display:grid;
+
+    grid-template-columns:2fr 1.5fr 1fr;
+
+    align-items:center;
+
+    padding:18px 0;
+
+    border-bottom:1px solid var(--border-color);
+
+}
+
+.card-footer{
+
+    display:flex;
+
+    justify-content:flex-end;
+
+    margin-top:auto;
+
+    padding-top:18px;
+
+}
+
+.view-all-btn{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:10px;
+
+    color:#3B82F6;
+
+    font-weight:600;
+
+}
+
+
+
+.table-row:hover{
+
+    background:var(--card-hover);
+
+}
+
+.status{
+
+    width:max-content;
+
+    padding:7px 16px;
+
+    border-radius:999px;
+
+    font-size:14px;
+
+    font-weight:600;
+
+}
+
+.status.active{
+
+    background:#DCFCE7;
+
+    color:#15803D;
+
+}
+
+.status.closed{
+
+    background:#FEE2E2;
+
+    color:#DC2626;
+
+}
+
+.status.draft{
+
+    background:#FEF3C7;
+
+    color:#D97706;
+
+}

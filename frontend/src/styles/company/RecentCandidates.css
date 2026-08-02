@@ -1,0 +1,274 @@
+.recent-candidates{
+
+    background:var(--card);
+
+    border:1px solid var(--border-color);
+
+    border-radius:22px;
+
+    padding:28px;
+
+    display:flex;
+
+    flex-direction:column;
+
+    height:100%;
+
+    min-height:420px;
+
+}
+
+.candidate-section-header{
+
+    margin-bottom:24px;
+
+}
+
+.candidate-section-title{
+
+    font-size:24px;
+
+    font-weight:700;
+
+    color:var(--text);
+
+    line-height:1.2;
+
+    margin:0;
+
+}
+
+.candidate-list{
+
+    flex:unset;
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:6px;
+
+}
+
+.candidate-card{
+
+    display:grid;
+
+    grid-template-columns:
+
+        2fr
+
+        90px
+
+        170px
+
+        90px;
+
+    align-items:center;
+
+    padding:18px 10px;
+
+    border-bottom:1px solid var(--border-color);
+
+    transition:.3s;
+
+}
+
+.candidate-card:hover{
+
+    background:var(--card-hover);
+
+}
+
+.candidate-info{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:16px;
+
+}
+
+.candidate-footer{
+
+    display:flex;
+
+    justify-content:flex-end;
+
+    margin-top:auto;
+
+    padding-top:18px;
+
+}
+
+.candidate-view-all-btn{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:10px;
+
+    color:#3B82F6;
+
+    font-weight:600;
+
+}
+
+.candidate-avatar{
+
+    width:54px;
+
+    height:54px;
+
+    border-radius:50%;
+
+    background:
+
+        linear-gradient(
+
+            135deg,
+
+            #2563EB,
+
+            #60A5FA
+
+        );
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    color:white;
+
+    font-weight:700;
+
+    font-size:18px;
+
+}
+
+.candidate-info h3{
+
+    color:var(--text);
+
+    font-weight:500;
+
+    font-size: 16px;
+
+    margin-bottom:5px;
+
+}
+
+.candidate-info p{
+
+    color:var(--text-secondary);
+
+}
+
+.candidate-score{
+
+    font-size:18px;
+
+    font-weight:500;
+
+    color:#F59E0B;
+
+}
+
+.candidate-status{
+
+    width:max-content;
+
+    padding:8px 18px;
+
+    border-radius:999px;
+
+    font-size:14px;
+
+    font-weight:600;
+
+}
+
+.interview-scheduled{
+
+    background:#DBEAFE;
+
+    color:#2563EB;
+
+}
+
+.under-review{
+
+    background:#FEF3C7;
+
+    color:#D97706;
+
+}
+
+.selected{
+
+    background:#DCFCE7;
+
+    color:#15803D;
+
+}
+
+.assessment-pending{
+
+    background:#F3F4F6;
+
+    color:#4B5563;
+
+}
+
+.candidate-view{
+    margin-left: 25px;
+
+    width:50px;
+
+    height:38px;
+
+    border:none;
+
+    border-radius:10px;
+
+    background:#2563EB;
+
+    color:white;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    gap:8px;
+
+    font-size:14px;
+
+    cursor:pointer;
+
+    transition:.3s;
+
+}
+
+.candidate-view:hover{
+
+    background:#1D4ED8;
+
+}
+
+.candidate-view:hover{
+
+    background:#1D4ED8;
+
+}
+
+.candidate-view-all-btn:hover{
+
+    color:#60A5FA;
+
+}

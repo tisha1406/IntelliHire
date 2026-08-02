@@ -1,0 +1,372 @@
+/* ============================================================
+   SHARED COMPONENT STYLES
+   — Overrides and extensions for all shared components
+   ============================================================ */
+
+/* ── Stats Card ──────────────────────────────────────────── */
+.stats-card {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3) !important;
+    border-radius: var(--radius-lg) !important;
+    min-height: 0 !important;
+}
+
+.stats-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md) !important;
+}
+
+.stats-icon {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: var(--radius-sm) !important;
+    font-size: 17px !important;
+}
+
+.stats-content span {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.stats-content h2 {
+    font-size: 24px !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.03em !important;
+    margin: 2px 0 0 !important;
+}
+
+.stats-change {
+    font-size: 11px !important;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.stats-change.trend-up   { color: var(--success) !important; background: var(--success-muted) !important; }
+.stats-change.trend-down { color: var(--danger)  !important; background: var(--danger-muted)  !important; }
+.trend-arrow { font-size: 9px; }
+
+/* ── Page Header ─────────────────────────────────────────── */
+.page-header-container {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--border);
+}
+
+.page-header-left-col {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.header-breadcrumbs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.breadcrumb-home,
+.breadcrumb-link {
+    font-size: 12px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    transition: color var(--transition);
+}
+.breadcrumb-home:hover, .breadcrumb-link:hover { color: var(--primary); }
+
+.breadcrumb-separator { font-size: 9px; color: var(--text-tertiary); }
+.breadcrumb-current   { font-size: 12px; color: var(--text-secondary); }
+
+.header-headings {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.header-title {
+    font-size: 22px !important;
+    font-weight: 700 !important;
+    color: var(--text) !important;
+    letter-spacing: -0.02em !important;
+    line-height: 1.2 !important;
+}
+
+.header-subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.page-header-actions-col {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    flex-shrink: 0;
+}
+
+/* ── Progress Card ───────────────────────────────────────── */
+.progress-card-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+}
+.progress-card-item:last-child { border-bottom: none; }
+
+.progress-card-item .prog-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+}
+.progress-card-item .prog-meta {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+.progress-track {
+    height: 4px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 4px;
+}
+.progress-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.6s ease;
+}
+
+/* ── Status Badge ────────────────────────────────────────── */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* ── Data Table Wrapper ──────────────────────────────────── */
+.data-table-panel {
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    background: var(--card);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+}
+
+/* ── Drawer ──────────────────────────────────────────────── */
+.drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--overlay);
+    z-index: 900;
+}
+
+.drawer-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 500px;
+    max-width: 95vw;
+    height: 100vh;
+    background: var(--card);
+    border-left: 1px solid var(--border);
+    z-index: 901;
+    overflow-y: auto;
+    padding: var(--space-3);
+    box-shadow: var(--shadow-lg);
+}
+
+/* ── Filter bar (shared) ─────────────────────────────────── */
+.filter-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-1) var(--space-2);
+    box-shadow: var(--shadow-xs);
+}
+
+.filter-toolbar-left  { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
+.filter-toolbar-right { display: flex; align-items: center; gap: var(--space-1); }
+
+/* Search input inside filter bar */
+.filter-search-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.filter-search-wrap .search-icon {
+    position: absolute;
+    left: 10px;
+    font-size: 12px;
+    color: var(--text-tertiary);
+    pointer-events: none;
+}
+.filter-search-input {
+    height: 34px;
+    width: 220px;
+    padding: 0 12px 0 30px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--input-bg);
+    color: var(--text);
+    font-size: 13px;
+    transition: all var(--transition);
+}
+.filter-search-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+    outline: none;
+}
+
+/* Inline select in filter bar */
+.filter-select {
+    height: 34px;
+    padding: 0 10px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--input-bg);
+    color: var(--text);
+    font-size: 12px;
+    cursor: pointer;
+    outline: none;
+    transition: border-color var(--transition);
+}
+.filter-select:focus { border-color: var(--primary); }
+
+/* Layout toggle pair */
+.layout-toggle {
+    display: flex;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 2px;
+    gap: 2px;
+}
+.layout-toggle-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    transition: all var(--transition);
+}
+.layout-toggle-btn.is-active {
+    background: var(--primary);
+    color: #fff;
+}
+
+/* ============================================================
+   COMPANY PORTAL COMPACT UI ENFORCEMENT
+   ============================================================ */
+
+/* Enforce compact button sizes (32px-36px height, fit-content width) */
+.company-main button:not(.sidebar-menu-item):not(.sidebar-sub-item):not(.modal-close-btn):not(.toast-dismiss-btn):not(.view-toggle-btn):not(.layout-toggle-btn):not(.tl-icon-btn):not(.history-dl-btn):not(.report-icon-btn):not(.view-toggle-btn),
+.company-main .custom-btn {
+    height: 36px !important;
+    padding: 0 16px !important;
+    width: auto !important;
+    max-width: fit-content !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 8px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    flex-grow: 0 !important;
+    flex-shrink: 0 !important;
+}
+
+/* Ensure PageHeader actions container stays horizontal and right-aligned */
+.company-main .page-header-container {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 16px !important;
+}
+
+.company-main .page-header-actions-col {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 10px !important;
+    width: auto !important;
+    flex-shrink: 0 !important;
+}
+
+/* Compact input and filter dropdown sizing */
+.company-main .custom-input,
+.company-main .custom-select,
+.company-main select,
+.company-main input[type="text"],
+.company-main input[type="search"],
+.company-main input[type="email"] {
+    height: 38px !important;
+    border-radius: 8px !important;
+    font-size: 13px !important;
+}
+
+/* Analytics filter bar horizontal alignment */
+.company-main .analytics-filter-bar {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 10px !important;
+    flex-wrap: wrap !important;
+}
+
+.company-main .filter-chip {
+    height: 32px !important;
+    padding: 0 14px !important;
+    font-size: 13px !important;
+    border-radius: 999px !important;
+    width: auto !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    white-space: nowrap !important;
+}
+
+/* Compact Stats Cards */
+.company-main .stats-card-container,
+.company-main .company-stats-card {
+    padding: 14px 16px !important;
+    border-radius: 12px !important;
+}
+
+/* Compact Tables */
+.company-main table.data-table th,
+.company-main table.data-table td,
+.company-main table.team-list-table th,
+.company-main table.team-list-table td,
+.company-main table.reports-list-table th,
+.company-main table.reports-list-table td {
+    padding: 10px 14px !important;
+    font-size: 13px !important;
+}

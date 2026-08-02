@@ -1,0 +1,329 @@
+/* =========================================================
+   NOTIFICATIONS PAGE
+========================================================= */
+
+.notifications-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    animation: fadeIn 0.3s ease-out both;
+}
+
+/* Body layout */
+.notifications-body {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 24px;
+}
+
+@media (max-width: 1000px) {
+    .notifications-body {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Filter chips */
+.notif-filter-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.notif-filter-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+}
+
+.notif-filter-chip svg {
+    font-size: 11px;
+}
+
+.notif-filter-chip.active,
+.notif-filter-chip:hover {
+    color: #fff;
+}
+
+/* Type colors */
+.notif-filter-chip.type-all.active    { background: #3B82F6; border-color: #3B82F6; }
+.notif-filter-chip.type-recruitment.active { background: #6366F1; border-color: #6366F1; }
+.notif-filter-chip.type-candidate.active   { background: #10B981; border-color: #10B981; }
+.notif-filter-chip.type-system.active      { background: #F59E0B; border-color: #F59E0B; }
+.notif-filter-chip.type-security.active    { background: #EF4444; border-color: #EF4444; }
+
+/* Main Notifications List */
+.notifications-list-panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+}
+
+.notif-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--border);
+}
+
+.notif-list-header h4 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.notif-list-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.mark-all-btn {
+    font-size: 12px;
+    color: var(--primary);
+    font-weight: 600;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    transition: opacity 0.2s;
+}
+
+.mark-all-btn:hover {
+    opacity: 0.7;
+}
+
+/* Notification Item */
+.notif-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 16px 22px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    cursor: pointer;
+    transition: background 0.15s ease;
+    position: relative;
+}
+
+.notif-item:last-child {
+    border-bottom: none;
+}
+
+.notif-item:hover {
+    background: var(--card-hover);
+}
+
+.notif-item.unread {
+    border-left: 3px solid var(--primary);
+}
+
+.notif-item.read {
+    border-left: 3px solid transparent;
+}
+
+.notif-type-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+}
+
+.notif-type-icon.recruitment { background: rgba(99,102,241,0.15); color: #6366F1; }
+.notif-type-icon.candidate   { background: rgba(16,185,129,0.15); color: #10B981; }
+.notif-type-icon.system      { background: rgba(245,158,11,0.15); color: #F59E0B; }
+.notif-type-icon.security    { background: rgba(239,68,68,0.15); color: #EF4444; }
+
+.notif-content {
+    flex: 1;
+}
+
+.notif-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 4px;
+}
+
+.notif-title-row h5 {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.notif-time {
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    margin-left: 12px;
+    flex-shrink: 0;
+}
+
+.notif-message {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.notif-unread-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--primary);
+    flex-shrink: 0;
+    margin-top: 6px;
+}
+
+/* Sidebar Settings */
+.notif-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.notif-settings-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3);
+    box-shadow: var(--shadow);
+}
+
+.notif-settings-card h4 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 18px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.notif-setting-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.notif-setting-row:last-child {
+    border-bottom: none;
+}
+
+.notif-setting-info h6 {
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.notif-setting-info p {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+/* Summary Card */
+.notif-summary-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3);
+    box-shadow: var(--shadow);
+}
+
+.notif-summary-card h4 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 16px;
+}
+
+.notif-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.notif-summary-row:last-child {
+    border-bottom: none;
+}
+
+.notif-summary-type {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text);
+}
+
+.notif-summary-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.notif-summary-count {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+/* Toggle switch */
+.toggle-switch {
+    position: relative;
+    width: 40px;
+    height: 22px;
+    flex-shrink: 0;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: var(--border);
+    border-radius: 999px;
+    transition: 0.3s;
+}
+
+.toggle-slider::before {
+    content: "";
+    position: absolute;
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: 0.3s;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background: var(--primary);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(18px);
+}

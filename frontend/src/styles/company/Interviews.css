@@ -1,0 +1,315 @@
+/* =========================================================
+   INTELLIHIRE — INTERVIEWS MODULE CSS
+   Premium SaaS ATS Aesthetic
+   ========================================================= */
+
+.interviews-page-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+
+    animation: fadeIn 0.3s ease-out both;
+}
+
+/* Statistics Grid */
+.dashboard-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+
+}
+
+/* Filters panel styling */
+.candidates-filter-panel {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background-color: var(--card);
+    padding: 16px;
+    box-shadow: var(--shadow-sm);
+}
+
+.filter-inputs {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.filter-inputs > * {
+    max-width: 420px;
+}
+
+/* Table styling override for compact row height & consistent fonts */
+.candidates-table-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background-color: var(--card);
+    padding: 12px 16px;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.table-candidate-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    cursor: pointer;
+}
+
+.table-candidate-cell strong {
+    font-size: 14px;
+    color: var(--text);
+}
+
+.table-candidate-cell strong:hover {
+    color: var(--primary);
+    text-decoration: underline;
+}
+
+.table-candidate-cell span {
+    font-size: 11px;
+    color: var(--text-tertiary);
+}
+
+.ai-score-value-bold {
+    color: var(--success);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.ai-score-pending {
+    color: var(--text-tertiary);
+    font-style: italic;
+}
+
+.table-actions-cell {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.btn-text-danger {
+    color: var(--danger) !important;
+}
+
+.btn-text-danger:hover {
+    background-color: var(--danger-muted) !important;
+}
+
+.text-muted-italics {
+    color: var(--text-tertiary);
+    font-style: italic;
+    font-size: 12px;
+}
+
+/* Evaluation Modal Details Grid */
+.evaluation-modal-details-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 8px 0;
+}
+
+.eval-summary-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 16px;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, var(--surface) 100%);
+    border: 1px solid var(--border);
+}
+
+.score-badge-circle {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background-color: var(--primary-muted);
+    border: 2px solid var(--primary);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+.score-badge-circle h3 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 800;
+}
+
+.score-badge-circle span {
+    font-size: 9px;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.eval-meta-col {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.eval-meta-col h3 {
+    margin: 0;
+    font-size: 18px;
+    color: var(--text);
+}
+
+.eval-meta-col p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.modal-inner-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.section-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+}
+
+.icon-eval {
+    color: var(--primary);
+}
+
+.eval-paragraph-desc {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.strengths-weaknesses-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.eval-box {
+    padding: 16px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+}
+
+.strength-box {
+    background-color: rgba(34, 197, 94, 0.03);
+    border-color: rgba(34, 197, 94, 0.1);
+}
+
+.weakness-box {
+    background-color: rgba(239, 68, 68, 0.03);
+    border-color: rgba(239, 68, 68, 0.1);
+}
+
+.eval-box h5 {
+    margin: 0 0 10px 0;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.strength-box h5 {
+    color: var(--success);
+}
+
+.weakness-box h5 {
+    color: var(--danger);
+}
+
+.eval-box ul {
+    margin: 0;
+    padding: 0 0 0 4px;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.eval-box li {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+/* Transcripts list */
+.transcripts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.transcript-box-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border-radius: var(--radius-md);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+}
+
+.transcript-question-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.transcript-question-line strong {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.4;
+}
+
+.transcript-answer-line {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-style: italic;
+    line-height: 1.5;
+    background-color: var(--card);
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--primary);
+}
+
+.transcript-sentiment-bar {
+    display: flex;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-tertiary);
+}
+
+.transcript-sentiment-bar strong {
+    color: var(--info);
+    margin-left: 4px;
+}
+
+/* Page transitions */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive adjustment */
+@media (max-width: 768px) {
+    .strengths-weaknesses-split {
+        grid-template-columns: 1fr;
+    }
+}
