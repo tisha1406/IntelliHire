@@ -1,0 +1,309 @@
+/* ==========================================================
+   INTELLIHIRE — CANDIDATE RESUME
+========================================================== */
+
+/* ── Upload Area ── */
+.c-resume-upload {
+    background: var(--card);
+    border: 2px dashed var(--border);
+    border-radius: var(--c-radius-card);
+    padding: 60px 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    margin-bottom: var(--c-space-md);
+}
+
+.c-resume-upload:hover, .c-resume-upload.drag-active {
+    border-color: #3B82F6;
+    background: rgba(59, 130, 246, 0.05);
+}
+
+.c-upload-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: rgba(59, 130, 246, 0.1);
+    color: #3B82F6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+    transition: transform 0.3s ease;
+}
+
+.c-resume-upload:hover .c-upload-icon {
+    transform: translateY(-5px);
+}
+
+.c-upload-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 8px;
+}
+
+.c-upload-desc {
+    font-size: 14px;
+    color: var(--text-secondary);
+    max-width: 400px;
+    line-height: 1.5;
+    margin-bottom: 24px;
+}
+
+.c-upload-btn {
+    background: var(--primary);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.c-upload-btn:hover {
+    background: var(--primary-hover);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+/* ── Grid Layout (12 column) ── */
+.c-resume-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: var(--c-space-md);
+}
+
+.col-span-12 { grid-column: span 12; }
+.col-span-8 { grid-column: span 8; }
+.col-span-6 { grid-column: span 6; }
+.col-span-4 { grid-column: span 4; }
+
+/* ── File Info Card ── */
+.c-file-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--c-space-md);
+    background: rgba(16, 185, 129, 0.05);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: var(--c-radius-card);
+    margin-bottom: var(--c-space-md);
+}
+
+.c-file-details {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.c-file-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: rgba(16, 185, 129, 0.1);
+    color: #10B981;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.c-file-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.c-file-meta {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+
+/* ── Score Rings ── */
+.c-score-ring-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 40px;
+    padding: 20px 0;
+}
+
+.c-score-ring {
+    text-align: center;
+}
+
+.c-ring-circle {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    border: 8px solid var(--border);
+    border-top-color: #3B82F6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 12px;
+    position: relative;
+}
+
+.c-ring-circle.success { border-top-color: #10B981; }
+.c-ring-circle.warning { border-top-color: #F59E0B; }
+
+.c-ring-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+/* ── Progress Bars ── */
+.c-skill-bar {
+    margin-bottom: 16px;
+}
+
+.c-skill-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 13.5px;
+    font-weight: 500;
+}
+
+.c-skill-name { color: var(--text); }
+.c-skill-val { color: var(--text-secondary); }
+
+.c-bar-bg {
+    height: 6px;
+    background: var(--border);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.c-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3B82F6, #8B5CF6);
+    border-radius: 999px;
+}
+
+/* ── Tags ── */
+.c-tags-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 8px;
+}
+
+.c-tag {
+    padding: 6px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 500;
+}
+
+/* ── Lists ── */
+.c-insight-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.c-insight-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 8px;
+    background: var(--surface);
+}
+
+.c-insight-item p {
+    font-size: 13.5px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* ── Resume Timeline ── */
+.c-resume-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 8px 0;
+}
+
+.c-r-time-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.c-r-time-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+}
+
+.c-r-time-item.done .c-r-time-icon {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: #10B981;
+    color: #10B981;
+}
+
+.c-r-time-text {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.c-r-time-item.done .c-r-time-text {
+    color: var(--text);
+}
+
+/* ── Resume Tips ── */
+.c-tip-box {
+    padding: 16px;
+    border-radius: 8px;
+    background: rgba(59, 130, 246, 0.05);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    margin-bottom: 16px;
+}
+
+.c-tip-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #3B82F6;
+    margin-bottom: 4px;
+}
+
+.c-tip-text {
+    font-size: 14px;
+    color: var(--text);
+    line-height: 1.5;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .col-span-8 { grid-column: span 12; }
+    .col-span-4 { grid-column: span 12; }
+}
+
+@media (max-width: 768px) {
+    .col-span-6 { grid-column: span 12; }
+    .c-score-ring-container { flex-direction: column; gap: 24px; }
+}

@@ -1,0 +1,13 @@
+.layout-section-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    transition: transform .25s, box-shadow .25s, border-color .25s;
+    width: 100%;
+}
+
+.layout-section-card:hover {
+    transform: translateY(-1px);
+    border-color: var(--border);
+}

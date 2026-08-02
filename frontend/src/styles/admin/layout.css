@@ -1,0 +1,70 @@
+/* ==========================================================
+   INTELLIHIRE APP LAYOUT
+========================================================== */
+
+.admin-layout{
+    display:flex;
+    height:100vh;
+    background:var(--bg);
+    padding:10px;
+    gap:10px;
+    overflow:hidden;
+}
+
+/* ==========================================================
+   MAIN AREA
+========================================================== */
+
+.admin-main{
+
+    flex:1;
+
+    display:flex;
+
+    flex-direction:column;
+
+    min-width:0;
+
+    overflow:hidden;
+
+    transition:var(--transition) ease;
+
+}
+
+/* ==========================================================
+   PAGE CONTENT
+========================================================== */
+
+.admin-content{
+    flex:1;
+    margin-top:10px;
+    overflow-y:auto;
+    overflow-x:hidden;
+    border-radius:var(--radius-lg);
+    padding:16px 20px;
+    /* fills remaining height below topbar+gap */
+    max-height:calc(100vh - 62px - 30px);
+    transition:var(--transition);
+}
+
+/* ==========================================================
+   SCROLLBAR
+========================================================== */
+
+.admin-content::-webkit-scrollbar{
+    width:4px;
+}
+
+.admin-content::-webkit-scrollbar-thumb{
+    background:var(--border);
+    border-radius:20px;
+}
+
+/* ==========================================================
+   RESPONSIVE
+========================================================== */
+
+@media (max-width:992px){
+.admin-layout{ padding:8px; gap:8px; }
+.admin-content{ padding:14px; border-radius:var(--radius-md); }
+}

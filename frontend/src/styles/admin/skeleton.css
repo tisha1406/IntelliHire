@@ -1,0 +1,37 @@
+.skeleton{
+
+    border-radius:8px;
+
+    background:linear-gradient(
+
+        90deg,
+
+        rgba(255,255,255,.08),
+
+        rgba(255,255,255,.18),
+
+        rgba(255,255,255,.08)
+
+    );
+
+    background-size:200%;
+
+    animation:loading 1.2s infinite;
+
+}
+
+@keyframes loading{
+
+    from{
+
+        background-position:200%;
+
+    }
+
+    to{
+
+        background-position:-200%;
+
+    }
+
+}

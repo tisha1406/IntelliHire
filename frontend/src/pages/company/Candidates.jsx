@@ -1,3 +1,4 @@
+export default function Candidates.jsx() { return null; }
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {  FaList, FaUserPlus, FaCheck, FaTimes, FaUserSlash, FaFilePdf, FaRobot } from "react-icons/fa";

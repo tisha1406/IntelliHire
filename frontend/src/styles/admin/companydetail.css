@@ -1,0 +1,229 @@
+/*==========================================================
+COMPANY DETAIL DASHBOARD LAYOUT
+==========================================================*/
+
+.cd-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding-bottom: 40px;
+}
+
+.cd-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 20px;
+    align-items: start;
+}
+
+/* Grid Column Spans */
+.cd-col-12 { grid-column: span 12; }
+.cd-col-9 { grid-column: span 9; }
+.cd-col-8 { grid-column: span 8; }
+.cd-col-6 { grid-column: span 6; }
+.cd-col-4 { grid-column: span 4; }
+.cd-col-3 { grid-column: span 3; }
+
+/* Dashboard Card */
+.cd-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.cd-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.cd-card-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cd-card-title svg {
+    color: var(--text-secondary);
+}
+
+/* KPI Cards */
+.cd-kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+}
+
+.cd-kpi:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary);
+}
+
+.cd-kpi-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.cd-kpi-value {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+/* Info List */
+.cd-info-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.cd-info-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.cd-info-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+}
+
+.cd-info-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.cd-info-text span:first-child {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.cd-info-text span:last-child {
+    font-size: 14px;
+    color: var(--text);
+    font-weight: 500;
+}
+
+/* Progress Bars */
+.cd-progress-group {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.cd-progress-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cd-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+}
+
+.cd-progress-header .label {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.cd-progress-header .value {
+    color: var(--text);
+    font-weight: 600;
+}
+
+.cd-progress-bar {
+    height: 6px;
+    background: var(--border);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.cd-progress-fill {
+    height: 100%;
+    background: var(--primary);
+    border-radius: 999px;
+    transition: width 0.5s ease;
+}
+
+/* Badges List */
+.cd-badge-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.cd-feature-group {
+    margin-bottom: 20px;
+}
+
+.cd-feature-group:last-child {
+    margin-bottom: 0;
+}
+
+.cd-feature-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+
+.cd-feature-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.cd-feature-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text);
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .cd-col-3 { grid-column: span 6; }
+    .cd-col-4 { grid-column: span 6; }
+    .cd-col-6 { grid-column: span 12; }
+    .cd-col-8 { grid-column: span 12; }
+}
+
+@media (max-width: 768px) {
+    .cd-col-3, .cd-col-4, .cd-col-6, .cd-col-8, .cd-col-9, .cd-col-12 {
+        grid-column: span 12;
+    }
+    .cd-feature-grid {
+        grid-template-columns: 1fr;
+    }
+}

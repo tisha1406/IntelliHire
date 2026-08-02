@@ -1,0 +1,166 @@
+.ih-btn{
+    height:40px;
+    border:none;
+    border-radius:var(--radius-sm);
+    padding:0 var(--space-md);
+    font-size:0.875rem;
+    font-weight:500;
+    transition:var(--transition);
+    cursor:pointer;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:var(--space-sm);
+    box-shadow:var(--shadow-sm);
+    white-space:nowrap;
+    position:relative;
+    overflow:hidden;
+}
+
+.ih-btn:hover{
+    transform:translateY(-1px);
+    box-shadow:var(--shadow);
+}
+
+.ih-btn-primary{
+    background:var(--primary);
+    color:white;
+}
+
+.ih-btn-primary:hover{
+    background:var(--primary-hover);
+}
+
+.ih-btn-outline{
+    background:var(--surface);
+    color:var(--text);
+    border:1px solid var(--border);
+    box-shadow:none;
+}
+
+.ih-btn-outline:hover{
+    background:var(--card-hover);
+    border-color:var(--text-secondary);
+}
+
+.ih-btn-danger{
+    background:transparent;
+    color:var(--danger);
+    border:1px solid var(--border);
+    box-shadow:none;
+}
+
+.ih-btn-danger:hover{
+    background:rgba(239,68,68,.05);
+    border-color:rgba(239,68,68,.2);
+}
+
+.ih-btn-ghost{
+    background:transparent;
+    color:var(--text-secondary);
+    box-shadow:none;
+}
+
+.ih-btn-ghost:hover{
+    background:var(--card-hover);
+    color:var(--text);
+    box-shadow:none;
+    transform:none;
+}
+
+.ih-btn-sm{
+    height:32px;
+    padding:0 var(--space-sm);
+    font-size:.75rem;
+    border-radius:var(--radius-xs);
+}
+
+.ih-btn-md{
+    height:40px;
+    padding:0 var(--space-md);
+}
+
+.ih-btn-lg{
+    height:48px;
+    padding:0 var(--space-lg);
+    font-size:1rem;
+    border-radius:var(--radius-md);
+}
+
+.ih-btn:disabled,
+.ih-btn.is-loading{
+    opacity:.65;
+    cursor:not-allowed;
+    transform:none;
+    box-shadow:none;
+}
+
+/* ===============================
+   Loading Spinner
+================================= */
+
+.btn-spinner{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:16px;
+    height:16px;
+    flex-shrink:0;
+}
+
+.animate-spin{
+    animation:spin .8s linear infinite;
+}
+
+/* ===============================
+   Icon Support
+================================= */
+
+.btn-icon-left,
+.btn-icon-right{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    flex-shrink:0;
+    font-size:1rem;
+    line-height:1;
+}
+
+.btn-icon-left{
+    margin-right:2px;
+}
+
+.btn-icon-right{
+    margin-left:2px;
+}
+
+.btn-text{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    line-height:1;
+}
+
+/* ===============================
+   Focus Accessibility
+================================= */
+
+.ih-btn:focus-visible{
+    outline:none;
+    box-shadow:
+        0 0 0 2px rgba(255,255,255,.08),
+        0 0 0 4px rgba(59,130,246,.35);
+}
+
+/* ===============================
+   Spinner Animation
+================================= */
+
+@keyframes spin{
+    from{
+        transform:rotate(0deg);
+    }
+    to{
+        transform:rotate(360deg);
+    }
+}

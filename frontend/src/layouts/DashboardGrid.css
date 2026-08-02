@@ -1,0 +1,12 @@
+.dashboard-layout-grid {
+    display: grid;
+    gap: 14px;
+    animation: dashboardFade .35s ease;
+    width: 100%;
+}
+
+@media(max-width: 768px) {
+    .dashboard-layout-grid {
+        gap: 24px;
+    }
+}

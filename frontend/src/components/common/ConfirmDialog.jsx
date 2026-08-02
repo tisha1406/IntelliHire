@@ -1,6 +1,6 @@
-import React from "react";
 import Modal from "./Modal";
 import Button from "./Button";
+import { AlertTriangle } from "lucide-react";
 
 export default function ConfirmDialog({
     isOpen,
@@ -10,27 +10,70 @@ export default function ConfirmDialog({
     message = "This action cannot be undone.",
     confirmText = "Confirm",
     cancelText = "Cancel",
-    type = "danger", // danger, warning, primary
+    type = "danger",
+    isDestructive = true,
+    isLoading = false,
     ...props
 }) {
+
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={title} size="sm" position="top-right" {...props}>
-            <div className="confirm-dialog-content">
-                <p className="confirm-dialog-msg">{message}</p>
-                <div className="confirm-dialog-actions">
-                    <Button variant="ghost" onClick={onClose}>
+
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={title}
+            size="sm"
+            position="top-right"
+            footer={
+                <>
+                    <Button
+                        variant="outline"
+                        onClick={onClose}
+                        disabled={isLoading}
+                    >
                         {cancelText}
                     </Button>
-                    <button
-    onClick={() => {
-        console.log("HTML Button");
-        onConfirm();
-    }}
->
-    Confirm
-</button>
-                </div>
+
+                    <Button
+                        variant={
+                            isDestructive
+                                ? "danger"
+                                : type
+                        }
+                        onClick={onConfirm}
+                        disabled={isLoading}
+                    >
+                        {isLoading
+                            ? "Processing..."
+                            : confirmText}
+                    </Button>
+                </>
+            }
+            {...props}
+        >
+
+            <div className="confirm-dialog-content">
+
+                {isDestructive && (
+
+                    <div className="confirm-dialog-icon">
+
+                        <AlertTriangle size={22} />
+
+                    </div>
+
+                )}
+
+                <p className="confirm-dialog-msg">
+
+                    {message}
+
+                </p>
+
             </div>
+
         </Modal>
+
     );
+
 }

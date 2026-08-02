@@ -1,0 +1,326 @@
+/* ==========================================================
+   INTELLIHIRE — CANDIDATE INTERVIEW ROOM
+========================================================== */
+
+/* ── Interview Shell ── */
+.c-interview-room {
+    min-height: 100vh;
+    background: #080F1E;
+    display: flex;
+    flex-direction: column;
+    color: white;
+}
+
+/* ── Header ── */
+.c-interview-header {
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(10px);
+}
+
+.c-interview-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.c-interview-brand-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+}
+
+.c-interview-header-title {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.c-interview-header-title span {
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+
+/* ── Content Layout ── */
+.c-interview-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 32px;
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+    gap: 24px;
+}
+
+/* ── Top Area ── */
+.c-interview-top {
+    text-align: center;
+    margin-bottom: 16px;
+}
+
+.c-interview-top h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+}
+
+.c-interview-top p {
+    font-size: 15px;
+    color: var(--text-secondary);
+}
+
+/* ── Grid Area (Strategy, Instructions, System Check) ── */
+.c-interview-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+}
+
+.c-interview-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+}
+
+.c-interview-card-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: white;
+}
+
+/* ── Strategy Metrics ── */
+.c-strat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.c-strat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.02);
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.c-strat-label {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.c-strat-val {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.c-strat-full {
+    grid-column: span 2;
+}
+
+/* Instructions */
+.c-instruction-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.c-instruction-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.c-instruction-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(59, 130, 246, 0.15);
+    color: #3B82F6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.c-instruction-text h4 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.c-instruction-text p {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.6);
+    line-height: 1.5;
+}
+
+/* Hardware Check */
+.c-hardware-box {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.c-sys-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.c-sys-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.c-sys-status {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 999px;
+}
+
+.c-sys-status.ok { background: rgba(16, 185, 129, 0.15); color: #10B981; }
+.c-sys-status.warn { background: rgba(245, 158, 11, 0.15); color: #F59E0B; }
+.c-sys-status.fail { background: rgba(239, 68, 68, 0.15); color: #EF4444; }
+
+/* ── Bottom Area ── */
+.c-interview-bottom {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.c-interview-meta {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+}
+
+.c-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.c-meta-label {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.c-meta-value {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.c-start-btn {
+    background: #3B82F6;
+    color: white;
+    padding: 14px 32px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.c-start-btn:hover {
+    background: #2563EB;
+    box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+}
+
+/* ── Active Interview UI ── */
+.c-active-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+}
+
+.c-pulse-ring {
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    background: rgba(59, 130, 246, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: pulse 2s infinite;
+}
+
+.c-mic-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: #3B82F6;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+    70% { box-shadow: 0 0 0 40px rgba(59, 130, 246, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+    .c-interview-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+    .c-interview-bottom {
+        flex-direction: column;
+        gap: 24px;
+    }
+    
+    .c-interview-meta {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+}

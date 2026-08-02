@@ -5,6 +5,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     """
+    IntelliHire application settings.
+    Loaded automatically from the .env file.
     IntelliHire application settings loaded from the .env file.
     """
 
@@ -19,10 +21,12 @@ class Settings(BaseSettings):
     # ==========================================================
     JWT_SECRET: str
     JWT_ALGORITHM: str = "HS256"
+
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # ==========================================================
+    # AI Providers
     # AI API Keys
     # ==========================================================
     GROQ_API_KEY: str
@@ -34,8 +38,12 @@ class Settings(BaseSettings):
     # ==========================================================
     APP_NAME: str = "IntelliHire"
     APP_VERSION: str = "1.0.0"
+
     DEBUG: bool = True
 
+    # ==========================================================
+    # Environment
+    # ==========================================================
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -46,7 +54,7 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     """
-    Returns a cached instance of the application settings.
+    Return cached application settings.
     """
     return Settings()
 

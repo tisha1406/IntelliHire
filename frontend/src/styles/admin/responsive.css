@@ -1,0 +1,63 @@
+@media (max-width:992px){
+
+    .sidebar{
+
+        position:fixed;
+
+        left:0;
+
+        top:0;
+
+        z-index:1000;
+
+        transform:translateX(0);
+
+    }
+
+    .sidebar.collapsed{
+
+        transform:translateX(-100%);
+
+        width:280px;
+
+    }
+
+    .admin-content{
+
+        padding:20px;
+
+    }
+
+}
+
+@media (max-width:768px){
+
+    .topbar{
+
+        padding:0 18px;
+
+    }
+
+    .topbar-left h2{
+
+        font-size:20px;
+
+    }
+
+    .user-info{
+
+        display:none;
+
+    }
+
+}
+
+@media (max-width:576px){
+
+    .admin-content{
+
+        padding:16px;
+
+    }
+
+}
