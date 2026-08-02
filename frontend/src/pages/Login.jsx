@@ -15,6 +15,8 @@ import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../api/client";
 import { useAuthContext } from "../context/AuthContext";
 
+import { apiRequest } from "../api/client";
+import { useAuthContext } from "../context/AuthContext";
 import "../styles/login.css";
 
 export default function Login() {
@@ -72,7 +74,7 @@ export default function Login() {
                     navigate("/");
             }
 
-        } catch {
+        } catch (err) {
 
             setError("Invalid email or password.");
 
@@ -341,6 +343,29 @@ export default function Login() {
                         className="forgot-password"
                     >
                         Forgot Password?
+                        </label>
+
+                        <a href="#">
+
+                            Forgot Password?
+
+                        </a>
+
+                    {error && (
+                        <p
+                            style={{
+                                color: "#ff6b6b",
+                                marginBottom: "15px",
+                                textAlign: "center",
+                            }}
+                        >
+                            {error}
+                        </p>
+                    )}
+                    </div>
+
+                    <button disabled={loading}>
+                        {loading ? "Signing In..." : "Sign In"}
                     </button>
 
                 </div>

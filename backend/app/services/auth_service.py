@@ -26,6 +26,7 @@ class AuthService:
         email: str,
         password: str,
     ):
+
         user = await self.user_repo.get_by_email(email)
 
         if not user:
@@ -74,6 +75,10 @@ class AuthService:
             company_id=company_id,
             campaign_id=campaign_id,
             candidate_id=candidate_id,
+        access_token = create_access_token(
+            user_id=str(user["_id"]),
+            role=user["role"],
+            company_id=user.get("company_id"),
         )
 
         refresh_token = create_refresh_token()
@@ -102,3 +107,10 @@ class AuthService:
             base_response["candidate_context"] = candidate_context
 
         return base_response
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+            "role": user["role"],
+            "company_id": user.get("company_id"),
+        }

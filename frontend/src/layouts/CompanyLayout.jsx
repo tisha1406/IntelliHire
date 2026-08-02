@@ -1,17 +1,43 @@
+import { useState } from "react";
 import { Outlet } from "react-router-dom";
 
-export default function CompanyLayout() {
-    return (
-        <div
-            style={{
-                minHeight: "100vh",
-                background: "#f8fafc",
-                padding: "40px",
-            }}
-        >
-            <h1>Company Dashboard</h1>
+import CompanyNavbar from "../components/company/CompanyNavbar";
+import CompanySidebar from "../components/company/CompanySidebar";
 
-            <Outlet />
+import "../styles/company/CompanyLayout.css";
+
+function CompanyLayout() {
+
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+
+    return (
+
+        <div className="company-layout">
+
+            <CompanySidebar
+                sidebarOpen={sidebarOpen}
+                setSidebarOpen={setSidebarOpen}
+            />
+
+            <div className="company-main">
+
+                <CompanyNavbar
+                    sidebarOpen={sidebarOpen}
+                    setSidebarOpen={setSidebarOpen}
+                />
+
+                <main className="company-content">
+
+                    <Outlet />
+
+                </main>
+
+            </div>
+
         </div>
+
     );
+
 }
+
+export default CompanyLayout;

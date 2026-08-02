@@ -9,13 +9,19 @@
     "preview": "vite preview"
   },
   "dependencies": {
+<<<<<<< HEAD
     "@hookform/resolvers": "^5.4.0",
     "@tanstack/react-query": "^5.101.4",
     "@tanstack/react-query-devtools": "^5.101.4",
+=======
+    "axios": "^1.18.1",
+    "chart.js": "^4.5.1",
+>>>>>>> origin/main
     "framer-motion": "^12.23.12",
     "jwt-decode": "^4.0.0",
     "lucide-react": "^1.25.0",
     "react": "^19.1.1",
+    "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.1.1",
     "react-hook-form": "^7.82.0",
     "react-hot-toast": "^2.6.0",

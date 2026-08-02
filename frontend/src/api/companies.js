@@ -10,6 +10,7 @@ export const CompaniesAPI = {
         if (params.limit) searchParams.append("limit", params.limit);
         if (params.offset) searchParams.append("offset", params.offset);
         
+
         const qs = searchParams.toString();
         const url = `/admin/companies${qs ? `?${qs}` : ""}`;
         return await apiRequest(url, {}, token);
@@ -71,3 +72,4 @@ export const CompaniesAPI = {
         }, token);
     }
 };
+

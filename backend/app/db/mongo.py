@@ -2,6 +2,7 @@ from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from app.config.settings import settings
 
+
 client: AsyncIOMotorClient | None = None
 database: AsyncIOMotorDatabase | None = None
 

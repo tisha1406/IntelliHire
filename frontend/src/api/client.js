@@ -58,5 +58,13 @@ export async function apiRequest(
         return data.data;
     }
 
+    if (!response.ok) {
+
+        throw new Error(
+            data.detail || "Request failed"
+        );
+
+    }
+
     return data;
 }

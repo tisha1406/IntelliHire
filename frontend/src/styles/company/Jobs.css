@@ -1,0 +1,399 @@
+/* ============================================================
+   Job Openings UI
+   ============================================================ */
+
+.jobs-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    color: var(--text);
+    background-color: transparent;
+    height: 100%;
+}
+
+/* Header */
+.jobs-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: var(--space-2);
+}
+
+.jobs-header__info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.jobs-header__breadcrumb {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.jobs-header__title {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text);
+}
+
+.jobs-header__subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+/* Buttons */
+.jobs-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    height: 36px; /* Explicit height requirement */
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    width: fit-content;
+    white-space: nowrap;
+    border: 1px solid transparent;
+}
+
+.jobs-btn--primary {
+    background-color: var(--primary);
+    color: #ffffff;
+}
+
+.jobs-btn--primary:hover {
+    background-color: var(--primary-hover);
+}
+
+.jobs-btn--secondary {
+    background-color: transparent;
+    color: var(--text);
+    border-color: var(--border-strong);
+}
+
+.jobs-btn--secondary:hover {
+    background-color: var(--card-hover);
+}
+
+/* Filter Card */
+.jobs-filter-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    background-color: var(--card);
+    padding: var(--space-2);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+}
+
+.jobs-filter-card__search,
+.jobs-filter-card__select {
+    height: 40px;
+    background-color: var(--input-bg);
+    border: 1px solid var(--input-border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    padding: 0 var(--space-2);
+    font-size: 13px;
+    outline: none;
+    transition: var(--transition);
+}
+
+.jobs-filter-card__search {
+    flex: 1;
+    min-width: 250px;
+}
+
+.jobs-filter-card__select {
+    min-width: 160px;
+}
+
+.jobs-filter-card__search:focus,
+.jobs-filter-card__select:focus {
+    border-color: var(--input-border-focus);
+}
+
+/* Table */
+.jobs-table-card {
+    background-color: var(--card);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.jobs-table-wrapper {
+    overflow-x: auto;
+}
+
+.jobs-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+}
+
+.jobs-table__th {
+    padding: var(--space-2) var(--space-3);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+
+.jobs-table__th--sortable {
+    cursor: pointer;
+    user-select: none;
+}
+
+.jobs-table__th--sortable:hover {
+    color: var(--text-secondary);
+}
+
+.jobs-table__tr {
+    border-bottom: 1px solid var(--border);
+    transition: var(--transition);
+}
+
+.jobs-table__tr:last-child {
+    border-bottom: none;
+}
+
+.jobs-table__tr:hover {
+    background-color: var(--card-hover);
+}
+
+.jobs-table__td {
+    padding: 0 var(--space-3);
+    height: 56px; /* Strict requirement for compact rows */
+    font-size: 13px;
+    color: var(--text);
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.jobs-cell-title {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.jobs-cell-title__main {
+    font-weight: 500;
+    color: var(--text);
+}
+
+.jobs-cell-title__sub {
+    font-size: 11px;
+    color: var(--text-tertiary);
+}
+
+/* Status Badges */
+.jobs-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.jobs-status--active {
+    color: var(--success);
+    background-color: var(--success-muted);
+}
+
+.jobs-status--draft {
+    color: var(--text-secondary);
+    background-color: var(--border);
+}
+
+.jobs-status--closed {
+    color: var(--warning);
+    background-color: var(--warning-muted);
+}
+
+/* Action Buttons */
+.jobs-action-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.jobs-action-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    background-color: transparent;
+    color: var(--text-tertiary);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.jobs-action-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.jobs-action-btn:hover {
+    background-color: var(--border-strong);
+    color: var(--text);
+}
+
+.jobs-action-btn--delete:hover {
+    color: var(--danger);
+    border-color: var(--danger-muted);
+    background-color: var(--danger-muted);
+}
+
+/* Pagination */
+.jobs-pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-2) var(--space-3);
+    border-top: 1px solid var(--border);
+}
+
+.jobs-pagination__info {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.jobs-pagination__controls {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.jobs-pagination__btn {
+    height: 28px;
+    padding: 0 var(--space-1);
+    border-radius: var(--radius-sm);
+    background-color: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.jobs-pagination__btn:hover:not(:disabled) {
+    background-color: var(--border-strong);
+    color: var(--text);
+}
+
+.jobs-pagination__btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Empty State */
+.jobs-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 24px;
+    text-align: center;
+}
+
+.jobs-empty__icon {
+    font-size: 48px;
+    color: var(--border-strong);
+    margin-bottom: var(--space-2);
+}
+
+.jobs-empty__title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 8px;
+}
+
+.jobs-empty__desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-3);
+    max-width: 400px;
+}
+
+/* Skeleton Loader */
+.jobs-skeleton {
+    animation: skeleton-pulse 1.5s infinite ease-in-out;
+    background-color: var(--border);
+    border-radius: 4px;
+}
+
+.jobs-skeleton--text {
+    height: 16px;
+    width: 60%;
+}
+
+.jobs-skeleton--badge {
+    height: 20px;
+    width: 48px;
+    border-radius: 12px;
+}
+
+@keyframes skeleton-pulse {
+    0% { opacity: 0.5; }
+    50% { opacity: 1; }
+    100% { opacity: 0.5; }
+}
+
+/* Toast Configuration for Top-Right */
+.jobs-toast-container {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+}
+
+.jobs-toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    background-color: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
+    min-width: 300px;
+}
+
+.jobs-toast--success {
+    background-color: var(--success-muted);
+    border-color: var(--success);
+    color: var(--success);
+}
+
+.jobs-toast--error {
+    background-color: var(--danger-muted);
+    border-color: var(--danger);
+    color: var(--danger);
+}

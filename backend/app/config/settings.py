@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     """
     IntelliHire application settings.
     Loaded automatically from the .env file.
+    IntelliHire application settings loaded from the .env file.
     """
 
     # ==========================================================
@@ -26,6 +27,7 @@ class Settings(BaseSettings):
 
     # ==========================================================
     # AI Providers
+    # AI API Keys
     # ==========================================================
     GROQ_API_KEY: str
     GEMINI_API_KEY: str
