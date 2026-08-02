@@ -1,4 +1,3 @@
-export default function Campaigns() { return null; }
 import React, { useState } from "react";
 import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";

@@ -1,1 +1,3 @@
-export default function ReportView.jsx() { return null; }
+export default function ReportView() {
+    return null;
+}

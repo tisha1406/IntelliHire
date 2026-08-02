@@ -1,1 +1,3 @@
-export default function InterviewSetup.jsx() { return null; }
+export default function InterviewSetup() {
+    return null;
+}

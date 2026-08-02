@@ -1,1 +1,3 @@
-export default function ResumeUpload.jsx() { return null; }
+export default function ResumeUpload() {
+    return null;
+}
