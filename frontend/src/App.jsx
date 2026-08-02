@@ -8,6 +8,27 @@ import AdminLayout from "./layouts/AdminLayout";
 import CompanyLayout from "./layouts/CompanyLayout";
 import CandidateLayout from "./layouts/CandidateLayout";
 
+import Dashboard from "./pages/company/Dashboard";
+import Campaigns from "./pages/company/Campaigns";
+import CampaignDetail from "./pages/company/CampaignDetail";
+import NewCampaign from "./pages/company/NewCampaign";
+import Candidates from "./pages/company/Candidates";
+import CandidateReport from "./pages/company/CandidateReport";
+import CandidateDetails from "./pages/company/CandidateDetails";
+import Analytics from "./pages/company/Analytics";
+import Exports from "./pages/company/Exports";
+import Profile from "./pages/company/Profile";
+import Settings from "./pages/company/Settings";
+import Activity from "./pages/company/Activity";
+import Jobs from "./pages/company/Jobs";
+import JobForm from "./pages/company/JobForm";
+import Interviews from "./pages/company/Interviews";
+import Reports from "./pages/company/Reports";
+import Team from "./pages/company/Team";
+import Notifications from "./pages/company/Notifications";
+import RecruiterProfile from "./pages/company/RecruiterProfile";
+import EditCampaign from "./pages/company/EditCampaign";
+
 function App() {
     return (
         <Routes>
@@ -27,13 +48,125 @@ function App() {
             />
 
             <Route
-                path="/company/*"
+                path="/company"
                 element={
                     <ProtectedRoute role="company">
                         <CompanyLayout />
                     </ProtectedRoute>
                 }
-            />
+            >
+
+                <Route
+                    index
+                    element={<Dashboard />}
+                />
+
+                <Route
+                    path="dashboard"
+                    element={<Dashboard />}
+                />
+
+                <Route
+                    path="campaigns"
+                    element={<Campaigns />}
+                />
+
+                <Route
+                    path="campaigns/new"
+                    element={<NewCampaign />}
+                />
+
+                <Route
+                    path="campaigns/edit/:id"
+                    element={<EditCampaign />}
+                />
+
+                <Route
+                    path="campaigns/:id"
+                    element={<CampaignDetail />}
+                />
+
+                <Route
+                    path="candidates"
+                    element={<Candidates />}
+                />
+
+                <Route
+                    path="candidates/:id/report"
+                    element={<CandidateReport />}
+                />
+
+                <Route
+                    path="candidates/:id"
+                    element={<CandidateDetails />}
+                />
+
+                <Route
+                    path="analytics"
+                    element={<Analytics />}
+                />
+
+                <Route
+                    path="exports"
+                    element={<Exports />}
+                />
+
+                <Route
+                    path="profile"
+                    element={<Profile />}
+                />
+
+                <Route
+                    path="settings"
+                    element={<Settings />}
+                />
+
+                <Route
+                    path="activity"
+                    element={<Activity />}
+                />
+
+                <Route
+                    path="jobs"
+                    element={<Jobs />}
+                />
+
+                <Route
+                    path="jobs/new"
+                    element={<JobForm />}
+                />
+
+                <Route
+                    path="jobs/:id/edit"
+                    element={<JobForm />}
+                />
+
+                <Route
+                    path="interviews"
+                    element={<Interviews />}
+                />
+
+                <Route
+                    path="reports"
+                    element={<Reports />}
+                />
+
+                <Route
+                    path="team"
+                    element={<Team />}
+                />
+
+                <Route
+                    path="notifications"
+                    element={<Notifications />}
+                />
+
+                <Route
+                    path="recruiter"
+                    element={<RecruiterProfile />}
+                />
+
+            </Route>
 
             <Route
                 path="/candidate/*"

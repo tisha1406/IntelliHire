@@ -6,12 +6,15 @@ import {
     FaShieldAlt,
     FaChartLine,
     FaMicrophone,
+    FaArrowRight,
 } from "react-icons/fa";
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import { apiRequest } from "../api/client";
 import { useAuthContext } from "../context/AuthContext";
+
 import "../styles/login.css";
 
 export default function Login() {
@@ -21,9 +24,11 @@ export default function Login() {
     const { login } = useAuthContext();
 
     const [loading, setLoading] = useState(false);
+
     const [error, setError] = useState("");
 
     const [email, setEmail] = useState("");
+
     const [password, setPassword] = useState("");
 
     const handleLogin = async (e) => {
@@ -67,7 +72,7 @@ export default function Login() {
                     navigate("/");
             }
 
-        } catch (err) {
+        } catch {
 
             setError("Invalid email or password.");
 
@@ -83,26 +88,43 @@ export default function Login() {
 
         <div className="login-page">
 
-            <div className="background-circle one"></div>
-            <div className="background-circle two"></div>
+            <div className="background-glow glow-left"></div>
 
-            <motion.div
+            <div className="background-glow glow-right"></div>
 
-                className="left-panel"
+            <motion.section
 
-                initial={{ x: -100, opacity: 0 }}
+                className="login-left"
 
-                animate={{ x: 0, opacity: 1 }}
+                initial={{
+                    opacity:0,
+                    x:-60
+                }}
 
-                transition={{ duration: 0.8 }}
+                animate={{
+                    opacity:1,
+                    x:0
+                }}
+
+                transition={{
+                    duration:.8
+                }}
 
             >
 
-                <div className="brand">
+                <div className="brand-block">
 
-                    <FaRobot className="robot-icon"/>
+                    <div className="robot-circle">
 
-                    <h1>IntelliHire</h1>
+                        <FaRobot />
+
+                    </div>
+
+                    <h1>
+
+                        IntelliHire
+
+                    </h1>
 
                     <p>
 
@@ -112,71 +134,167 @@ export default function Login() {
 
                 </div>
 
-                <div className="features">
+                <div className="feature-list">
 
-                    <div>
+                    <motion.div
 
-                        <FaMicrophone/>
+                        whileHover={{
+                            x:8
+                        }}
 
-                        <span>Voice Interviews</span>
+                        className="feature-item"
 
-                    </div>
+                    >
 
-                    <div>
+                        <div className="feature-icon">
 
-                        <FaChartLine/>
+                            <FaMicrophone />
 
-                        <span>AI Evaluation</span>
+                        </div>
 
-                    </div>
+                        <div className="feature-content">
 
-                    <div>
+                            <h3>
 
-                        <FaShieldAlt/>
+                                Voice Interviews
 
-                        <span>Secure Authentication</span>
+                            </h3>
 
-                    </div>
+                            <span>
+
+                                Conduct AI-powered voice interviews with real-time analysis.
+
+                            </span>
+
+                        </div>
+
+                    </motion.div>
+
+                    <motion.div
+
+                        whileHover={{
+                            x:8
+                        }}
+
+                        className="feature-item"
+
+                    >
+
+                        <div className="feature-icon">
+
+                            <FaChartLine />
+
+                        </div>
+
+                        <div className="feature-content">
+
+                            <h3>
+
+                                AI Evaluation
+
+                            </h3>
+
+                            <span>
+
+                                Automated candidate scoring with intelligent insights.
+
+                            </span>
+
+                        </div>
+
+                    </motion.div>
+
+                    <motion.div
+
+                        whileHover={{
+                            x:8
+                        }}
+
+                        className="feature-item"
+
+                    >
+
+                        <div className="feature-icon">
+
+                            <FaShieldAlt />
+
+                        </div>
+
+                        <div className="feature-content">
+
+                            <h3>
+
+                                Secure Authentication
+
+                            </h3>
+
+                            <span>
+
+                                Enterprise-grade JWT authentication with encrypted sessions.
+
+                            </span>
+
+                        </div>
+
+                    </motion.div>
 
                 </div>
 
-            </motion.div>
+            </motion.section>
 
-            <motion.div
+            <motion.section
 
                 className="login-card"
 
-                initial={{ y: 60, opacity: 0 }}
+                initial={{
+                    opacity:0,
+                    y:40
+                }}
 
-                animate={{ y: 0, opacity: 1 }}
+                animate={{
+                    opacity:1,
+                    y:0
+                }}
 
-                transition={{ duration: .8 }}
+                transition={{
+                    duration:.8
+                }}
 
             >
 
-                <h2>
+                <div className="login-header">
 
-                    Welcome Back
+                    <span className="welcome-tag">
 
-                </h2>
+                        Welcome Back
 
-                <p>
+                    </span>
 
-                    Sign in to continue to IntelliHire
+                    <h2>
 
-                </p>
+                        Sign in to IntelliHire
+
+                    </h2>
+
+                    <p>
+
+                        Access your recruitment dashboard and continue hiring smarter.
+
+                    </p>
+
+                </div>
 
                 <form onSubmit={handleLogin}>
 
-                    <div className="input-box">
+                    <div className="input-group">
 
-                        <FaEnvelope/>
+                        <FaEnvelope />
 
                         <input
 
                             type="email"
 
-                            placeholder="Email"
+                            placeholder="Email Address"
 
                             value={email}
 
@@ -188,9 +306,9 @@ export default function Login() {
 
                     </div>
 
-                    <div className="input-box">
+                    <div className="input-group">
 
-                        <FaLock/>
+                        <FaLock />
 
                         <input
 
@@ -208,65 +326,150 @@ export default function Login() {
 
                     </div>
 
-                    <div className="remember">
+                    <div className="login-options">
 
-                        <label>
+                                            <label className="remember-me">
 
-                            <input type="checkbox"/>
+                        <input type="checkbox" />
 
-                            Remember Me
+                        <span>Remember Me</span>
 
-                        </label>
+                    </label>
 
-                        <a href="#">
-
-                            Forgot Password?
-
-                        </a>
-
-                    {error && (
-                        <p
-                            style={{
-                                color: "#ff6b6b",
-                                marginBottom: "15px",
-                                textAlign: "center",
-                            }}
-                        >
-                            {error}
-                        </p>
-                    )}
-                    </div>
-
-                    <button disabled={loading}>
-                        {loading ? "Signing In..." : "Sign In"}
+                    <button
+                        type="button"
+                        className="forgot-password"
+                    >
+                        Forgot Password?
                     </button>
-
-                </form>
-
-                <small>
-
-                    Protected by JWT Authentication
-
-                </small>
-
-                <div className="login-help">
-
-                    <div className="help-card">
-
-                        <h4>🎤 Candidate</h4>
-
-                        <p>
-                            Use the interview invitation link shared by the recruiter.
-                        </p>
-
-                    </div>
 
                 </div>
 
-            </motion.div>
+                {error && (
 
-        </div>
+                    <div className="login-error">
 
-    );
+                        {error}
+
+                    </div>
+
+                )}
+
+                <button
+
+                    type="submit"
+
+                    className="login-button"
+
+                    disabled={loading}
+
+                >
+
+                    {loading ? (
+
+                        "Signing In..."
+
+                    ) : (
+
+                        <>
+
+                            <span>Sign In</span>
+
+                            <FaArrowRight />
+
+                        </>
+
+                    )}
+
+                </button>
+
+                <button
+                    type="button"
+                    className="login-button"
+                    style={{
+                        marginTop: 12,
+                        background: "linear-gradient(135deg, #10B981 0%, #3B82F6 100%)",
+                        boxShadow: "0 4px 12px rgba(16,185,129,0.3)"
+                    }}
+                    onClick={async () => {
+                        console.log("Demo Login clicked");
+                        console.log("Sending login request...");
+                        setLoading(true);
+                        setError("");
+                        try {
+                            const response = await apiRequest("/api/auth/login", {
+                                method: "POST",
+                                body: JSON.stringify({
+                                    email: "candidate@intellihire.dev",
+                                    password: "TestCandidate123!",
+                                }),
+                            });
+                            console.log("Login response received");
+                            console.log("JWT received", response.access_token);
+                            console.log("Saving authentication");
+                            login(response.access_token);
+                            console.log("Redirecting");
+                            navigate("/candidate");
+                        } catch (err) {
+                            console.error("Login failed:", err);
+                            setError(err.message || "Invalid demo credentials.");
+                        } finally {
+                            setLoading(false);
+                        }
+                    }}
+                    disabled={loading}
+                >
+                    <span>Demo Candidate Login</span>
+                    <FaArrowRight />
+                </button>
+
+            </form>
+
+            <div className="login-divider">
+
+                <span>
+
+                    Protected by JWT Authentication
+
+                </span>
+
+            </div>
+
+            <div className="login-help">
+
+                <div className="help-card">
+
+                    <div className="help-header">
+
+                        <span className="help-emoji">
+
+                            🎤
+
+                        </span>
+
+                        <h4>
+
+                            Candidate
+
+                        </h4>
+
+                    </div>
+
+                    <p>
+
+                        Use the interview invitation link shared by your recruiter to
+                        begin your AI-powered interview session.
+
+                    </p>
+
+                </div>
+
+            </div>
+
+        </motion.section>
+
+    </div>
+
+);
 
 }

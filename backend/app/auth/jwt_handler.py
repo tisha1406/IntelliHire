@@ -40,6 +40,7 @@ class TokenPayload(BaseModel):
     role: str
     company_id: str | None = None
     campaign_id: str | None = None
+    candidate_id: str | None = None
     exp: int
     iat: int
 
@@ -77,6 +78,7 @@ def create_access_token(
     role: str,
     company_id: str | None = None,
     campaign_id: str | None = None,
+    candidate_id: str | None = None,
 ) -> str:
     """
     Create a short-lived JWT access token.
@@ -93,6 +95,7 @@ def create_access_token(
         "role": role,
         "company_id": company_id,
         "campaign_id": campaign_id,
+        "candidate_id": candidate_id,
         "iat": int(now.timestamp()),
         "exp": int(expire.timestamp()),
     }

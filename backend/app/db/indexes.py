@@ -22,7 +22,7 @@ async def create_indexes():
     # Companies
     # ==========================================================
     await db.companies.create_index(
-        "contact_email",
+        "general.contact_email",
         unique=True,
         name="idx_company_email_unique",
     )
@@ -108,4 +108,4 @@ async def create_indexes():
         name="idx_validator_turn",
     )
 
-    print("✅ MongoDB indexes created.")
+    print("MongoDB indexes created.")

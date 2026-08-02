@@ -1,0 +1,493 @@
+/* ==========================================================
+   INTELLIHIRE — CANDIDATE SIDEBAR
+========================================================== */
+
+.c-sidebar {
+    width: 260px;
+    height: 100vh;
+    background: var(--card);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.c-sidebar.collapsed {
+    width: 80px;
+}
+
+/* ── Header ── */
+.c-sidebar-header {
+    height: 72px;
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+}
+
+.c-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    overflow: hidden;
+}
+
+.c-brand-logo {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 700;
+    flex-shrink: 0;
+    transition: all 0.25s ease;
+}
+
+.c-brand-text h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+    opacity: 1;
+    transition: opacity 0.25s ease;
+}
+
+.c-sidebar.collapsed .c-brand-text h2 {
+    opacity: 0;
+    width: 0;
+}
+
+.c-sidebar.collapsed .c-brand-logo {
+    width: 44px;
+    height: 44px;
+    font-size: 20px;
+}
+
+.c-collapse-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.c-collapse-btn:hover {
+    background: var(--border);
+    color: var(--text);
+}
+
+.c-sidebar.collapsed .c-sidebar-header {
+    padding: 0;
+    justify-content: center;
+}
+
+.c-sidebar.collapsed .c-collapse-btn {
+    display: none;
+}
+
+/* ── Dividers ── */
+.c-sidebar-divider {
+    height: 1px;
+    background: var(--border);
+    width: calc(100% - 40px);
+    margin: 0 auto;
+    flex-shrink: 0;
+}
+
+.c-sidebar.collapsed .c-sidebar-divider {
+    width: 48px;
+    margin: 0 auto;
+}
+
+/* ── Company Widget ── */
+.c-sidebar-company {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.c-company-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border);
+    transition: all 0.25s ease;
+    overflow: hidden;
+}
+
+.c-company-logo {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: rgba(59, 130, 246, 0.1);
+    color: #3B82F6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.c-company-info {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    opacity: 1;
+    transition: opacity 0.25s ease;
+}
+
+.c-company-info h3 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 2px;
+}
+
+.c-company-info p {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.c-sidebar.collapsed .c-sidebar-company {
+    padding: 16px 0;
+    display: flex;
+    justify-content: center;
+}
+
+.c-sidebar.collapsed .c-company-card {
+    padding: 0;
+    border: none;
+    background: transparent;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+}
+
+.c-sidebar.collapsed .c-company-logo {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+    margin: 0;
+}
+
+.c-sidebar.collapsed .c-company-info {
+    opacity: 0;
+    width: 0;
+    display: none;
+}
+
+/* ── Scroll Area ── */
+.c-sidebar-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.c-sidebar-scroll::-webkit-scrollbar {
+    width: 0px; /* Hidden completely */
+    display: none;
+}
+.c-sidebar-scroll::-webkit-scrollbar-thumb {
+    background: transparent;
+}
+
+.c-sidebar.collapsed .c-sidebar-scroll {
+    padding: 16px 0;
+    align-items: center;
+}
+
+/* ── Navigation ── */
+.c-nav-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+}
+
+.c-nav-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    padding-left: 12px;
+    transition: opacity 0.25s ease;
+    white-space: nowrap;
+}
+
+.c-sidebar.collapsed .c-nav-title {
+    opacity: 0;
+    height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+.c-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+    height: 44px; /* Consistent height */
+}
+
+.c-sidebar.collapsed .c-nav-link {
+    justify-content: center;
+    align-items: center;
+    padding: 0;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    gap: 0; /* Remove gap in collapsed state to prevent any shifting */
+    margin: 0 auto; /* Ensure the link itself is centered within the sidebar */
+}
+
+/* Tooltip for collapsed state */
+.c-nav-link[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    left: calc(100% + 12px);
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.c-sidebar:not(.collapsed) .c-nav-link[title]:hover::after {
+    display: none;
+}
+
+.c-nav-icon {
+    flex-shrink: 0;
+    color: var(--text-muted);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 20px;
+    height: 20px;
+    opacity: 0.7; /* Inactive icons reduced opacity */
+}
+
+.c-sidebar.collapsed .c-nav-icon {
+    width: 24px;
+    height: 24px;
+    margin: 0; /* Remove any margin */
+}
+
+.c-nav-label {
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    opacity: 1;
+    transition: opacity 0.25s ease;
+}
+
+.c-sidebar.collapsed .c-nav-label {
+    opacity: 0;
+    width: 0;
+    display: none;
+}
+
+.c-nav-link:hover {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.03);
+}
+.c-nav-link:hover .c-nav-icon {
+    color: var(--text);
+    transform: scale(1.1);
+    opacity: 1;
+}
+
+/* Rounded active indicator */
+.c-nav-link.active {
+    color: #3B82F6;
+    background: rgba(59, 130, 246, 0.08);
+}
+
+.c-nav-link.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 24px;
+    width: 4px;
+    border-radius: 0 4px 4px 0;
+    background: #3B82F6;
+}
+
+.c-sidebar.collapsed .c-nav-link.active {
+    background: #3B82F6;
+    color: white;
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+}
+
+.c-sidebar.collapsed .c-nav-link.active::before {
+    display: none;
+}
+
+.c-sidebar.collapsed .c-nav-link.active .c-nav-icon {
+    color: white;
+    opacity: 1;
+}
+
+.c-nav-link.active .c-nav-icon {
+    color: #3B82F6;
+    opacity: 1;
+}
+
+.c-nav-link.active:hover {
+    background: rgba(59, 130, 246, 0.12);
+}
+
+.c-sidebar.collapsed .c-nav-link.active:hover {
+    background: #2563EB;
+}
+
+/* ── Footer ── */
+.c-sidebar-footer {
+    padding: 16px 20px;
+    flex-shrink: 0;
+}
+
+.c-user-widget {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px;
+    border-radius: 8px;
+    transition: all 0.25s ease;
+    width: 100%;
+    overflow: hidden;
+}
+
+.c-user-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #10B981, #059669);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.c-user-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    white-space: nowrap;
+    opacity: 1;
+    transition: opacity 0.25s ease;
+}
+
+.c-user-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.c-user-role {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.c-user-logout {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.c-user-logout:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: #EF4444;
+}
+
+.c-sidebar.collapsed .c-sidebar-footer {
+    padding: 16px 0;
+    display: flex;
+    justify-content: center;
+}
+
+.c-sidebar.collapsed .c-user-widget {
+    padding: 0;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    background: transparent;
+}
+
+.c-sidebar.collapsed .c-user-avatar {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+}
+
+.c-sidebar.collapsed .c-user-info,
+.c-sidebar.collapsed .c-user-logout {
+    display: none;
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+    .c-sidebar {
+        position: fixed;
+        transform: translateX(-100%);
+    }
+    .c-sidebar:not(.collapsed) {
+        transform: translateX(0);
+    }
+}

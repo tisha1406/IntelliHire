@@ -13,6 +13,10 @@ export async function apiRequest(
         ...options.headers,
     };
 
+    if (options.body instanceof FormData) {
+        delete headers["Content-Type"];
+    }
+
     if (token) {
         headers.Authorization = `Bearer ${token}`;
     }
@@ -42,12 +46,16 @@ export async function apiRequest(
 
     const data = await response.json();
 
-    if (!response.ok) {
-
+    // If HTTP error or our standard response indicates failure
+    if (!response.ok || (data.success !== undefined && !data.success)) {
         throw new Error(
-            data.detail || "Request failed"
+            data.message || data.detail || "Request failed"
         );
+    }
 
+    // Return the inner data from the standard APIResponse wrapper if present
+    if (data.success !== undefined && data.data !== undefined) {
+        return data.data;
     }
 
     return data;
