@@ -2,17 +2,18 @@
 Company User Profile endpoints.
 Allows the authenticated company-role user to read and update their own profile.
 """
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from passlib.context import CryptContext
 from pydantic import BaseModel
 
-from app.repositories.user_repository import UserRepository
-from app.rbac.permissions import require_role
 from app.auth.jwt_handler import TokenPayload
 from app.rbac.models import UserRole
+from app.rbac.permissions import require_role
+from app.repositories.company_repository import CompanyRepository
+from app.repositories.user_repository import UserRepository
 
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -22,13 +23,14 @@ router = APIRouter(
 )
 
 user_repo = UserRepository()
+company_repo = CompanyRepository()
 
 
-# ─── Schemas ──────────────────────────────────────────────────
 class ProfileResponse(BaseModel):
     id: str
     name: str
     email: str
+    company_name: str = ""
     phone: Optional[str] = ""
     location: Optional[str] = ""
     linkedin: Optional[str] = ""
@@ -54,7 +56,6 @@ class PasswordChangeRequest(BaseModel):
     confirm_password: str
 
 
-# ─── Endpoints ────────────────────────────────────────────────
 @router.get("", response_model=ProfileResponse, summary="Get Current User Profile")
 async def get_profile(
     current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
@@ -66,7 +67,16 @@ async def get_profile(
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
 
-    # Format joined date
+    company_name = ""
+    if current_user.company_id:
+        company = await company_repo.get_by_id(current_user.company_id)
+        if company:
+            company_name = (
+                company.get("company_name")
+                or company.get("general", {}).get("name", "")
+                or company.get("name", "")
+            )
+
     created = user.get("created_at")
     if isinstance(created, datetime):
         joined_date = created.strftime("%B %Y")
@@ -77,6 +87,7 @@ async def get_profile(
         id=str(user["_id"]),
         name=user.get("name", ""),
         email=user.get("email", ""),
+        company_name=company_name,
         phone=user.get("phone", ""),
         location=user.get("location", ""),
         linkedin=user.get("linkedin", ""),
@@ -105,7 +116,6 @@ async def update_profile(
     if not success:
         raise HTTPException(status_code=404, detail="User not found.")
 
-    # Return updated profile
     return await get_profile(current_user)
 
 
@@ -121,7 +131,6 @@ async def change_password(
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
 
-    # Verify current password
     hashed = user.get("password_hash") or user.get("hashed_password") or user.get("password", "")
     if not hashed or not pwd_ctx.verify(payload.current_password, hashed):
         raise HTTPException(status_code=400, detail="Current password is incorrect.")
@@ -133,9 +142,12 @@ async def change_password(
         raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
 
     new_hash = pwd_ctx.hash(payload.new_password)
-    await user_repo.update(current_user.sub, {
-        "password_hash": new_hash,
-        "updated_at": datetime.now(UTC),
-    })
+    await user_repo.update(
+        current_user.sub,
+        {
+            "password_hash": new_hash,
+            "updated_at": datetime.now(UTC),
+        },
+    )
 
     return {"message": "Password updated successfully."}

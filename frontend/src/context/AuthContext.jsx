@@ -90,7 +90,7 @@ export function AuthProvider({ children }) {
     // Authentication
     // ==========================
 
-    const login = (accessToken, refresh = null) => {
+    const login = (accessToken, refresh = null, companyName = null) => {
 
         localStorage.setItem(
             "accessToken",
@@ -108,6 +108,10 @@ export function AuthProvider({ children }) {
 
         }
 
+        if (companyName) {
+            localStorage.setItem("companyName", companyName);
+        }
+
         setToken(accessToken);
 
     };
@@ -117,6 +121,8 @@ export function AuthProvider({ children }) {
         localStorage.removeItem("accessToken");
 
         localStorage.removeItem("refreshToken");
+
+        localStorage.removeItem("companyName");
 
         setToken(null);
 

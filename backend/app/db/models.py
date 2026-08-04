@@ -158,6 +158,7 @@ class CompanyFeatures(BaseModel):
     multilingual_support: bool = True
 
 class Company(MongoBaseModel):
+    company_name: str = ""
     general: CompanyGeneral
     subscription: CompanySubscription
     limits: CompanyLimits
