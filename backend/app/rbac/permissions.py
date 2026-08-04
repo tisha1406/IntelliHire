@@ -13,10 +13,13 @@ def require_role(*allowed_roles: UserRole):
         token: TokenPayload = Depends(decode_jwt),
     ) -> TokenPayload:
 
-        if token.role not in [role.value for role in allowed_roles]:
+        user_role_upper = token.role.upper()
+        allowed_values = [r.value.upper() for r in allowed_roles]
+
+        if user_role_upper != "SUPER_ADMIN" and user_role_upper not in allowed_values:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions",
+                detail=f"Insufficient permissions. Your role: {token.role}, Required: {allowed_values}",
             )
 
         return token

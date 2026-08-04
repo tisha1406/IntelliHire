@@ -21,7 +21,7 @@ function CompanyNavbar() {
 
     const navigate = useNavigate();
     const { toggleTheme } = useTheme();
-    const { user, logout } = useAuthContext();
+    const { user, logout, companyProfile } = useAuthContext();
 
     const [showNotifications, setShowNotifications] = useState(false);
     const [showProfile, setShowProfile] = useState(false);
@@ -64,10 +64,11 @@ function CompanyNavbar() {
     };
 
     // Derive display values from the real authenticated user
-    const displayName = user?.name || "User";
-    const displayEmail = user?.email || "";
+    const displayName = companyProfile?.company_name || user?.name || "Company";
+    const displayEmail = companyProfile?.contact_email || user?.email || "";
     const initials = displayName
         .split(" ")
+        .filter(Boolean)
         .map(n => n[0])
         .join("")
         .slice(0, 2)

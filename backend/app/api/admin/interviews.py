@@ -5,6 +5,7 @@ from app.schemas.response import APIResponse, success_response, PaginationMeta
 from app.auth.jwt_handler import TokenPayload
 from app.rbac.permissions import require_role
 from app.rbac.models import UserRole
+from app.db.mongo import serialize_mongo_doc
 
 router = APIRouter(
     prefix="/admin/interviews",
@@ -29,12 +30,10 @@ async def get_all_interviews(
     interviews = await repo.get_many(query=query, limit=limit, skip=offset)
     total = await repo.count(query)
 
-    for i in interviews:
-        i["id"] = str(i["_id"])
-        del i["_id"]
+    serialized_interviews = serialize_mongo_doc(interviews)
 
     return success_response(
-        data=interviews,
+        data=serialized_interviews,
         pagination=PaginationMeta(total=total, limit=limit, skip=offset, has_more=(offset + limit) < total),
         message="Interviews retrieved successfully."
     )
@@ -50,10 +49,9 @@ async def get_interview(
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found.")
 
-    interview["id"] = str(interview["_id"])
-    del interview["_id"]
+    serialized_interview = serialize_mongo_doc(interview)
 
-    return success_response(data=interview)
+    return success_response(data=serialized_interview)
 
 @router.get("/calendar/events", response_model=APIResponse[list[dict]])
 async def get_calendar_events(
@@ -66,12 +64,13 @@ async def get_calendar_events(
     # If we had proper dates we could filter, for now return all
     
     interviews = await repo.get_many(query=query, limit=100)
+    serialized_interviews = serialize_mongo_doc(interviews)
     
     events = []
-    for i in interviews:
+    for i in serialized_interviews:
         events.append({
-            "id": str(i["_id"]),
-            "title": i.get("title", f"Interview {str(i['_id'])[:6]}"),
+            "id": i.get("id"),
+            "title": i.get("title", f"Interview {i.get('id', '')[:6]}"),
             "start": i.get("scheduled_at", i.get("created_at")),
             "end": i.get("scheduled_at", i.get("created_at")), # mock end
             "status": i.get("status", "scheduled"),

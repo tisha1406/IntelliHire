@@ -24,6 +24,7 @@ import {
     FaPlus,
 } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuthContext } from "../../context/AuthContext";
 
 import PageHeader from "../../components/common/PageHeader";
 import StatsCard from "../../components/common/StatsCard";
@@ -80,6 +81,7 @@ const colorMap = {
 
 export default function Dashboard() {
     const navigate = useNavigate();
+    const { companyProfile } = useAuthContext();
     const [tasks, setTasks] = useState(mockTodayTasks);
 
     // Live data state
@@ -227,7 +229,7 @@ export default function Dashboard() {
             animate="show"
         >
             <PageHeader
-                title="Dashboard"
+                title={`${companyProfile?.company_name || "Company"} Dashboard`}
                 subtitle="Recruitment overview"
                 breadcrumbs={[]}
                 actions={

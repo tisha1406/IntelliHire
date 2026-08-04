@@ -1,10 +1,30 @@
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+from bson.objectid import ObjectId
 
 from app.config.settings import settings
 
 
 client: AsyncIOMotorClient | None = None
 database: AsyncIOMotorDatabase | None = None
+
+
+def serialize_mongo_doc(doc):
+    """
+    Recursively converts MongoDB ObjectId fields to strings and maps _id to id.
+    """
+    if isinstance(doc, dict):
+        new_doc = {}
+        for k, v in doc.items():
+            if k == '_id':
+                new_doc['id'] = str(v)
+            else:
+                new_doc[k] = serialize_mongo_doc(v)
+        return new_doc
+    elif isinstance(doc, list):
+        return [serialize_mongo_doc(i) for i in doc]
+    elif isinstance(doc, ObjectId):
+        return str(doc)
+    return doc
 
 
 async def connect_db():

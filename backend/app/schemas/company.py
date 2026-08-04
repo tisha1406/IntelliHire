@@ -10,7 +10,7 @@ class InterviewSettingsRequest(BaseModel):
 
 
 class CampaignCreateRequest(BaseModel):
-    company_id: str
+    company_id: Optional[str] = None
 
     name: str
     department: str

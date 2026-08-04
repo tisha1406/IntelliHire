@@ -6,6 +6,7 @@ import {
 } from "react";
 
 import { jwtDecode } from "jwt-decode";
+import profileService from "../services/company/profileService";
 
 const AuthContext = createContext();
 
@@ -20,6 +21,8 @@ export function AuthProvider({ children }) {
     );
 
     const [user, setUser] = useState(null);
+
+    const [companyProfile, setCompanyProfile] = useState(null);
 
     const [loading, setLoading] = useState(true);
 
@@ -67,6 +70,16 @@ export function AuthProvider({ children }) {
                 exp: decoded.exp,
 
             });
+
+            if (decoded.role === "company") {
+                profileService.getProfile().then(profile => {
+                    setCompanyProfile(profile);
+                }).catch(err => {
+                    console.error("Failed to fetch company profile:", err);
+                });
+            } else {
+                setCompanyProfile(null);
+            }
 
         }
 
@@ -129,6 +142,7 @@ export function AuthProvider({ children }) {
         setRefreshToken(null);
 
         setUser(null);
+        setCompanyProfile(null);
 
     };
 
@@ -161,6 +175,14 @@ export function AuthProvider({ children }) {
                 exp: decoded.exp,
 
             });
+
+            if (decoded.role === "company" && !companyProfile) {
+                profileService.getProfile().then(profile => {
+                    setCompanyProfile(profile);
+                }).catch(err => {
+                    console.error("Failed to fetch company profile:", err);
+                });
+            }
 
         }
 
@@ -197,6 +219,10 @@ export function AuthProvider({ children }) {
                 refreshToken,
 
                 user,
+
+                companyProfile,
+
+                setCompanyProfile,
 
                 loading,
 

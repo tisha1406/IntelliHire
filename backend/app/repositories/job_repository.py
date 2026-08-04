@@ -26,7 +26,7 @@ class JobRepository:
 
     async def get_many(
         self,
-        company_id: str,
+        company_id: Optional[str] = None,
         query: Optional[str] = None,
         department: Optional[str] = None,
         employment_type: Optional[str] = None,
@@ -36,7 +36,9 @@ class JobRepository:
         sort_key: str = "created_at",
         sort_order: int = -1
     ) -> tuple[List[dict], int]:
-        filter_query: Dict[str, Any] = {"company_id": ObjectId(company_id)}
+        filter_query: Dict[str, Any] = {}
+        if company_id:
+            filter_query["company_id"] = ObjectId(company_id)
 
         if query:
             filter_query["$or"] = [
@@ -59,6 +61,11 @@ class JobRepository:
         total = await self.collection.count_documents(filter_query)
         
         return jobs, total
+
+    async def count(self, filter_query: Optional[dict] = None) -> int:
+        if filter_query is None:
+            filter_query = {}
+        return await self.collection.count_documents(filter_query)
 
     async def update(self, job_id: str, update_data: dict) -> bool:
         if not ObjectId.is_valid(job_id):

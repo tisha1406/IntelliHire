@@ -1,6 +1,9 @@
 from bson import ObjectId
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, status, Depends
+from app.auth.jwt_handler import TokenPayload
+from app.rbac.models import UserRole
+from app.rbac.permissions import require_role
 
 from app.repositories.campaign_repository import CampaignRepository
 
@@ -23,13 +26,15 @@ router = APIRouter(
 )
 async def create_campaign(
     request: CampaignCreateRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
 ):
     repo = CampaignRepository()
 
     campaign = request.model_dump()
 
+    # Discard any frontend-provided company_id
     campaign["company_id"] = ObjectId(
-        request.company_id
+        current_user.sub
     )
 
     campaign["status"] = "active"
@@ -46,10 +51,12 @@ async def create_campaign(
 async def get_campaigns(
     limit: int = Query(10, ge=1),
     offset: int = Query(0, ge=0),
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
 ):
     repo = CampaignRepository()
 
     campaigns = await repo.get_many(
+        query={"company_id": ObjectId(current_user.sub)},
         limit=limit,
         skip=offset,
     )
@@ -68,6 +75,7 @@ async def get_campaigns(
 @router.get("/{campaign_id}")
 async def get_campaign(
     campaign_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
 ):
     repo = CampaignRepository()
 
@@ -75,7 +83,7 @@ async def get_campaign(
         campaign_id
     )
 
-    if not campaign:
+    if not campaign or str(campaign.get("company_id")) != current_user.sub:
         raise HTTPException(
             status_code=404,
             detail="Campaign not found.",
@@ -98,6 +106,7 @@ async def get_campaign(
 async def update_campaign(
     campaign_id: str,
     request: CampaignUpdateRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
 ):
     repo = CampaignRepository()
 
@@ -105,7 +114,7 @@ async def update_campaign(
         campaign_id
     )
 
-    if not campaign:
+    if not campaign or str(campaign.get("company_id")) != current_user.sub:
         raise HTTPException(
             status_code=404,
             detail="Campaign not found.",
@@ -135,6 +144,7 @@ async def update_campaign(
 @router.delete("/{campaign_id}")
 async def delete_campaign(
     campaign_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
 ):
     repo = CampaignRepository()
 
@@ -142,7 +152,7 @@ async def delete_campaign(
         campaign_id
     )
 
-    if not campaign:
+    if not campaign or str(campaign.get("company_id")) != current_user.sub:
         raise HTTPException(
             status_code=404,
             detail="Campaign not found.",

@@ -71,7 +71,6 @@ const handleDuplicate = async (id) => {
         const target = res.data;
 
         const payload = {
-            company_id: target.company_id,
             name: `${target.name} (Copy)`,
             department: target.department,
             location: target.location,

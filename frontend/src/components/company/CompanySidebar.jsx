@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { FaChevronLeft, FaSignOutAlt } from "react-icons/fa";
 import {
@@ -17,7 +16,6 @@ import {
     FaBuilding
 } from "react-icons/fa";
 import useAuth from "../../hooks/useAuth";
-import profileService from "../../services/company/profileService";
 
 import "../../styles/company/CompanySidebar.css";
 import "../../styles/company/overlay.css";
@@ -106,32 +104,8 @@ const menuGroups = [
 ];
 
 function CompanySidebar({ sidebarOpen, setSidebarOpen }) {
-    const { logout } = useAuth();
-    const [companyName, setCompanyName] = useState(
-        localStorage.getItem("companyName") || "Company Portal"
-    );
-
-    useEffect(() => {
-        let mounted = true;
-
-        profileService.getProfile()
-            .then((profile) => {
-                if (!mounted) return;
-
-                setCompanyName(
-                    profile?.company_name || "Company Portal"
-                );
-            })
-            .catch(() => {
-                if (mounted) {
-                    setCompanyName("Company Portal");
-                }
-            });
-
-        return () => {
-            mounted = false;
-        };
-    }, []);
+    const { logout, companyProfile } = useAuth();
+    const companyName = companyProfile?.company_name || localStorage.getItem("companyName") || "Company Portal";
 
     return (
         <>

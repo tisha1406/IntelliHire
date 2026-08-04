@@ -26,34 +26,64 @@ class AuthService:
         email: str,
         password: str,
     ):
-
+        is_company_login = False
         user = await self.user_repo.get_by_email(email)
 
+        # Ignore legacy seeded company users in the users collection
+        if user and user.get("role") == "company":
+            user = None
+
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password",
-            )
+            company = await self.company_repo.get_by_email(email)
+            if company and "credentials" in company:
+                user = company
+                is_company_login = True
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Company account not found.",
+                )
 
-        if not verify_password(
-            password,
-            user["password_hash"],
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password",
-            )
+        if is_company_login:
+            if not verify_password(password, user["credentials"]["password_hash"]):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid email or password.",
+                )
+            
+            # Check if active
+            company_status = user.get("subscription", {}).get("status") or user.get("status")
+            if company_status != "active":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Company account is inactive.\nPlease contact IntelliHire administrator.",
+                )
+            if user.get("deleted_at"):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Cannot login. Company account deleted.",
+                )
 
-        # Check if account is active
-        if not user.get("is_active", True):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Account is disabled. Contact support.",
-            )
+            role = "company"
+            company_id = str(user["_id"])
+            candidate_id = None
+        else:
+            if not verify_password(password, user["password_hash"]):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid email or password",
+                )
 
-        role = user["role"]
-        candidate_id = str(user["candidate_id"]) if user.get("candidate_id") else None
-        company_id = str(user.get("company_id")) if user.get("company_id") else None
+            if not user.get("is_active", True):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Account is disabled. Contact support.",
+                )
+
+            role = user["role"]
+            candidate_id = str(user["candidate_id"]) if user.get("candidate_id") else None
+            company_id = str(user.get("company_id")) if user.get("company_id") else None
+        
         campaign_id = None
 
         # For candidate logins: fetch campaign context
@@ -82,14 +112,23 @@ class AuthService:
         # Store refresh token hash (hashed)
         import hashlib
         refresh_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
-        await self.user_repo.store_refresh_token(
-            str(user["_id"]),
-            refresh_hash,
-        )
-
-        await self.user_repo.update_last_login(
-            str(user["_id"])
-        )
+        
+        if is_company_login:
+            await self.company_repo.store_refresh_token(
+                str(user["_id"]),
+                refresh_hash,
+            )
+            await self.company_repo.update_last_login(
+                str(user["_id"])
+            )
+        else:
+            await self.user_repo.store_refresh_token(
+                str(user["_id"]),
+                refresh_hash,
+            )
+            await self.user_repo.update_last_login(
+                str(user["_id"])
+            )
 
         base_response = {
             "access_token": access_token,
