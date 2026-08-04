@@ -38,6 +38,7 @@ class CompanyService:
         
         company_doc = data.copy()
         company_doc.update({
+            "company_name": data["general"]["name"],
             "status": "active",
             "created_at": now,
             "updated_at": now,
@@ -65,6 +66,10 @@ class CompanyService:
 
     async def update_company(self, company_id: str, data: dict, updated_by: str) -> bool:
         update_doc = data.copy()
+        if "general" in update_doc and isinstance(update_doc["general"], dict):
+            general_name = update_doc["general"].get("name")
+            if general_name:
+                update_doc["company_name"] = general_name
         update_doc["updated_at"] = datetime.now(timezone.utc).isoformat()
         update_doc["updated_by"] = updated_by
         result = await self.company_repo.update(company_id, update_doc)

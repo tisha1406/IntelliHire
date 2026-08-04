@@ -97,7 +97,17 @@ class AuthService:
             "token_type": "bearer",
             "role": role,
             "company_id": company_id,
+            "company_name": "",
         }
+
+        if role == "company" and company_id:
+            company = await self.company_repo.get_by_id(company_id)
+            if company:
+                base_response["company_name"] = (
+                    company.get("company_name")
+                    or company.get("general", {}).get("name", "")
+                    or company.get("name", "")
+                )
 
         if candidate_context:
             base_response["candidate_context"] = candidate_context

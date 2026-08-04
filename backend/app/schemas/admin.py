@@ -87,6 +87,7 @@ class CompanyUpdateResponse(BaseModel):
 
 class CompanyResponse(BaseModel):
     id: str
+    company_name: str = ""
     general: CompanyGeneralSchema
     subscription: CompanySubscriptionSchema
     limits: CompanyLimitsSchema

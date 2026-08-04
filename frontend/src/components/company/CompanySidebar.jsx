@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { FaChevronLeft, FaSignOutAlt } from "react-icons/fa";
 import {
@@ -16,6 +17,7 @@ import {
     FaBuilding
 } from "react-icons/fa";
 import useAuth from "../../hooks/useAuth";
+import profileService from "../../services/company/profileService";
 
 import "../../styles/company/CompanySidebar.css";
 import "../../styles/company/overlay.css";
@@ -105,6 +107,31 @@ const menuGroups = [
 
 function CompanySidebar({ sidebarOpen, setSidebarOpen }) {
     const { logout } = useAuth();
+    const [companyName, setCompanyName] = useState(
+        localStorage.getItem("companyName") || "Company Portal"
+    );
+
+    useEffect(() => {
+        let mounted = true;
+
+        profileService.getProfile()
+            .then((profile) => {
+                if (!mounted) return;
+
+                setCompanyName(
+                    profile?.company_name || "Company Portal"
+                );
+            })
+            .catch(() => {
+                if (mounted) {
+                    setCompanyName("Company Portal");
+                }
+            });
+
+        return () => {
+            mounted = false;
+        };
+    }, []);
 
     return (
         <>
@@ -135,7 +162,7 @@ function CompanySidebar({ sidebarOpen, setSidebarOpen }) {
                     <div className="sidebar-logo">
                         <FaRobot className="logo-icon" />
                         <div>
-                            <h2>IntelliHire</h2>
+                            <h2>{companyName}</h2>
                             <span>Company Portal</span>
                         </div>
                     </div>

@@ -55,6 +55,8 @@ export async function apiRequest(
 
     // Return the inner data from the standard APIResponse wrapper if present
     if (data.success !== undefined && data.data !== undefined) {
+        // Preserve the wrapper metadata for callers that need it, but return the
+        // inner payload so login/auth flows can read nested fields like access_token.
         return data.data;
     }
 

@@ -49,9 +49,17 @@ export default function Login() {
                 }
             );
 
-            login(response.access_token);
+            const payload = response?.data ?? response;
+            const accessToken = payload?.access_token || payload?.accessToken;
+            const companyName = payload?.company_name || payload?.companyName || null;
 
-            switch (response.role) {
+            if (!accessToken) {
+                throw new Error("No authentication token received from the server.");
+            }
+
+            login(accessToken, payload?.refresh_token || payload?.refreshToken || null, companyName);
+
+            switch (payload.role) {
 
                 case "admin":
                     navigate("/admin");
@@ -99,7 +107,15 @@ export default function Login() {
                 }),
             });
 
-            login(response.access_token);
+            const payload = response?.data ?? response;
+            const accessToken = payload?.access_token || payload?.accessToken;
+            const companyName = payload?.company_name || payload?.companyName || null;
+
+            if (!accessToken) {
+                throw new Error("No authentication token received from the server.");
+            }
+
+            login(accessToken, payload?.refresh_token || payload?.refreshToken || null, companyName);
             navigate("/candidate");
 
         } catch (err) {

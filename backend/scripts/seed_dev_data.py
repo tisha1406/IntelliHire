@@ -201,6 +201,15 @@ async def seed_companies():
         )
 
         if existing:
+            if not existing.get("company_name"):
+                await company_repo.update(
+                    str(existing["_id"]),
+                    {
+                        "company_name": existing.get("company_name")
+                        or existing.get("general", {}).get("name", "")
+                        or existing.get("name", ""),
+                    },
+                )
             print(
                 f"✓ {company['general']['name']} already exists"
             )
@@ -216,6 +225,7 @@ async def seed_companies():
 
         validated_data.update(
             {
+                "company_name": validated_data["general"]["name"],
                 "status": "active",
                 "created_at": now,
                 "updated_at": now,
