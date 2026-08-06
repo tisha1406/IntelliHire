@@ -1,6 +1,7 @@
 from datetime import datetime, UTC
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 
 from app.repositories.candidate_repository import CandidateRepository
 from app.repositories.campaign_repository import CampaignRepository
@@ -589,3 +590,35 @@ async def schedule_interview(
             await session_repo.create(session_data)
 
     return {"message": "Interview scheduled"}
+
+
+# ---------------------------------------------------------
+# REASSIGN CANDIDATE
+# ---------------------------------------------------------
+class ReassignRequest(BaseModel):
+    recruiter_id: str
+
+@router.put("/{candidate_id}/reassign", response_model=APIResponse[dict])
+async def reassign_candidate(
+    candidate_id: str,
+    request: ReassignRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+):
+    repo = CandidateRepository()
+    cand = await repo.get(candidate_id)
+    if not cand or str(cand.get("company_id")) != str(current_user.company_id):
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
+    # Verify the new recruiter belongs to the company
+    from app.repositories.recruiter_repository import RecruiterRepository
+    recruiter_repo = RecruiterRepository()
+    recruiter = await recruiter_repo.get_by_id(request.recruiter_id)
+    if not recruiter or str(recruiter.get("company_id")) != str(current_user.company_id):
+        raise HTTPException(status_code=400, detail="Recruiter not found in this company")
+
+    await repo.update(candidate_id, {
+        "assigned_recruiter_id": ObjectId(request.recruiter_id),
+        "updated_at": datetime.now(UTC)
+    })
+
+    return success_response(message="Candidate reassigned successfully")

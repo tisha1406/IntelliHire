@@ -8,6 +8,7 @@ import { PermissionsProvider } from "./context/PermissionsContext";
 import AdminLayout from "./layouts/AdminLayout";
 import CompanyLayout from "./layouts/CompanyLayout";
 import CandidateLayout from "./layouts/CandidateLayout";
+import RecruiterLayout from "./layouts/RecruiterLayout";
 
 import Dashboard from "./pages/company/Dashboard";
 import Campaigns from "./pages/company/Campaigns";
@@ -29,6 +30,16 @@ import Team from "./pages/company/Team";
 import Notifications from "./pages/company/Notifications";
 import RecruiterProfile from "./pages/company/RecruiterProfile";
 import EditCampaign from "./pages/company/EditCampaign";
+
+// Recruiter Pages
+import RecruiterDashboard from "./pages/recruiter/Dashboard";
+import RecruiterCandidates from "./pages/recruiter/MyCandidates";
+import RecruiterCampaigns from "./pages/recruiter/MyCampaigns";
+import RecruiterInterviews from "./pages/recruiter/InterviewSessions";
+import RecruiterReports from "./pages/recruiter/InterviewReports";
+import RecruiterNotifications from "./pages/recruiter/RecruiterNotifications";
+import RecruiterProfilePage from "./pages/recruiter/RecruiterProfilePage";
+import ChangePassword from "./pages/recruiter/ChangePassword";
 
 function App() {
     return (
@@ -169,6 +180,25 @@ function App() {
                     element={<RecruiterProfile />}
                 />
 
+            </Route>
+
+            <Route
+                path="/recruiter"
+                element={
+                    <ProtectedRoute role="recruiter">
+                        <RecruiterLayout />
+                    </ProtectedRoute>
+                }
+            >
+                <Route index element={<RecruiterDashboard />} />
+                <Route path="dashboard" element={<RecruiterDashboard />} />
+                <Route path="candidates" element={<RecruiterCandidates />} />
+                <Route path="campaigns" element={<RecruiterCampaigns />} />
+                <Route path="interviews" element={<RecruiterInterviews />} />
+                <Route path="reports" element={<RecruiterReports />} />
+                <Route path="notifications" element={<RecruiterNotifications />} />
+                <Route path="profile" element={<RecruiterProfilePage />} />
+                <Route path="change-password" element={<ChangePassword />} />
             </Route>
 
             <Route

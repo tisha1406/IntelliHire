@@ -75,6 +75,14 @@ export default function Login() {
                 case "candidate":
                     navigate("/candidate");
                     break;
+                    
+                case "recruiter":
+                    if (payload.must_change_password) {
+                        navigate("/recruiter/change-password");
+                    } else {
+                        navigate("/recruiter");
+                    }
+                    break;
 
                 default:
                     navigate("/");

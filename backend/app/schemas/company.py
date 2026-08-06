@@ -23,6 +23,8 @@ class CampaignCreateRequest(BaseModel):
     requirements: List[str]
 
     interview_settings: InterviewSettingsRequest
+    
+    assigned_recruiter_ids: Optional[List[str]] = None
 
 
 class CampaignUpdateRequest(BaseModel):
@@ -39,6 +41,8 @@ class CampaignUpdateRequest(BaseModel):
     interview_settings: Optional[InterviewSettingsRequest] = None
 
     status: Optional[str] = None
+    
+    assigned_recruiter_ids: Optional[List[str]] = None
 
 
 class CampaignResponse(BaseModel):

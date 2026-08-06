@@ -83,6 +83,7 @@ class AuthService:
             role = user["role"]
             candidate_id = str(user["candidate_id"]) if user.get("candidate_id") else None
             company_id = str(user.get("company_id")) if user.get("company_id") else None
+            recruiter_id = str(user.get("recruiter_id")) if role == "recruiter" else None
         
         campaign_id = None
 
@@ -105,6 +106,7 @@ class AuthService:
             company_id=company_id,
             campaign_id=campaign_id,
             candidate_id=candidate_id,
+            recruiter_id=recruiter_id if 'recruiter_id' in locals() else None,
         )
 
         refresh_token = create_refresh_token()
@@ -138,6 +140,9 @@ class AuthService:
             "company_id": company_id,
             "company_name": "",
         }
+
+        if role == "recruiter":
+            base_response["must_change_password"] = user.get("must_change_password", False)
 
         if role == "company" and company_id:
             company = await self.company_repo.get_by_id(company_id)

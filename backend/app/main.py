@@ -45,6 +45,7 @@ from app.api.company.profile import router as company_profile_router
 from app.api.company.dashboard import router as company_dashboard_router
 from app.api.company.notifications import router as company_notifications_router
 from app.api.company.platform_config import router as company_platform_config_router
+from app.api.company.recruiters import router as company_recruiters_router
 
 # ===========================
 # Authentication
@@ -58,6 +59,15 @@ from app.api.candidates import router as candidates_router
 from app.api.candidate_portal import router as candidate_portal_router
 from app.api.resume import router as resume_router
 from app.api.interview import router as interview_router
+
+# ===========================
+# Recruiter APIs
+# ===========================
+from app.api.recruiter.dashboard import router as recruiter_dashboard_router
+from app.api.recruiter.candidates import router as recruiter_candidates_router
+from app.api.recruiter.campaigns import router as recruiter_campaigns_router
+from app.api.recruiter.interviews import router as recruiter_interviews_router
+from app.api.recruiter.profile import router as recruiter_profile_router
 
 # ===========================
 # WebSocket APIs
@@ -152,6 +162,7 @@ app.include_router(company_profile_router)
 app.include_router(company_dashboard_router)
 app.include_router(company_notifications_router)
 app.include_router(company_platform_config_router)
+app.include_router(company_recruiters_router)
 
 # ---------- Authentication ----------
 app.include_router(auth_router)
@@ -161,6 +172,13 @@ app.include_router(candidates_router)
 app.include_router(candidate_portal_router)
 app.include_router(resume_router)
 app.include_router(interview_router)
+
+# ---------- Recruiter ----------
+app.include_router(recruiter_dashboard_router, prefix="/api/recruiter")
+app.include_router(recruiter_candidates_router, prefix="/api/recruiter")
+app.include_router(recruiter_campaigns_router, prefix="/api/recruiter")
+app.include_router(recruiter_interviews_router, prefix="/api/recruiter")
+app.include_router(recruiter_profile_router, prefix="/api/recruiter")
 
 # ---------- WebSockets ----------
 app.include_router(ws_router)
