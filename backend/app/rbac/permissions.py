@@ -44,3 +44,17 @@ def require_own_company(
         )
 
     return token
+
+
+def require_recruiter_scope(
+    token: TokenPayload = Depends(require_role(UserRole.RECRUITER)),
+) -> TokenPayload:
+    """
+    Ensures that the token belongs to a recruiter.
+    """
+    if not token.recruiter_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Recruiter scope missing",
+        )
+    return token
