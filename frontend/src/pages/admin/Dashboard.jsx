@@ -49,7 +49,7 @@ export default function Dashboard() {
                 <KpiCard
                     title="Companies"
                     value={isLoading ? null : (summaryCards.companies?.count || 0).toLocaleString()}
-                    change={`${summaryCards.companies?.active_count || 0} active`}
+                    change={`${summaryCards.companies?.active_count || 0} active, ${summaryCards.companies?.suspended_count || 0} suspended`}
                     icon={<Building2 size={24}/>}
                     linkTo="/admin/companies"
                     loading={isLoading}
@@ -57,7 +57,7 @@ export default function Dashboard() {
                 <KpiCard
                     title="Platform Users"
                     value={isLoading ? null : (summaryCards.platform_users?.count || 0).toLocaleString()}
-                    change={`${summaryCards.platform_users?.active_count || 0} active`}
+                    change={`${summaryCards.platform_users?.recruiters || 0} recruiters, ${summaryCards.platform_users?.candidates || 0} candidates`}
                     icon={<Users size={24}/>}
                     linkTo="/admin/users"
                     loading={isLoading}
@@ -65,17 +65,17 @@ export default function Dashboard() {
                 <KpiCard
                     title="Interviews"
                     value={isLoading ? null : (summaryCards.interviews?.count || 0).toLocaleString()}
-                    change={`${summaryCards.interviews?.active_count || 0} active now`}
+                    change={`${summaryCards.interviews?.success_rate || '0%'} avg success rate`}
                     icon={<Briefcase size={24}/>}
                     linkTo="/admin/interviews"
                     loading={isLoading}
                 />
                 <KpiCard
-                    title="Success Rate"
-                    value={isLoading ? null : summaryCards.success_rate?.count || "0%"}
-                    change="Avg completion"
+                    title="Platform Alerts"
+                    value={isLoading ? null : (summaryCards.companies?.near_limits || 0).toLocaleString()}
+                    change="Companies near usage limits"
                     icon={<TrendingUp size={24}/>}
-                    linkTo="/admin/analytics"
+                    linkTo="/admin/companies"
                     loading={isLoading}
                 />
             </StatGrid>

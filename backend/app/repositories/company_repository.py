@@ -173,3 +173,32 @@ class CompanyRepository(BaseRepository):
                 "updated_at": datetime.now(UTC),
             },
         )
+
+    # ==========================================================
+    # Phase 2: Usage and Features
+    # ==========================================================
+
+    async def update_usage(
+        self,
+        company_id: str,
+        field: str,
+        increment: int = 1,
+    ) -> bool:
+        """
+        Increment or decrement a specific usage counter.
+        Example field: 'recruiters_used', 'campaigns_used', 'candidates_used'
+        """
+        result = await self.collection.update_one(
+            {"_id": ObjectId(company_id)},
+            {"$inc": {f"usage.{field}": increment}}
+        )
+        return result.modified_count > 0
+
+    async def get_features(self, company_id: str) -> dict:
+        """
+        Retrieve feature flags for a company.
+        """
+        company = await self.get_by_id(company_id)
+        if not company:
+            return {}
+        return company.get("features", {})

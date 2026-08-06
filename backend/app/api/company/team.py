@@ -1,132 +1,224 @@
-from datetime import datetime
+"""
+Company Team Management API
+Manages the company's recruiting team by reading/writing to the `recruiters` collection.
+All endpoints require COMPANY authentication and are automatically scoped to the
+authenticated company's company_id — no frontend-provided company_id is trusted.
+
+Decision: Team Members == Recruiters. One collection, one concept.
+"""
+from datetime import datetime, timezone
 from typing import Optional, List
 
-from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
+from bson import ObjectId
+from fastapi import APIRouter, HTTPException, Query, Depends, status
+from pydantic import BaseModel, EmailStr
 
-from app.repositories.user_repository import UserRepository
+from app.auth.jwt_handler import TokenPayload
+from app.rbac.models import UserRole
+from app.rbac.permissions import require_role
+from app.repositories.recruiter_repository import RecruiterRepository
+from app.repositories.company_repository import CompanyRepository
+from app.db.mongo import serialize_mongo_doc
+from app.middleware.limits import check_limit
 
 router = APIRouter(prefix="/company/team", tags=["Company Team"])
 
-user_repo = UserRepository()
 
-INITIAL_TEAM = [
-    {"name": "Sarah Jenkins", "designation": "Director of Talent Acquisition", "department": "Human Resources", "email": "sarah.jenkins@intellihire.ai", "phone": "+1 (555) 101-2020", "role": "Admin", "status": "Active"},
-    {"name": "Dev Patel", "designation": "Lead AI Technical Recruiter", "department": "Recruitment", "email": "dev.patel@intellihire.ai", "phone": "+1 (555) 101-2021", "role": "Recruiter", "status": "Active"},
-    {"name": "Anna Kovac", "designation": "Design & Product Recruiter", "department": "Recruitment", "email": "anna.kovac@intellihire.ai", "phone": "+1 (555) 101-2022", "role": "Recruiter", "status": "Active"},
-    {"name": "Marcus Vance", "designation": "Sales & Growth Hiring Partner", "department": "Recruitment", "email": "marcus.vance@intellihire.ai", "phone": "+1 (555) 101-2023", "role": "Recruiter", "status": "Active"},
-    {"name": "Elena Rostova", "designation": "Senior Engineering Recruiter", "department": "Recruitment", "email": "elena.rostova@intellihire.ai", "phone": "+1 (555) 101-2024", "role": "Recruiter", "status": "Active"},
-    {"name": "Alex Mercer", "designation": "Head of Engineering", "department": "Engineering", "email": "alex.mercer@intellihire.ai", "phone": "+1 (555) 101-2025", "role": "Hiring Manager", "status": "Active"},
-    {"name": "Priya Nair", "designation": "VP of Product", "department": "Product", "email": "priya.nair@intellihire.ai", "phone": "+1 (555) 101-2026", "role": "Hiring Manager", "status": "Active"},
-]
-
+# ──────────────────────────────────────────────────────────────────────
+# Request / Response models
+# ──────────────────────────────────────────────────────────────────────
 
 class TeamMemberResponse(BaseModel):
     id: str
     name: str
-    designation: str
-    department: str
     email: str
-    phone: Optional[str] = ""
     role: str
+    designation: Optional[str] = ""
+    department: Optional[str] = ""
+    phone: Optional[str] = ""
     status: str
+    company_id: Optional[str] = None
+    created_at: Optional[str] = None
 
 
 class InviteMemberRequest(BaseModel):
     name: str
-    email: str
-    role: str
+    email: EmailStr
+    role: str = "recruiter"
+    designation: Optional[str] = None
+    department: Optional[str] = None
+    phone: Optional[str] = None
 
 
-async def seed_team_if_empty():
-    count = await user_repo.count({"source": "team_member"})
-    if count == 0:
-        for m in INITIAL_TEAM:
-            doc = {
-                **m,
-                "source": "team_member",
-                "created_at": datetime.utcnow()
-            }
-            await user_repo.create(doc)
+class UpdateMemberRequest(BaseModel):
+    name: Optional[str] = None
+    role: Optional[str] = None
+    designation: Optional[str] = None
+    department: Optional[str] = None
+    phone: Optional[str] = None
+    status: Optional[str] = None
 
+
+# ──────────────────────────────────────────────────────────────────────
+# Helper
+# ──────────────────────────────────────────────────────────────────────
+
+def _format_member(doc: dict) -> TeamMemberResponse:
+    created = doc.get("created_at")
+    if isinstance(created, datetime):
+        created_str = created.isoformat()
+    else:
+        created_str = str(created) if created else None
+
+    return TeamMemberResponse(
+        id=str(doc["_id"]),
+        name=doc.get("name", ""),
+        email=doc.get("email", ""),
+        role=doc.get("role", "recruiter"),
+        designation=doc.get("designation", ""),
+        department=doc.get("department", ""),
+        phone=doc.get("phone", ""),
+        status=doc.get("status", "active"),
+        company_id=doc.get("company_id"),
+        created_at=created_str,
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# GET /company/team
+# ──────────────────────────────────────────────────────────────────────
 
 @router.get("", response_model=List[TeamMemberResponse], summary="Get Team Members")
 async def get_team(
     search: Optional[str] = Query(None),
-    role: Optional[str] = Query(None)
+    role: Optional[str] = Query(None),
+    status_filter: Optional[str] = Query(None, alias="status"),
+    limit: int = Query(100, ge=1),
+    offset: int = Query(0, ge=0),
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
 ):
     """
-    Get all team members from MongoDB. Seeds initial data if empty.
+    Return all recruiters (team members) belonging to this company.
+    Filtered by company_id from JWT — not trusted from request.
     """
-    await seed_team_if_empty()
-    members = await user_repo.get_many({"source": "team_member"}, limit=200)
+    repo = RecruiterRepository()
+    query: dict = {"company_id": current_user.sub}
 
-    results = []
-    for m in members:
-        item = TeamMemberResponse(
-            id=str(m["_id"]),
-            name=m.get("name", "Unknown"),
-            designation=m.get("designation", ""),
-            department=m.get("department", ""),
-            email=m.get("email", ""),
-            phone=m.get("phone", ""),
-            role=m.get("role", "Recruiter"),
-            status=m.get("status", "Active"),
+    if search:
+        query["$or"] = [
+            {"name": {"$regex": search, "$options": "i"}},
+            {"email": {"$regex": search, "$options": "i"}},
+            {"designation": {"$regex": search, "$options": "i"}},
+        ]
+    if role:
+        query["role"] = {"$regex": f"^{role}$", "$options": "i"}
+    if status_filter:
+        query["status"] = status_filter
+
+    members = await repo.get_many(query=query, limit=limit, skip=offset)
+    return [_format_member(m) for m in members]
+
+
+# ──────────────────────────────────────────────────────────────────────
+# POST /company/team
+# ──────────────────────────────────────────────────────────────────────
+
+@router.post("", response_model=TeamMemberResponse, status_code=status.HTTP_201_CREATED, summary="Add Team Member")
+async def invite_team_member(
+    payload: InviteMemberRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+    _: TokenPayload = Depends(check_limit("max_recruiters", "recruiters_used")),
+):
+    """
+    Add a new recruiter to this company's team.
+    company_id is taken from the authenticated JWT — never from the request.
+    """
+    repo = RecruiterRepository()
+
+    # Check for duplicate email within this company
+    existing = await repo.get_by_email(payload.email)
+    if existing and existing.get("company_id") == current_user.sub:
+        raise HTTPException(
+            status_code=409,
+            detail="A team member with this email already exists in your company.",
         )
-
-        if search and search.lower() not in (
-            item.name.lower() + item.designation.lower() + item.department.lower()
-        ):
-            continue
-        if role and role.lower() != item.role.lower():
-            continue
-
-        results.append(item)
-
-    return results
-
-
-@router.post("", response_model=TeamMemberResponse, summary="Invite New Team Member")
-async def invite_team_member(payload: InviteMemberRequest):
-    """
-    Add a new team member / recruiter to the company.
-    """
-    existing = await user_repo.get_by_email(payload.email)
-    if existing and existing.get("source") == "team_member":
-        raise HTTPException(status_code=409, detail="A team member with this email already exists.")
 
     doc = {
         "name": payload.name,
         "email": payload.email,
         "role": payload.role,
-        "designation": payload.role,
-        "department": "Recruitment" if payload.role == "Recruiter" else "Management",
-        "phone": "",
-        "status": "Active",
-        "source": "team_member",
-        "created_at": datetime.utcnow()
+        "designation": payload.designation or payload.role.title(),
+        "department": payload.department or "Recruitment",
+        "phone": payload.phone or "",
+        "status": "active",
+        "company_id": current_user.sub,   # always from JWT
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
     }
 
-    inserted_id = await user_repo.create(doc)
+    inserted_id = await repo.create(doc)
+    doc["_id"] = ObjectId(inserted_id)
 
-    return TeamMemberResponse(
-        id=inserted_id,
-        name=doc["name"],
-        designation=doc["designation"],
-        department=doc["department"],
-        email=doc["email"],
-        phone=doc["phone"],
-        role=doc["role"],
-        status=doc["status"],
-    )
+    company_repo = CompanyRepository()
+    await company_repo.update_usage(current_user.sub, "recruiters_used", 1)
 
+    return _format_member(doc)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# PATCH /company/team/{member_id}
+# ──────────────────────────────────────────────────────────────────────
+
+@router.patch("/{member_id}", response_model=TeamMemberResponse, summary="Update Team Member")
+async def update_team_member(
+    member_id: str,
+    payload: UpdateMemberRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+):
+    """
+    Update a recruiter's details. Validates the recruiter belongs to this company.
+    """
+    repo = RecruiterRepository()
+    member = await repo.get_by_id(member_id)
+
+    if not member or member.get("company_id") != current_user.sub:
+        raise HTTPException(status_code=404, detail="Team member not found.")
+
+    update_data = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No fields to update.")
+
+    update_data["updated_at"] = datetime.now(timezone.utc)
+    await repo.update(member_id, update_data)
+
+    updated = await repo.get_by_id(member_id)
+    return _format_member(updated)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# DELETE /company/team/{member_id}
+# ──────────────────────────────────────────────────────────────────────
 
 @router.delete("/{member_id}", summary="Remove Team Member")
-async def remove_team_member(member_id: str):
+async def remove_team_member(
+    member_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+):
     """
-    Remove a team member from MongoDB.
+    Remove a recruiter from this company's team.
+    Validates the recruiter belongs to this company before deletion.
     """
-    deleted = await user_repo.delete(member_id)
+    repo = RecruiterRepository()
+    member = await repo.get_by_id(member_id)
+
+    if not member or member.get("company_id") != current_user.sub:
+        raise HTTPException(status_code=404, detail="Team member not found.")
+
+    deleted = await repo.delete(member_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Team member not found.")
+
+    company_repo = CompanyRepository()
+    await company_repo.update_usage(current_user.sub, "recruiters_used", -1)
+
     return {"message": "Team member removed successfully.", "id": member_id}

@@ -9,6 +9,8 @@ from app.repositories.interview_report_repository import InterviewReportReposito
 from app.rbac.permissions import require_role
 from app.auth.jwt_handler import TokenPayload
 from app.rbac.models import UserRole
+from app.middleware.limits import check_limit
+from app.repositories.company_repository import CompanyRepository
 
 from app.schemas.response import (
     APIResponse,
@@ -44,6 +46,7 @@ async def invite_candidate(
     current_user: TokenPayload = Depends(
         require_role(UserRole.COMPANY)
     ),
+    _: TokenPayload = Depends(check_limit("max_candidates", "candidates_used")),
 ):
     service = InvitationService()
 
@@ -55,6 +58,9 @@ async def invite_candidate(
             name=req.name,
             email=req.email,
         )
+
+        company_repo = CompanyRepository()
+        await company_repo.update_usage(current_user.sub, "candidates_used", 1)
 
     except HTTPException:
 
@@ -393,6 +399,7 @@ async def get_candidate(
 async def create_candidate(
     candidate: dict,
     current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+    _: TokenPayload = Depends(check_limit("max_candidates", "candidates_used")),
 ):
     repo = CandidateRepository()
     candidate["company_id"] = ObjectId(current_user.company_id)
@@ -405,6 +412,10 @@ async def create_candidate(
     candidate.setdefault("status", "Pending")
 
     cand_id = await repo.create(candidate)
+    
+    company_repo = CompanyRepository()
+    await company_repo.update_usage(current_user.sub, "candidates_used", 1)
+    
     return {
         "message": "Candidate created",
         "id": str(cand_id),
@@ -449,6 +460,10 @@ async def delete_candidate(
         raise HTTPException(status_code=404, detail="Candidate not found")
 
     await repo.delete(candidate_id)
+
+    company_repo = CompanyRepository()
+    await company_repo.update_usage(current_user.sub, "candidates_used", -1)
+
     return {"message": "Candidate deleted"}
 
 

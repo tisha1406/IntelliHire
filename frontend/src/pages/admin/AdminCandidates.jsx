@@ -48,8 +48,10 @@ export default function AdminCandidates() {
                 </div>
             )
         },
-        { title: "Company", dataIndex: "company_name", sortable: true },
-        { title: "Resume", dataIndex: "resume_status", sortable: true, render: (val) => <Badge variant={val === 'screened' ? 'success' : 'warning'}>{val?.toUpperCase()}</Badge> },
+        { title: "Company", dataIndex: "company_name", sortable: true, render: (val) => val || "—" },
+        { title: "Campaign", dataIndex: "campaign_name", sortable: true, render: (val) => val || "—" },
+        { title: "Recruiter", dataIndex: "recruiter_name", sortable: true, render: (val) => val || "—" },
+        { title: "Resume", dataIndex: "resume_status", sortable: true, render: (val) => val ? <Badge variant={val === 'screened' ? 'success' : 'warning'}>{val.toUpperCase()}</Badge> : "—" },
         {
             title: "Readiness", dataIndex: "readiness_score", sortable: true, align: "right",
             render: (val) => val ? (

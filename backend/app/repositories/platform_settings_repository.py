@@ -101,7 +101,9 @@ class PlatformSettingsRepository(BaseRepository):
                     {"id": "explainability", "name": "Explainability Engine", "enabled": True, "category": "Advanced AI"},
                     {"id": "branding", "name": "Custom Branding", "enabled": True, "category": "Customization"},
                     {"id": "api_access", "name": "API Access", "enabled": False, "category": "Developer"},
-                    {"id": "custom_questions", "name": "Custom Questions", "enabled": True, "category": "Customization"}
+                    {"id": "custom_questions", "name": "Custom Questions", "enabled": True, "category": "Customization"},
+                    {"id": "anti_cheat", "name": "Anti-Cheat Systems", "enabled": True, "category": "Security"},
+                    {"id": "resume_parser", "name": "Resume Parser", "enabled": True, "category": "Core"}
                 ],
                 "security_policies": {
                     "mfa_required": False,

@@ -101,6 +101,24 @@ async def create_recruiter(
         message="Recruiter created successfully."
     )
 
+@router.get("/stats", response_model=APIResponse[dict])
+async def get_recruiter_stats(
+    token: TokenPayload = Depends(require_role(UserRole.ADMIN))
+):
+    repo = RecruiterRepository()
+    total = await repo.count()
+    active = await repo.count({"status": "active"})
+    suspended = await repo.count({"status": "suspended"})
+    
+    return success_response(
+        data={
+            "total": total,
+            "active": active,
+            "suspended": suspended
+        },
+        message="Recruiter stats retrieved successfully."
+    )
+
 @router.get("/{recruiter_id}", response_model=APIResponse[dict])
 async def get_recruiter(
     recruiter_id: str,

@@ -70,6 +70,31 @@ export const CompaniesAPI = {
         return await apiRequest(`/admin/companies/${id}/reset-password`, {
             method: "POST"
         }, token);
+    },
+
+    getRecruiters: async (id, limit = 50, offset = 0) => {
+        const token = localStorage.getItem("accessToken");
+        return await apiRequest(`/admin/companies/${id}/recruiters?limit=${limit}&offset=${offset}`, {}, token);
+    },
+
+    getCampaigns: async (id, limit = 50, offset = 0) => {
+        const token = localStorage.getItem("accessToken");
+        return await apiRequest(`/admin/companies/${id}/campaigns?limit=${limit}&offset=${offset}`, {}, token);
+    },
+
+    getCandidates: async (id, limit = 50, offset = 0) => {
+        const token = localStorage.getItem("accessToken");
+        return await apiRequest(`/admin/companies/${id}/candidates?limit=${limit}&offset=${offset}`, {}, token);
+    },
+
+    getAuditLogs: async (id, limit = 50, offset = 0) => {
+        const token = localStorage.getItem("accessToken");
+        return await apiRequest(`/admin/companies/${id}/audit-logs?limit=${limit}&offset=${offset}`, {}, token);
+    },
+
+    getInterviews: async (id, limit = 50, offset = 0) => {
+        const token = localStorage.getItem("accessToken");
+        return await apiRequest(`/admin/companies/${id}/interviews?limit=${limit}&offset=${offset}`, {}, token);
     }
 };
 

@@ -6,6 +6,7 @@ from app.auth.jwt_handler import TokenPayload
 from app.rbac.permissions import require_role
 from app.rbac.models import UserRole
 from app.db.mongo import serialize_mongo_doc
+from app.utils.relations import RelationResolver
 
 router = APIRouter(
     prefix="/admin/interviews",
@@ -31,9 +32,12 @@ async def get_all_interviews(
     total = await repo.count(query)
 
     serialized_interviews = serialize_mongo_doc(interviews)
+    
+    resolver = RelationResolver()
+    populated_interviews = await resolver.populate(serialized_interviews)
 
     return success_response(
-        data=serialized_interviews,
+        data=populated_interviews,
         pagination=PaginationMeta(total=total, limit=limit, skip=offset, has_more=(offset + limit) < total),
         message="Interviews retrieved successfully."
     )
@@ -50,8 +54,12 @@ async def get_interview(
         raise HTTPException(status_code=404, detail="Interview not found.")
 
     serialized_interview = serialize_mongo_doc(interview)
+    
+    resolver = RelationResolver()
+    populated_interviews = await resolver.populate([serialized_interview])
+    populated_interview = populated_interviews[0] if populated_interviews else serialized_interview
 
-    return success_response(data=serialized_interview)
+    return success_response(data=populated_interview)
 
 @router.get("/calendar/events", response_model=APIResponse[list[dict]])
 async def get_calendar_events(

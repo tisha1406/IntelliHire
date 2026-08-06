@@ -10,6 +10,7 @@ import PageHeader from "../../components/common/PageHeader";
 import Button from "../../components/common/Button";
 import Toast from "../../components/common/Toast";
 import StatusBadge from "../../components/common/StatusBadge";
+import FeatureGuard from "../../components/common/FeatureGuard";
 import exportService from "../../services/company/exportService";
 
 const EXPORT_TYPES = [
@@ -145,8 +146,9 @@ export default function Exports() {
     };
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 32, animation: "fadeInPage 0.4s ease-out" }}>
-            {toast && (
+        <FeatureGuard featureName="export_reports">
+            <div style={{ display: "flex", flexDirection: "column", gap: 32, animation: "fadeInPage 0.4s ease-out" }}>
+                {toast && (
                 <Toast
                     message={toast.message}
                     type={toast.type}
@@ -333,7 +335,8 @@ export default function Exports() {
                         </table>
                     </div>
                 )}
+                </div>
             </div>
-        </div>
+        </FeatureGuard>
     );
 }

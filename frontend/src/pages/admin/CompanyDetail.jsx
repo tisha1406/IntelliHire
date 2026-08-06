@@ -16,6 +16,15 @@ export default function CompanyDetail() {
     const [error, setError] = useState(null);
     const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
 
+    // New tabs state
+    const [activeTab, setActiveTab] = useState("overview");
+    const [recruiters, setRecruiters] = useState([]);
+    const [campaigns, setCampaigns] = useState([]);
+    const [candidates, setCandidates] = useState([]);
+    const [interviews, setInterviews] = useState([]);
+    const [auditLogs, setAuditLogs] = useState([]);
+    const [tabLoading, setTabLoading] = useState(false);
+
     const fetchCompany = async () => {
         try {
             setError(null);
@@ -33,6 +42,36 @@ export default function CompanyDetail() {
     useEffect(() => {
         fetchCompany();
     }, [companyId]);
+
+    useEffect(() => {
+        const fetchTabData = async () => {
+            if (activeTab === "overview") return;
+            setTabLoading(true);
+            try {
+                if (activeTab === "recruiters" && recruiters.length === 0) {
+                    const res = await CompaniesAPI.getRecruiters(companyId);
+                    setRecruiters(res.data || res);
+                } else if (activeTab === "campaigns" && campaigns.length === 0) {
+                    const res = await CompaniesAPI.getCampaigns(companyId);
+                    setCampaigns(res.data || res);
+                } else if (activeTab === "candidates" && candidates.length === 0) {
+                    const res = await CompaniesAPI.getCandidates(companyId);
+                    setCandidates(res.data || res);
+                } else if (activeTab === "interviews" && interviews.length === 0) {
+                    const res = await CompaniesAPI.getInterviews(companyId);
+                    setInterviews(res.data || res);
+                } else if (activeTab === "auditLogs" && auditLogs.length === 0) {
+                    const res = await CompaniesAPI.getAuditLogs(companyId);
+                    setAuditLogs(res.data || res);
+                }
+            } catch (err) {
+                console.error(`Failed to load ${activeTab}:`, err);
+            } finally {
+                setTabLoading(false);
+            }
+        };
+        fetchTabData();
+    }, [activeTab, companyId]);
 
     const handleSuspend = async () => {
         try {
@@ -201,6 +240,27 @@ export default function CompanyDetail() {
                 rightContent={rightContent}
             />
 
+            {/* Tabs Navigation */}
+            <div className="cd-tabs-nav" style={{ display: 'flex', gap: '16px', borderBottom: '1px solid var(--border)', marginBottom: '24px', overflowX: 'auto', paddingBottom: '8px' }}>
+                {["overview", "recruiters", "campaigns", "candidates", "interviews", "auditLogs"].map((tab) => (
+                    <button 
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        style={{ 
+                            background: 'none', border: 'none', padding: '12px 16px', cursor: 'pointer',
+                            color: activeTab === tab ? 'var(--primary)' : 'var(--text-secondary)',
+                            borderBottom: activeTab === tab ? '2px solid var(--primary)' : '2px solid transparent',
+                            fontWeight: activeTab === tab ? '600' : '400',
+                            textTransform: 'capitalize', whiteSpace: 'nowrap'
+                        }}
+                    >
+                        {tab === "auditLogs" ? "Audit Logs" : tab}
+                    </button>
+                ))}
+            </div>
+
+            {/* Tabs Content */}
+            {activeTab === "overview" && (
             <div className="cd-grid">
                 
                 {/* KPI Cards */}
@@ -427,16 +487,136 @@ export default function CompanyDetail() {
                                 )}
                             </div>
                             <div className="cd-col-6">
-                                <h5 className="cd-feature-title">Analytics (Charts)</h5>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', color: 'var(--text-muted)', fontSize: '13px' }}>
-                                    No analytics available
-                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
             </div>
+            )}
+
+            {activeTab !== "overview" && (
+                <div className="cd-card" style={{ padding: '24px' }}>
+                    {tabLoading ? (
+                        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading...</div>
+                    ) : (
+                        <div style={{ overflowX: 'auto' }}>
+                            {activeTab === "recruiters" && (
+                                <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                                            <th style={{ padding: '12px' }}>Name</th>
+                                            <th style={{ padding: '12px' }}>Email</th>
+                                            <th style={{ padding: '12px' }}>Role</th>
+                                            <th style={{ padding: '12px' }}>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {recruiters.length > 0 ? recruiters.map((r, i) => (
+                                            <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                <td style={{ padding: '12px' }}>{r.name}</td>
+                                                <td style={{ padding: '12px' }}>{r.email}</td>
+                                                <td style={{ padding: '12px' }}><Badge>{r.role}</Badge></td>
+                                                <td style={{ padding: '12px' }}><Badge variant={r.status === 'active' ? 'success' : 'outline'}>{r.status}</Badge></td>
+                                            </tr>
+                                        )) : (<tr><td colSpan="4" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>No recruiters found.</td></tr>)}
+                                    </tbody>
+                                </table>
+                            )}
+
+                            {activeTab === "campaigns" && (
+                                <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                                            <th style={{ padding: '12px' }}>Title</th>
+                                            <th style={{ padding: '12px' }}>Department</th>
+                                            <th style={{ padding: '12px' }}>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {campaigns.length > 0 ? campaigns.map((c, i) => (
+                                            <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                <td style={{ padding: '12px' }}>{c.title}</td>
+                                                <td style={{ padding: '12px' }}>{c.department || '--'}</td>
+                                                <td style={{ padding: '12px' }}><Badge>{c.status}</Badge></td>
+                                            </tr>
+                                        )) : (<tr><td colSpan="3" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>No campaigns found.</td></tr>)}
+                                    </tbody>
+                                </table>
+                            )}
+
+                            {activeTab === "candidates" && (
+                                <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                                            <th style={{ padding: '12px' }}>Name</th>
+                                            <th style={{ padding: '12px' }}>Email</th>
+                                            <th style={{ padding: '12px' }}>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {candidates.length > 0 ? candidates.map((c, i) => (
+                                            <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                <td style={{ padding: '12px' }}>{c.full_name || c.name || '--'}</td>
+                                                <td style={{ padding: '12px' }}>{c.email || '--'}</td>
+                                                <td style={{ padding: '12px' }}><Badge>{c.status || 'unknown'}</Badge></td>
+                                            </tr>
+                                        )) : (<tr><td colSpan="3" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>No candidates found.</td></tr>)}
+                                    </tbody>
+                                </table>
+                            )}
+
+                            {activeTab === "interviews" && (
+                                <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                                            <th style={{ padding: '12px' }}>Candidate</th>
+                                            <th style={{ padding: '12px' }}>Campaign</th>
+                                            <th style={{ padding: '12px' }}>Score</th>
+                                            <th style={{ padding: '12px' }}>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {interviews.length > 0 ? interviews.map((iv, i) => (
+                                            <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                <td style={{ padding: '12px' }}>{iv.candidate_name || '--'}</td>
+                                                <td style={{ padding: '12px' }}>{iv.campaign_name || '--'}</td>
+                                                <td style={{ padding: '12px' }}>{iv.score ? `${iv.score}%` : '--'}</td>
+                                                <td style={{ padding: '12px' }}><Badge variant={iv.status === 'completed' ? 'success' : 'outline'}>{iv.status || 'unknown'}</Badge></td>
+                                            </tr>
+                                        )) : (<tr><td colSpan="4" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>No interviews found.</td></tr>)}
+                                    </tbody>
+                                </table>
+                            )}
+
+                            {activeTab === "auditLogs" && (
+                                <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                                            <th style={{ padding: '12px' }}>Action</th>
+                                            <th style={{ padding: '12px' }}>User ID</th>
+                                            <th style={{ padding: '12px' }}>Timestamp</th>
+                                            <th style={{ padding: '12px' }}>Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {auditLogs.length > 0 ? auditLogs.map((log, i) => (
+                                            <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                <td style={{ padding: '12px' }}><strong>{log.action}</strong></td>
+                                                <td style={{ padding: '12px', fontSize: '13px' }}>{log.user_id}</td>
+                                                <td style={{ padding: '12px', fontSize: '13px' }}>{new Date(log.timestamp).toLocaleString()}</td>
+                                                <td style={{ padding: '12px', fontSize: '13px', maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {log.details ? JSON.stringify(log.details) : '--'}
+                                                </td>
+                                            </tr>
+                                        )) : (<tr><td colSpan="4" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>No audit logs found.</td></tr>)}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

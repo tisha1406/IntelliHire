@@ -15,10 +15,16 @@ class DashboardService:
         """Aggregate data for the Admin Dashboard."""
         
         # 1. Welcome
+        last_login = None
+        if isinstance(admin_user, dict):
+            last_login = admin_user.get("last_login")
+        elif hasattr(admin_user, "last_login"):
+            last_login = admin_user.last_login
+
         welcome = {
-            "name": admin_user.name if hasattr(admin_user, "name") else "Admin User",
-            "role": admin_user.role if hasattr(admin_user, "role") else "SUPER_ADMIN",
-            "last_login": datetime.now(timezone.utc).isoformat()  # Mocking last login for now
+            "name": admin_user.get("name") if isinstance(admin_user, dict) else (admin_user.name if hasattr(admin_user, "name") else "Admin User"),
+            "role": admin_user.get("role") if isinstance(admin_user, dict) else (admin_user.role if hasattr(admin_user, "role") else "SUPER_ADMIN"),
+            "last_login": last_login.isoformat() if hasattr(last_login, "isoformat") else str(last_login) if last_login else None,
         }
 
         # 2. Statistics
@@ -28,7 +34,7 @@ class DashboardService:
         total_candidates = await self.candidate_repo.count()
         
         completed_interviews = await self.interview_repo.count({"status": "completed"})
-        success_rate = (completed_interviews / total_interviews * 100) if total_interviews > 0 else 97.8
+        success_rate = round(completed_interviews / total_interviews * 100, 1) if total_interviews > 0 else 0.0
         
         statistics = {
             "totalCompanies": total_companies,
@@ -39,33 +45,57 @@ class DashboardService:
 
         # 3. Summary Cards
         active_companies = await self.company_repo.count({"subscription.status": "active"})
+        suspended_companies = await self.company_repo.count({"subscription.status": "suspended"})
+        
+        # Calculate companies near limits
+        all_companies = await self.company_repo.get_many(limit=1000)
+        near_limits_count = 0
+        plans_distribution = {"Starter": 0, "Professional": 0, "Enterprise": 0}
+        
+        for c in all_companies:
+            plan = c.get("subscription", {}).get("plan", "Starter")
+            if plan in plans_distribution:
+                plans_distribution[plan] += 1
+            else:
+                plans_distribution[plan] = 1
+                
+            limits = c.get("limits", {})
+            usage = c.get("usage", {})
+            
+            if limits and usage:
+                max_rec = limits.get("max_recruiters", 1)
+                used_rec = usage.get("recruiters_used", 0)
+                if max_rec > 0 and (used_rec / max_rec) >= 0.8:
+                    near_limits_count += 1
+                    continue
+                
+                max_camp = limits.get("max_campaigns", 1)
+                used_camp = usage.get("campaigns_used", 0)
+                if max_camp > 0 and (used_camp / max_camp) >= 0.8:
+                    near_limits_count += 1
+                    continue
+        
         active_interviews = await self.interview_repo.count({"status": "in_progress"})
         
         summary_cards = {
             "companies": {
                 "count": total_companies,
                 "active_count": active_companies,
-                "trend": "+12%",
-                "status": "active"
+                "suspended_count": suspended_companies,
+                "near_limits": near_limits_count,
+                "plans": plans_distribution
             },
             "platform_users": {
                 "count": total_users,
-                "active_count": total_users, # Simplification
-                "trend": "+5%",
-                "status": "active"
+                "recruiters": await self.user_repo.count({"role": "RECRUITER"}),
+                "candidates": total_candidates,
             },
             "interviews": {
                 "count": total_interviews,
                 "active_count": active_interviews,
-                "trend": "+18%",
+                "success_rate": f"{round(success_rate, 1)}%",
                 "status": "active"
             },
-            "success_rate": {
-                "count": f"{round(success_rate, 1)}%",
-                "active_count": completed_interviews,
-                "trend": "+2%",
-                "status": "active"
-            }
         }
 
         # 4. Recent Activity
@@ -95,11 +125,16 @@ class DashboardService:
             "disk": "32%"
         }
 
-        # 6. Recruitment Pipeline
+        # 6. Recruitment Pipeline / Platform Usage
         applied_candidates = await self.candidate_repo.count({"status": "applied"})
         shortlisted_candidates = await self.candidate_repo.count({"status": "shortlisted"})
         rejected_candidates = await self.candidate_repo.count({"status": "rejected"})
         hired_candidates = await self.candidate_repo.count({"status": "hired"})
+        
+        # Calculate AI Tokens (mocking a collection query for now as we don't have token logs yet)
+        # Assuming ~4500 tokens per completed interview
+        total_ai_tokens = completed_interviews * 4500
+        total_storage_mb = total_interviews * 15 # 15MB per interview audio/video
         
         recruitment_pipeline = {
             "applications": total_candidates,
@@ -109,13 +144,16 @@ class DashboardService:
             "interview_completed": completed_interviews,
             "selected": hired_candidates,
             "rejected": rejected_candidates,
-            "hired": hired_candidates
+            "hired": hired_candidates,
+            "total_ai_tokens": total_ai_tokens,
+            "total_storage_mb": total_storage_mb
         }
 
-        # 7. Platform Usage
+        # 7. Platform Usage – real active session count from MongoDB
+        active_sessions = await self.interview_repo.count({"status": "in_progress"})
         platform_usage = {
-            "active_sessions": 120,
-            "api_requests": 14500
+            "active_sessions": active_sessions,
+            "api_requests": 0,    # No request counter collection yet; will be 0 until Phase 2
         }
 
         # 8. Charts

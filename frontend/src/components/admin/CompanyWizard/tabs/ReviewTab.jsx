@@ -17,9 +17,9 @@ export default function ReviewTab({ watch, masterConfig, isEditMode, loading, on
                     <div>
                         <h4 style={{ color: 'var(--text)', borderBottom: '1px solid var(--border)', paddingBottom: '8px', marginBottom: '12px' }}>General Information</h4>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <div><strong>Email:</strong> {formData.general?.contact_email || "N/A"}</div>
+                            <div><strong>Email:</strong> {formData.general?.contact_email || "—"}</div>
                             <div><strong>Plan:</strong> {formData.subscription?.plan}</div>
-                            <div><strong>Industry:</strong> {formData.general?.industry || "N/A"}</div>
+                            <div><strong>Industry:</strong> {formData.general?.industry || "—"}</div>
                             <div><strong>Status:</strong> {formData.subscription?.status}</div>
                         </div>
 

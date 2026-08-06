@@ -36,16 +36,12 @@ const EMPLOYMENT_TYPES = [
     { value: "Remote", label: "Remote" }
 ];
 
-const STRICTNESS_LEVELS = [
-    { value: "Low", label: "Low (Friendly guidance)" },
-    { value: "Medium", label: "Medium (Standard guidelines)" },
-    { value: "High", label: "High (Technical correctness prioritised)" },
-    { value: "Very High", label: "Very High (Strict code validation)" }
-];
+import { usePermissions } from "../../context/PermissionsContext";
 
 export default function NewCampaign() {
     const navigate = useNavigate();
     const { user, loading } = useAuthContext();
+    const { platform } = usePermissions();
     const [currentStep, setCurrentStep] = useState(0);
 
     // Form inputs state
@@ -325,16 +321,18 @@ export default function NewCampaign() {
                                     <h3>Configure AI Agent Parameters</h3>
                                     <div className="form-grid-2x">
                                         <Select
-                                            label="AI Strictness Policy"
-                                            options={STRICTNESS_LEVELS}
+                                            label="AI Strictness Policy (Difficulty)"
+                                            options={(platform?.difficulty_levels || []).map(d => ({ value: d, label: d }))}
                                             value={formData.strictness}
                                             onChange={(e) => setFormData({ ...formData, strictness: e.target.value })}
+                                            placeholder="Select strictness..."
                                         />
-                                        <Input
+                                        <Select
                                             label="Primary Interview Target"
-                                            placeholder="e.g. Technical / System / Marketing Pitch"
+                                            options={(platform?.interview_types || []).map(t => ({ value: t, label: t }))}
                                             value={formData.interviewType}
                                             onChange={(e) => setFormData({ ...formData, interviewType: e.target.value })}
+                                            placeholder="Select type..."
                                         />
                                     </div>
                                     <div className="duration-slider-section">

@@ -14,6 +14,9 @@ from app.schemas.company import (
     CampaignUpdateResponse,
 )
 
+from app.middleware.limits import check_limit
+from app.repositories.company_repository import CompanyRepository
+
 router = APIRouter(
     prefix="/company/campaigns",
     tags=["Company - Campaigns"],
@@ -27,6 +30,7 @@ router = APIRouter(
 async def create_campaign(
     request: CampaignCreateRequest,
     current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+    _: TokenPayload = Depends(check_limit("max_campaigns", "campaigns_used")),
 ):
     repo = CampaignRepository()
 
@@ -42,6 +46,9 @@ async def create_campaign(
     campaign_id = await repo.create(
         campaign
     )
+
+    company_repo = CompanyRepository()
+    await company_repo.update_usage(current_user.sub, "campaigns_used", 1)
 
     return CampaignResponse(
         campaign_id=str(campaign_id)
@@ -161,6 +168,9 @@ async def delete_campaign(
     await repo.delete(
         campaign_id
     )
+
+    company_repo = CompanyRepository()
+    await company_repo.update_usage(current_user.sub, "campaigns_used", -1)
 
     return {
         "message": "Campaign deleted successfully."

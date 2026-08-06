@@ -38,7 +38,7 @@ export default function CandidateTopbar() {
                 <div className="c-context-item">
                     <span className="c-context-label">Campaign</span>
                     <span className="c-context-value">
-                        {dashboardLoading ? "Loading..." : (dashboard?.campaign_name || "Unknown Campaign")}
+                        {dashboardLoading ? "Loading..." : (dashboard?.campaign_name || "—")}
                     </span>
                 </div>
                 
@@ -47,7 +47,7 @@ export default function CandidateTopbar() {
                 <div className="c-context-item">
                     <span className="c-context-label">Role</span>
                     <span className="c-context-value">
-                        {dashboardLoading ? "Loading..." : (dashboard?.job_position || "Unknown Role")}
+                        {dashboardLoading ? "Loading..." : (dashboard?.job_position || "—")}
                     </span>
                 </div>
 

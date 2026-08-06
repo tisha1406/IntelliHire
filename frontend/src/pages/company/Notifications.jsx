@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     FaBell, FaBriefcase, FaUser, FaCog, FaShieldAlt,
@@ -7,7 +7,7 @@ import {
 
 import PageHeader from "../../components/common/PageHeader";
 import Button from "../../components/common/Button";
-import { mockNotifications } from "../../mock/notifications";
+import notificationService from "../../services/company/notificationService";
 
 import "../../styles/company/Notifications.css";
 
@@ -31,10 +31,40 @@ const FILTERS = ["All", "recruitment", "candidate", "system", "security"];
 
 export default function Notifications() {
     const [activeFilter, setActiveFilter] = useState("All");
-    const [notifications, setNotifications] = useState(mockNotifications);
+    const [notifications, setNotifications] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [settings, setSettings] = useState(
         Object.fromEntries(NOTIF_SETTINGS.map(s => [s.key, s.defaultOn]))
     );
+
+    // Load notifications from backend on mount
+    useEffect(() => {
+        const load = async () => {
+            try {
+                const res = await notificationService.getNotifications(100, 0);
+                const raw = res.data?.data || res.data || [];
+                // Normalize backend shape to match UI shape
+                const normalized = raw.map(n => ({
+                    id: n.id || n._id,
+                    type: n.type || "system",
+                    title: n.title || "",
+                    message: n.message || "",
+                    time: n.created_at
+                        ? new Date(n.created_at).toLocaleDateString()
+                        : "",
+                    unread: !n.is_read,
+                    action: n.action || null,
+                }));
+                setNotifications(normalized);
+            } catch (err) {
+                console.error("Failed to load notifications:", err);
+                setNotifications([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+        load();
+    }, []);
 
     const filtered = notifications.filter(n =>
         activeFilter === "All" || n.type === activeFilter
@@ -46,7 +76,10 @@ export default function Notifications() {
         return acc;
     }, {});
 
-    const markAllRead = () => {
+    const markAllRead = async () => {
+        try {
+            await notificationService.markAllRead();
+        } catch { /* update locally even if API fails */ }
         setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
     };
 
@@ -55,7 +88,10 @@ export default function Notifications() {
         setNotifications(prev => prev.filter(n => n.id !== id));
     };
 
-    const markRead = (id) => {
+    const markRead = async (id) => {
+        try {
+            await notificationService.markRead(id);
+        } catch { /* update locally even if API fails */ }
         setNotifications(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n));
     };
 

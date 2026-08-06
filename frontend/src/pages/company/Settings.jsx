@@ -9,12 +9,12 @@ import {
 import PageHeader from "../../components/common/PageHeader";
 
 import "../../styles/company/Settings.css";
-
 const NAV_ITEMS = [
     { id: "general",       label: "General",         icon: <FaCog /> },
+    { id: "platform",      label: "Platform Config (Read-only)", icon: <FaShieldAlt /> },
     { id: "appearance",    label: "Appearance",       icon: <FaPalette /> },
     { id: "notifications", label: "Notifications",    icon: <FaBell /> },
-    { id: "security",      label: "Security",         icon: <FaShieldAlt /> },
+    { id: "security",      label: "Security (Read-only)", icon: <FaShieldAlt /> },
     { id: "integrations",  label: "Integrations",     icon: <FaPlug /> },
     { id: "company",       label: "Company Profile",  icon: <FaBriefcase /> },
     { id: "api",           label: "API & Webhooks",   icon: <FaKey /> },
@@ -31,7 +31,10 @@ const INTEGRATIONS = [
 /* Sections that have a save action */
 const SAVEABLE = ["general", "appearance", "notifications", "security", "company", "api"];
 
+import { usePermissions } from "../../context/PermissionsContext";
+
 export default function Settings() {
+    const { platform, security, branding } = usePermissions();
     const [activeSection, setActiveSection] = useState("general");
 
     const DEFAULTS = {
@@ -155,32 +158,66 @@ export default function Settings() {
                                 </div>
                                 <div className="setting-row">
                                     <div className="setting-row-info">
-                                        <h6>Default Language</h6>
+                                        <h6>Default Language (Admin Controlled)</h6>
                                         <p>Interface language for all users</p>
                                     </div>
-                                    <select className="settings-select">
-                                        <option>English (US)</option>
-                                        <option>English (UK)</option>
-                                        <option>German</option>
-                                        <option>French</option>
-                                    </select>
+                                    <input className="settings-input" style={{ opacity: 0.7 }} disabled value={platform?.default_language || "English"} />
                                 </div>
                                 <div className="setting-row">
                                     <div className="setting-row-info">
-                                        <h6>Time Zone</h6>
+                                        <h6>Time Zone (Admin Controlled)</h6>
                                         <p>Used for scheduling interviews and reminders</p>
                                     </div>
-                                    <select className="settings-select">
-                                        <option>UTC+05:30 – India Standard Time</option>
-                                        <option>UTC+00:00 – Greenwich Mean Time</option>
-                                        <option>UTC-05:00 – Eastern Time</option>
-                                        <option>UTC-08:00 – Pacific Time</option>
-                                    </select>
+                                    <input className="settings-input" style={{ opacity: 0.7 }} disabled value={platform?.timezone || "UTC"} />
                                 </div>
                             </div>
                         </div>
 
                         <SaveFooter />
+                    </motion.div>
+                );
+
+            /* ── PLATFORM CONFIG ─────────────────────────────────── */
+            case "platform":
+                return (
+                    <motion.div className="settings-panel" key="platform"
+                        initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}>
+
+                        <div className="settings-section">
+                            <div className="settings-section-header">
+                                <div className="settings-section-icon" style={{ background: "rgba(16,185,129,0.12)", color: "#10B981" }}><FaShieldAlt /></div>
+                                <div>
+                                    <h4>Platform Configuration</h4>
+                                    <p>Managed centrally by the Super Admin.</p>
+                                </div>
+                            </div>
+                            <div className="settings-section-body">
+                                <div className="setting-row">
+                                    <div className="setting-row-info">
+                                        <h6>Allowed AI Models</h6>
+                                    </div>
+                                    <div>{(platform?.allowed_ai_models || []).join(", ") || "None"}</div>
+                                </div>
+                                <div className="setting-row">
+                                    <div className="setting-row-info">
+                                        <h6>Allowed Interview Modes</h6>
+                                    </div>
+                                    <div>{(platform?.interview_modes || []).join(", ") || "None"}</div>
+                                </div>
+                                <div className="setting-row">
+                                    <div className="setting-row-info">
+                                        <h6>Maximum Interview Duration</h6>
+                                    </div>
+                                    <div>{platform?.max_interview_duration || 60} minutes</div>
+                                </div>
+                                <div className="setting-row">
+                                    <div className="setting-row-info">
+                                        <h6>Allowed Voices</h6>
+                                    </div>
+                                    <div>{(platform?.allowed_voices || []).join(", ") || "Default"}</div>
+                                </div>
+                            </div>
+                        </div>
                     </motion.div>
                 );
 
@@ -358,22 +395,19 @@ export default function Settings() {
                                 <div className="setting-row">
                                     <div className="setting-row-info">
                                         <h6>Two-Factor Authentication (2FA)</h6>
-                                        <p>Require OTP on every login</p>
+                                        <p>Require OTP on every login (Admin Controlled)</p>
                                     </div>
-                                    <label className="settings-toggle">
-                                        <input type="checkbox" checked={settings.twoFactor} onChange={() => toggle("twoFactor")} />
+                                    <label className="settings-toggle" style={{ opacity: 0.7 }}>
+                                        <input type="checkbox" disabled checked={security?.two_factor_required || false} />
                                         <span className="settings-toggle-slider" />
                                     </label>
                                 </div>
                                 <div className="setting-row">
                                     <div className="setting-row-info">
-                                        <h6>Auto Session Timeout (30 min)</h6>
-                                        <p>Automatically log out after 30 minutes of inactivity</p>
+                                        <h6>Auto Session Timeout (Minutes)</h6>
+                                        <p>Automatically log out after inactivity (Admin Controlled)</p>
                                     </div>
-                                    <label className="settings-toggle">
-                                        <input type="checkbox" checked={settings.sessionTimeout} onChange={() => toggle("sessionTimeout")} />
-                                        <span className="settings-toggle-slider" />
-                                    </label>
+                                    <input className="settings-input" style={{ opacity: 0.7 }} disabled value={security?.session_timeout_minutes || "Never"} />
                                 </div>
                                 <div className="setting-row">
                                     <div className="setting-row-info">

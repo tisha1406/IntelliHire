@@ -11,6 +11,7 @@ import PageHeader from "../../components/common/PageHeader";
 import Button from "../../components/common/Button";
 import StatusBadge from "../../components/common/StatusBadge";
 import Toast from "../../components/common/Toast";
+import FeatureGuard from "../../components/common/FeatureGuard";
 import reportService from "../../services/company/reportService";
 
 import "../../styles/company/Reports.css";
@@ -147,8 +148,9 @@ export default function Reports() {
     };
 
     return (
-        <div className="reports-page">
-            {toast && (
+        <FeatureGuard featureName="reports">
+            <div className="reports-page">
+                {toast && (
                 <Toast
                     message={toast.message}
                     type={toast.type}
@@ -386,5 +388,6 @@ export default function Reports() {
                 </div>
             </div>
         </div>
+        </FeatureGuard>
     );
 }

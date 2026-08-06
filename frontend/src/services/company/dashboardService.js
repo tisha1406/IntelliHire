@@ -2,50 +2,37 @@ import api from "../api";
 
 const dashboardService = {
     /**
-     * Fetch live dashboard stats: candidates, campaigns, interviews, hiring rate
+     * Fetch all dashboard data in one aggregated call.
+     * The backend endpoint /company/dashboard computes everything from MongoDB
+     * scoped to the authenticated company — no multiple round-trips needed.
      */
+    getDashboard() {
+        return api.get("/company/dashboard");
+    },
+
+    // ── Legacy individual calls kept for Analytics page compatibility ────────
+
+    /** KPI metrics (used by Analytics page) */
     getStats() {
         return api.get("/company/analytics/kpis");
     },
 
-    /**
-     * Fetch recent candidates (last 4)
-     */
-    getRecentCandidates() {
-        return api.get("/company/candidates/", { params: { limit: 4, sort: "newest" } });
-    },
-
-    /**
-     * Fetch upcoming scheduled interview sessions
-     */
-    getUpcomingInterviews() {
-        return api.get("/company/candidates/interviews", { params: { limit: 4 } });
-    },
-
-    /**
-     * Fetch hiring funnel counts for bar chart
-     */
-    getHiringFunnel() {
-        return api.get("/company/analytics/hiring-funnel");
-    },
-
-    /**
-     * Fetch monthly hiring trend for line chart
-     */
+    /** Monthly hiring trend (used by Analytics page) */
     getHiringTrend() {
         return api.get("/company/analytics/hiring-trend");
     },
 
-    /**
-     * Fetch department breakdown for doughnut chart
-     */
+    /** Hiring funnel (used by Analytics page) */
+    getHiringFunnel() {
+        return api.get("/company/analytics/hiring-funnel");
+    },
+
+    /** Department breakdown (used by Analytics page) */
     getDepartmentBreakdown() {
         return api.get("/company/analytics/department-breakdown");
     },
 
-    /**
-     * Fetch top recruiter performance data
-     */
+    /** Recruiter performance (used by Analytics page) */
     getRecruiterPerformance() {
         return api.get("/company/analytics/recruiter-performance");
     },

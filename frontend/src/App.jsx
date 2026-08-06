@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 
 import ProtectedRoute from "./routes/ProtectedRoute";
+import { PermissionsProvider } from "./context/PermissionsContext";
 
 import AdminLayout from "./layouts/AdminLayout";
 import CompanyLayout from "./layouts/CompanyLayout";
@@ -51,7 +52,9 @@ function App() {
                 path="/company"
                 element={
                     <ProtectedRoute role="company">
-                        <CompanyLayout />
+                        <PermissionsProvider>
+                            <CompanyLayout />
+                        </PermissionsProvider>
                     </ProtectedRoute>
                 }
             >

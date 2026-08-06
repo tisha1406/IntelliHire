@@ -41,7 +41,7 @@ export default function ResumeScreening() {
             title: "Candidate", dataIndex: "candidate_name", sortable: true,
             render: (val, row) => (
                 <div>
-                    <strong style={{ color: 'var(--text)', display: 'block' }}>{val || 'Unknown Candidate'}</strong>
+                    <strong style={{ color: 'var(--text)', display: 'block' }}>{val || '—'}</strong>
                     <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{row.id}</span>
                 </div>
             )

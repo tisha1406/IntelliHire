@@ -51,7 +51,7 @@ export default function AdminCandidateDetail() {
 
     return (
         <DashboardGrid>
-            <PageHeader title={titleContent} description={`${c.company_name || 'N/A'} • ${c.email}`} />
+            <PageHeader title={titleContent} description={`${c.company_name || '—'} • ${c.campaign_name || '—'} • ${c.email}`} />
 
             <StatGrid columns={4}>
                 <Card className="ih-card">
@@ -65,13 +65,13 @@ export default function AdminCandidateDetail() {
                 <Card className="ih-card">
                     <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '8px' }}>Interview Status</div>
                     <div style={{ height: '38px', display: 'flex', alignItems: 'center' }}>
-                        <Badge variant="success">{c.status?.toUpperCase() || 'N/A'}</Badge>
+                        <Badge variant="success">{c.status ? c.status.toUpperCase() : '—'}</Badge>
                     </div>
                 </Card>
                 <Card className="ih-card">
                     <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '8px' }}>Resume Status</div>
                     <div style={{ height: '38px', display: 'flex', alignItems: 'center' }}>
-                        <Badge variant="success">{c.resume_status?.toUpperCase() || 'N/A'}</Badge>
+                        <Badge variant="success">{c.resume_status ? c.resume_status.toUpperCase() : '—'}</Badge>
                     </div>
                 </Card>
             </StatGrid>
@@ -104,8 +104,10 @@ export default function AdminCandidateDetail() {
                             {[
                                 { label: 'Full Name', value: c.name },
                                 { label: 'Email', value: c.email },
-                                { label: 'Phone', value: c.phone || 'N/A' },
-                                { label: 'Company', value: c.company_name || 'N/A' },
+                                { label: 'Phone', value: c.phone || '—' },
+                                { label: 'Company', value: c.company_name || '—' },
+                                { label: 'Campaign', value: c.campaign_name || '—' },
+                                { label: 'Recruiter', value: c.recruiter_name || '—' },
                             ].map(({ label, value }) => (
                                 <div key={label}>
                                     <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>{label}</div>

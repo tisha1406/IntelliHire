@@ -42,6 +42,9 @@ from app.api.company.exports import router as exports_router
 from app.api.company.analytics import router as company_analytics_router
 from app.api.company.team import router as team_router
 from app.api.company.profile import router as company_profile_router
+from app.api.company.dashboard import router as company_dashboard_router
+from app.api.company.notifications import router as company_notifications_router
+from app.api.company.platform_config import router as company_platform_config_router
 
 # ===========================
 # Authentication
@@ -62,6 +65,8 @@ from app.api.interview import router as interview_router
 from app.api.ws import router as ws_router
 
 
+from app.db.bootstrap import bootstrap_platform
+
 # ==========================================================
 # Startup / Shutdown
 # ==========================================================
@@ -71,6 +76,9 @@ async def lifespan(app: FastAPI):
 
     await connect_db()
     await create_indexes()
+    
+    # Run Platform Bootstrap
+    await bootstrap_platform()
 
     yield
 
@@ -141,6 +149,9 @@ app.include_router(exports_router)
 app.include_router(company_analytics_router)
 app.include_router(team_router)
 app.include_router(company_profile_router)
+app.include_router(company_dashboard_router)
+app.include_router(company_notifications_router)
+app.include_router(company_platform_config_router)
 
 # ---------- Authentication ----------
 app.include_router(auth_router)

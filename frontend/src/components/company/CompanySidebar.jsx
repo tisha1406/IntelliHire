@@ -16,6 +16,7 @@ import {
     FaBuilding
 } from "react-icons/fa";
 import useAuth from "../../hooks/useAuth";
+import { usePermissions } from "../../context/PermissionsContext";
 
 import "../../styles/company/CompanySidebar.css";
 import "../../styles/company/overlay.css";
@@ -63,16 +64,19 @@ const menuGroups = [
                 title: "Hiring Analytics",
                 path: "/company/analytics",
                 icon: <FaChartBar />,
+                feature: "analytics",
             },
             {
                 title: "Reports",
                 path: "/company/reports",
                 icon: <FaFileAlt />,
+                feature: "reports",
             },
             {
                 title: "Exports",
                 path: "/company/exports",
                 icon: <FaFileExport />,
+                feature: "export_reports",
             }
         ]
     },
@@ -105,6 +109,7 @@ const menuGroups = [
 
 function CompanySidebar({ sidebarOpen, setSidebarOpen }) {
     const { logout, companyProfile } = useAuth();
+    const { hasFeature } = usePermissions();
     const companyName = companyProfile?.company_name || localStorage.getItem("companyName") || "Company Portal";
 
     return (
@@ -149,21 +154,26 @@ function CompanySidebar({ sidebarOpen, setSidebarOpen }) {
                                 <h4 className="sidebar-group-header">{group.title}</h4>
                             )}
                             <div className="sidebar-menu-list">
-                                {group.items.map((item) => (
-                                    <NavLink
-                                        key={item.title}
-                                        to={item.path}
-                                        className={({ isActive }) =>
-                                            isActive
-                                                ? "sidebar-item active"
-                                                : "sidebar-item"
-                                        }
-                                        onClick={() => setSidebarOpen(false)}
-                                    >
-                                        {item.icon}
-                                        <span>{item.title}</span>
-                                    </NavLink>
-                                ))}
+                                {group.items.map((item) => {
+                                    if (item.feature && !hasFeature(item.feature)) {
+                                        return null;
+                                    }
+                                    return (
+                                        <NavLink
+                                            key={item.title}
+                                            to={item.path}
+                                            className={({ isActive }) =>
+                                                isActive
+                                                    ? "sidebar-item active"
+                                                    : "sidebar-item"
+                                            }
+                                            onClick={() => setSidebarOpen(false)}
+                                        >
+                                            {item.icon}
+                                            <span>{item.title}</span>
+                                        </NavLink>
+                                    );
+                                })}
                             </div>
                         </div>
                     ))}

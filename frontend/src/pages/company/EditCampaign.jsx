@@ -39,17 +39,13 @@ const EMPLOYMENT_TYPES = [
     { value: "Remote", label: "Remote" }
 ];
 
-const STRICTNESS_LEVELS = [
-    { value: "Low", label: "Low (Friendly guidance)" },
-    { value: "Medium", label: "Medium (Standard guidelines)" },
-    { value: "High", label: "High (Technical correctness prioritised)" },
-    { value: "Very High", label: "Very High (Strict code validation)" }
-];
+import { usePermissions } from "../../context/PermissionsContext";
 
 export default function EditCampaign() {
     const navigate = useNavigate();
     const { id } = useParams();
     const { user, loading } = useAuthContext();
+    const { platform } = usePermissions();
 
     const [pageLoading, setPageLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
@@ -548,8 +544,8 @@ export default function EditCampaign() {
                                 <div className="form-grid-2x">
 
                                     <Select
-                                        label="AI Strictness Policy"
-                                        options={STRICTNESS_LEVELS}
+                                        label="AI Strictness Policy (Difficulty)"
+                                        options={(platform?.difficulty_levels || []).map(d => ({ value: d, label: d }))}
                                         value={formData.strictness}
                                         onChange={(e) =>
                                             setFormData({
@@ -557,11 +553,12 @@ export default function EditCampaign() {
                                                 strictness: e.target.value
                                             })
                                         }
+                                        placeholder="Select strictness..."
                                     />
 
-                                    <Input
+                                    <Select
                                         label="Interview Type"
-                                        placeholder="e.g. Technical"
+                                        options={(platform?.interview_types || []).map(t => ({ value: t, label: t }))}
                                         value={formData.interviewType}
                                         onChange={(e) =>
                                             setFormData({
@@ -569,6 +566,7 @@ export default function EditCampaign() {
                                                 interviewType: e.target.value
                                             })
                                         }
+                                        placeholder="Select type..."
                                     />
 
                                 </div>

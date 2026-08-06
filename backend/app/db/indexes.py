@@ -152,4 +152,31 @@ async def create_indexes():
         name="idx_validator_turn",
     )
 
+    # ==========================================================
+    # Company Notifications
+    # ==========================================================
+    await _safe_create_index(
+        db.company_notifications,
+        "target",
+        name="idx_notification_target",
+    )
+
+    await _safe_create_index(
+        db.company_notifications,
+        "company_id",
+        name="idx_notification_company",
+    )
+
+    await _safe_create_index(
+        db.company_notifications,
+        "created_at",
+        name="idx_notification_created",
+    )
+
+    await _safe_create_index(
+        db.company_notifications,
+        "is_read",
+        name="idx_notification_read",
+    )
+
     print("MongoDB indexes created.")

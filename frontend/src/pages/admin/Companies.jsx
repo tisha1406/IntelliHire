@@ -59,7 +59,7 @@ export default function Companies() {
             title: "Industry", 
             dataIndex: ["general", "industry"], 
             sortable: true,
-            render: (val, row) => row.general?.industry || <span style={{ color: 'var(--text-muted)' }}>N/A</span>
+            render: (val, row) => row.general?.industry || <span style={{ color: 'var(--text-muted)' }}>—</span>
         },
         { 
             title: "Plan", 
@@ -73,7 +73,7 @@ export default function Companies() {
             sortable: true,
             render: (val, row) => {
                 let variant = 'primary';
-                let displayVal = row.subscription?.status?.toUpperCase() || 'UNKNOWN';
+                let displayVal = row.subscription?.status?.toUpperCase() || '—';
                 if (row.deleted_at) {
                     variant = 'secondary';
                     displayVal = 'DELETED';

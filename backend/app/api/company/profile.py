@@ -37,6 +37,9 @@ class CompanyProfileResponse(BaseModel):
     phone: Optional[str] = None
     website: Optional[str] = None
     status: Optional[str] = None
+    features: Optional[dict] = None
+    usage: Optional[dict] = None
+    limits: Optional[dict] = None
 
 
 class ProfileUpdateRequest(BaseModel):
@@ -80,7 +83,10 @@ async def get_profile(
         contact_person=general.get("contact_person") or company.get("contact_person"),
         phone=general.get("phone") or company.get("phone"),
         website=general.get("website") or company.get("website"),
-        status=company.get("status")
+        status=company.get("status"),
+        features=company.get("features", {}),
+        usage=company.get("usage", {}),
+        limits=company.get("limits", {})
     )
 
 

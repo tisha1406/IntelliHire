@@ -42,15 +42,15 @@ export default function Interviews() {
             title: "Candidate", dataIndex: "candidate_name", sortable: true,
             render: (val, row) => (
                 <div>
-                    <strong style={{ color: 'var(--text)', display: 'block' }}>{val || 'Unknown Candidate'}</strong>
+                    <strong style={{ color: 'var(--text)', display: 'block' }}>{val || '—'}</strong>
                     <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{row.id}</span>
                 </div>
             )
         },
-        { title: "Company", dataIndex: "company_name", sortable: true },
-        { title: "Campaign", dataIndex: "campaign_title", sortable: true },
-        { title: "Mode", dataIndex: "mode", sortable: true, render: (val) => <span style={{ color: 'var(--text-secondary)' }}>{val?.toUpperCase() || 'N/A'}</span> },
-        { title: "Language", dataIndex: "language", sortable: true },
+        { title: "Company", dataIndex: "company_name", sortable: true, render: (val) => val || "—" },
+        { title: "Campaign", dataIndex: "campaign_name", sortable: true, render: (val) => val || "—" },
+        { title: "Mode", dataIndex: "mode", sortable: true, render: (val) => <span style={{ color: 'var(--text-secondary)' }}>{val ? val.toUpperCase() : '—'}</span> },
+        { title: "Language", dataIndex: "language", sortable: true, render: (val) => val || "—" },
         { title: "AI Model", dataIndex: "ai_model", sortable: true, render: (val) => val ? <code style={{ color: 'var(--primary)', background: 'var(--primary-subtle)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px' }}>{val}</code> : '—' },
         { title: "Duration", dataIndex: "duration", sortable: true, align: "right", render: (val) => val ? `${val}m` : '—' },
         { title: "Score", dataIndex: "score", sortable: true, align: "right", render: (val) => val ? <strong>{val}%</strong> : '—' },

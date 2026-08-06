@@ -158,7 +158,7 @@ export default function CampaignDetail() {
                                     icon: <FaCalendarAlt />, label: "Deadline",
                                     value: campaign.deadline
                                         ? new Date(campaign.deadline).toLocaleDateString("en-US", { day: "numeric", month: "short" })
-                                        : "N/A",
+                                        : "—",
                                     color: "#F59E0B"
                                 },
                                 { icon: <FaClock />, label: "Days Left", value: `${daysLeft}d`, color: daysLeft < 7 ? "#EF4444" : "#10B981" },
@@ -288,7 +288,7 @@ export default function CampaignDetail() {
                                                 </div>
                                             </td>
                                             <td style={{ padding: "12px 18px", fontSize: 12, color: "var(--text-secondary)" }}>
-                                                {(cand.experience || "N/A").split(" - ")[0]}
+                                                {(cand.experience || "—").split(" - ")[0]}
                                             </td>
                                             <td style={{ padding: "12px 18px" }}>
                                                 <span style={{ fontSize: 13, fontWeight: 800, color: (cand.aiMatch || 0) >= 90 ? "#10B981" : "#F59E0B" }}>

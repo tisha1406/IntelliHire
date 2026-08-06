@@ -22,9 +22,11 @@ import {
     FaBullhorn,
     FaArrowRight,
     FaPlus,
+    FaShieldAlt
 } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthContext } from "../../context/AuthContext";
+import { usePermissions } from "../../context/PermissionsContext";
 
 import PageHeader from "../../components/common/PageHeader";
 import StatsCard from "../../components/common/StatsCard";
@@ -34,12 +36,9 @@ import StatusBadge from "../../components/common/StatusBadge";
 import Badge from "../../components/common/Badge";
 import dashboardService from "../../services/company/dashboardService";
 
-// Static data: tasks + announcements (no backend for these)
-import {
-    mockTodayTasks,
-    mockAnnouncements,
-    mockHiringProgress,
-} from "../../mock/dashboard";
+// Personal task list is local-only (no backend yet)
+// We will replace this with Platform Overview
+// import { mockTodayTasks } from "../../mock/dashboard";
 
 import "../../styles/company/Dashboard.css";
 
@@ -82,15 +81,16 @@ const colorMap = {
 export default function Dashboard() {
     const navigate = useNavigate();
     const { companyProfile } = useAuthContext();
-    const [tasks, setTasks] = useState(mockTodayTasks);
+    const { subscription, limits, features, platform } = usePermissions();
 
-    // Live data state
+    // Live data state from /company/dashboard
+    const [dashboardData, setDashboardData] = useState(null);
     const [stats, setStats] = useState(null);
     const [recentCandidates, setRecentCandidates] = useState([]);
-    const [upcomingInterviews, setUpcomingInterviews] = useState([]);
+    const [recentInterviews, setRecentInterviews] = useState([]);
+    const [recentNotifications, setRecentNotifications] = useState([]);
     const [hiringTrend, setHiringTrend] = useState([]);
     const [hiringFunnel, setHiringFunnel] = useState([]);
-    const [deptBreakdown, setDeptBreakdown] = useState([]);
     const [recruiterPerf, setRecruiterPerf] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -98,37 +98,23 @@ export default function Dashboard() {
         const loadDashboard = async () => {
             setLoading(true);
             try {
-                const [
-                    kpisRes,
-                    candidatesRes,
-                    interviewsRes,
-                    trendRes,
-                    funnelRes,
-                    deptRes,
-                    recRes,
-                ] = await Promise.allSettled([
-                    dashboardService.getStats(),
-                    dashboardService.getRecentCandidates(),
-                    dashboardService.getUpcomingInterviews(),
-                    dashboardService.getHiringTrend(),
-                    dashboardService.getHiringFunnel(),
-                    dashboardService.getDepartmentBreakdown(),
-                    dashboardService.getRecruiterPerformance(),
-                ]);
+                const res = await dashboardService.getDashboard();
+                const data = res.data?.data || res.data || {};
 
-                if (kpisRes.status === "fulfilled") setStats(kpisRes.value.data);
-                if (candidatesRes.status === "fulfilled") {
-                    const data = candidatesRes.value.data;
-                    setRecentCandidates(Array.isArray(data) ? data.slice(0, 4) : (data?.candidates || []).slice(0, 4));
-                }
-                if (interviewsRes.status === "fulfilled") {
-                    const data = interviewsRes.value.data;
-                    setUpcomingInterviews(Array.isArray(data) ? data.slice(0, 4) : []);
-                }
-                if (trendRes.status === "fulfilled") setHiringTrend(trendRes.value.data || []);
-                if (funnelRes.status === "fulfilled") setHiringFunnel(funnelRes.value.data || []);
-                if (deptRes.status === "fulfilled") setDeptBreakdown(deptRes.value.data || []);
-                if (recRes.status === "fulfilled") setRecruiterPerf(recRes.value.data || []);
+                setDashboardData(data);
+                setStats(data.kpis || null);
+                setRecentCandidates(data.recent_candidates || []);
+                setRecentInterviews(data.recent_interviews || []);
+                setRecentNotifications(data.recent_notifications || []);
+                setHiringTrend(data.hiring_trend || []);
+                setHiringFunnel(data.hiring_funnel || []);
+
+                // Recruiter performance comes from analytics endpoint separately
+                try {
+                    const recRes = await dashboardService.getRecruiterPerformance();
+                    setRecruiterPerf(recRes.data?.data || recRes.data || []);
+                } catch { /* no recruiter data yet */ }
+
             } catch (err) {
                 console.error("Dashboard load error:", err);
             } finally {
@@ -138,47 +124,47 @@ export default function Dashboard() {
         loadDashboard();
     }, []);
 
-    const handleToggleTask = (taskId) => {
-        setTasks(tasks.map((t) => (t.id === taskId ? { ...t, done: !t.done } : t)));
-    };
+
+
 
     // Build live stat cards from backend KPIs
+    const kpis = stats || {};
     const statCards = stats
         ? [
             {
                 id: "stat-1", title: "Total Applications",
-                value: stats.totalApplications?.value || "—",
-                change: stats.totalApplications?.change || "",
-                icon: "campaign", positive: true
+                value: kpis.totalApplications?.value || "0",
+                change: "",
+                icon: "campaign", positive: true,
             },
             {
-                id: "stat-2", title: "Total Candidates",
-                value: stats.totalApplications?.value || "—",
-                change: stats.totalApplications?.change || "",
-                icon: "users", positive: true
+                id: "stat-2", title: "Total Interviews",
+                value: kpis.totalInterviews?.value || "0",
+                change: "",
+                icon: "robot", positive: true,
             },
             {
-                id: "stat-3", title: "Interviews Conducted",
-                value: stats.totalInterviews?.value || "—",
-                change: stats.totalInterviews?.change || "",
-                icon: "robot", positive: true
+                id: "stat-3", title: "Active Campaigns",
+                value: dashboardData?.usage?.active_campaigns ?? "0",
+                change: "",
+                icon: "users", positive: true,
             },
             {
-                id: "stat-4", title: "Offer Acceptance Rate",
-                value: stats.offerAcceptanceRate?.value || "—",
-                change: stats.offerAcceptanceRate?.change || "",
-                icon: "chart", positive: true
+                id: "stat-4", title: "Candidates Hired",
+                value: dashboardData?.usage?.hired_candidates ?? "0",
+                change: "",
+                icon: "chart", positive: true,
             },
         ]
         : [];
 
     // ─── Chart: Applications Trend (Line) ─────────────────────────────────────
     const lineData = {
-        labels: hiringTrend.length > 0 ? hiringTrend.map(d => d.month) : ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"],
+        labels: hiringTrend.length > 0 ? hiringTrend.map(d => d.month) : ["Jan","Feb","Mar","Apr","May","Jun"],
         datasets: [
             {
                 label: "Applications",
-                data: hiringTrend.length > 0 ? hiringTrend.map(d => d.applications) : [45, 72, 61, 98, 121, 140, 185],
+                data: hiringTrend.length > 0 ? hiringTrend.map(d => d.applications) : [0,0,0,0,0,0],
                 borderColor: "#3B82F6",
                 backgroundColor: "rgba(59, 130, 246, 0.12)",
                 fill: true,
@@ -190,18 +176,17 @@ export default function Dashboard() {
 
     // ─── Chart: Hiring Funnel (Bar) ─────────────────────────────────────────────
     const barData = {
-        labels: hiringFunnel.length > 0 ? hiringFunnel.map(d => d.stage) : ["Applied", "AI Screened", "Assessments", "Interviews", "Hired"],
+        labels: hiringFunnel.length > 0 ? hiringFunnel.map(d => d.stage) : ["Applied","AI Screened","Interview","Offered","Hired"],
         datasets: [
             {
                 label: "Candidates",
-                data: hiringFunnel.length > 0 ? hiringFunnel.map(d => d.count) : [850, 510, 306, 122, 38],
+                data: hiringFunnel.length > 0 ? hiringFunnel.map(d => d.count) : [0,0,0,0,0],
                 backgroundColor: [
                     "rgba(59, 130, 246, 0.8)",
                     "rgba(96, 165, 250, 0.8)",
                     "rgba(139, 92, 246, 0.8)",
                     "rgba(16, 185, 129, 0.8)",
                     "rgba(245, 158, 11, 0.8)",
-                    "rgba(236, 72, 153, 0.8)",
                 ],
                 borderWidth: 0,
                 borderRadius: 8,
@@ -209,12 +194,14 @@ export default function Dashboard() {
         ],
     };
 
-    // ─── Chart: Department Hiring (Doughnut) ────────────────────────────────────
+    // ─── Chart: Department Hiring (Doughnut) — use hiring funnel if no dept data ──
+    const doughnutLabels = hiringFunnel.length > 0 ? hiringFunnel.map(d => d.stage) : ["No Data"];
+    const doughnutValues = hiringFunnel.length > 0 ? hiringFunnel.map(d => d.count) : [1];
     const doughnutData = {
-        labels: deptBreakdown.length > 0 ? deptBreakdown.map(d => d.department) : ["Engineering", "AI & Data Science", "Product/Design", "Sales/Marketing", "HR"],
+        labels: doughnutLabels,
         datasets: [
             {
-                data: deptBreakdown.length > 0 ? deptBreakdown.map(d => d.hires) : [18, 8, 5, 6, 1],
+                data: doughnutValues,
                 backgroundColor: ["#3B82F6", "#8B5CF6", "#C084FC", "#10B981", "#F59E0B"],
                 borderWidth: 0,
             },
@@ -318,57 +305,86 @@ export default function Dashboard() {
 
             {/* Widgets */}
             <motion.div className="dashboard-widgets-grid" variants={itemVariants}>
-                {/* Tasks */}
+                {/* Platform Overview */}
                 <Card className="widget-panel">
                     <div className="widget-header">
-                        <h4><FaTasks className="widget-icon" /> Tasks</h4>
+                        <h4><FaShieldAlt className="widget-icon" /> Platform Overview</h4>
                     </div>
-                    <div className="widget-list tasks-scrollable">
-                        {tasks.map((task) => (
-                            <label key={task.id} className={`task-item-row ${task.done ? "is-done" : ""}`}>
-                                <input
-                                    type="checkbox"
-                                    checked={task.done}
-                                    onChange={() => handleToggleTask(task.id)}
-                                    className="task-checkbox"
-                                />
-                                <span className="task-text-content">
-                                    {task.task.length > 28 ? task.task.substring(0, 28) + "..." : task.task}
-                                </span>
-                                <Badge
-                                    variant={task.priority === "High" ? "danger" : task.priority === "Medium" ? "warning" : "neutral"}
-                                    className="task-priority-badge"
-                                >
-                                    {task.priority}
+                    <div className="widget-list">
+                        <div style={{ padding: "12px", borderBottom: "1px solid var(--border)", display: 'flex', justifyContent: 'space-between' }}>
+                            <div>
+                                <h5 style={{ margin: "0 0 4px 0" }}>Plan: {subscription?.plan_id?.toUpperCase() || "TRIAL"}</h5>
+                                <Badge variant={subscription?.status === "active" ? "success" : "warning"}>
+                                    {subscription?.status || "active"}
                                 </Badge>
-                            </label>
-                        ))}
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                                <span style={{ fontSize: "12px", color: "var(--text-secondary)", display: 'block' }}>Features</span>
+                                <strong>{Object.keys(features || {}).filter(k => features[k]).length} Active</strong>
+                            </div>
+                        </div>
+                        <div style={{ padding: "12px", borderBottom: "1px solid var(--border)" }}>
+                            <h5 style={{ margin: "0 0 4px 0" }}>Allowed Capabilities</h5>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: "12px", color: "var(--text-secondary)" }}>
+                                <div><strong>AI Models:</strong> {(platform?.allowed_ai_models || []).join(", ") || "Default"}</div>
+                                <div><strong>Languages:</strong> {(platform?.allowed_languages || []).join(", ") || "Default"}</div>
+                                <div><strong>Voice Models:</strong> {(platform?.allowed_voices || []).join(", ") || "Default"}</div>
+                            </div>
+                        </div>
+                        <div style={{ padding: "12px" }}>
+                            <h5 style={{ margin: "0 0 8px 0" }}>Usage vs Limits</h5>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: "12px", color: "var(--text-secondary)" }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>Recruiters</span>
+                                    <span>{dashboardData?.usage?.recruiters_used ?? 0} / {limits?.max_recruiters ?? "∞"}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>Campaigns</span>
+                                    <span>{dashboardData?.usage?.campaigns_used ?? 0} / {limits?.max_campaigns ?? "∞"}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>Candidates</span>
+                                    <span>{dashboardData?.usage?.candidates_used ?? 0} / {limits?.max_candidates ?? "∞"}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>Storage Used</span>
+                                    <span>{dashboardData?.usage?.storage_used_gb ?? "0"}GB / {limits?.storage_limit_gb ?? "∞"}GB</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </Card>
 
-                {/* Hiring Goals */}
+                {/* Hiring Goals from funnel data */}
                 <Card className="widget-panel">
                     <div className="widget-header">
-                        <h4>Hiring Goals</h4>
+                        <h4>Hiring Funnel</h4>
                     </div>
                     <div className="widget-list objectives-scroll">
-                        {mockHiringProgress.map((obj, index) => (
-                            <div key={index} className="hiring-objective-row">
-                                <div className="hiring-obj-meta">
-                                    <span className="hiring-obj-dept">{obj.department}</span>
-                                    <span className="hiring-obj-count">{obj.currentHires} / {obj.targetHires}</span>
+                        {hiringFunnel.length > 0
+                            ? hiringFunnel.map((stage, index) => (
+                                <div key={index} className="hiring-objective-row">
+                                    <div className="hiring-obj-meta">
+                                        <span className="hiring-obj-dept">{stage.stage}</span>
+                                        <span className="hiring-obj-count">{stage.count}</span>
+                                    </div>
+                                    <div className="hiring-obj-bar-bg">
+                                        <div
+                                            className="hiring-obj-bar-fill"
+                                            style={{
+                                                width: `${Math.min(stage.percentage, 100)}%`,
+                                                background: index % 2 === 0 ? "var(--primary)" : "var(--success)",
+                                            }}
+                                        />
+                                    </div>
                                 </div>
-                                <div className="hiring-obj-bar-bg">
-                                    <div
-                                        className="hiring-obj-bar-fill"
-                                        style={{
-                                            width: `${obj.progress}%`,
-                                            background: index % 2 === 0 ? "var(--primary)" : "var(--success)"
-                                        }}
-                                    />
+                            ))
+                            : (
+                                <div style={{ color: "var(--text-secondary)", fontSize: 13, padding: "12px 0" }}>
+                                    No funnel data available.
                                 </div>
-                            </div>
-                        ))}
+                            )
+                        }
                     </div>
                 </Card>
 
@@ -397,49 +413,59 @@ export default function Dashboard() {
 
             {/* Bottom: Announcements + Interviews + Candidates */}
             <motion.div className="dashboard-bottom-flex" variants={itemVariants}>
-                {/* Announcements (static) */}
+                {/* Notifications / Announcements (live from backend) */}
                 <Card className="widget-panel">
                     <div className="widget-header">
-                        <h4><FaBullhorn className="widget-icon" /> Announcements</h4>
+                        <h4><FaBullhorn className="widget-icon" /> Notifications</h4>
                     </div>
                     <div className="widget-list announcements-scroll">
-                        {mockAnnouncements.map((ann) => (
-                            <div key={ann.id} className="announcement-item-box">
-                                <div className="ann-title-line">
-                                    <h5>{ann.title}</h5>
-                                    <span>{ann.date}</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </Card>
-
-                {/* Upcoming AI Interviews (live) */}
-                <Card className="bottom-panel-item">
-                    <div className="panel-header-row">
-                        <h4>Upcoming AI Interviews</h4>
-                        <Link to="/company/interviews" className="view-all-link">
-                            Schedule Portal <FaArrowRight />
-                        </Link>
-                    </div>
-                    <div className="panel-list-view">
-                        {upcomingInterviews.length > 0
-                            ? upcomingInterviews.map((int) => (
-                                <div key={int.id || int._id} className="simple-interview-row">
-                                    <div className="interview-datetime">
-                                        <strong>{int.time || int.scheduled_time || "—"}</strong>
-                                        <span>{int.date || int.scheduled_date || "—"}</span>
+                        {recentNotifications.length > 0
+                            ? recentNotifications.map((ann) => (
+                                <div key={ann.id} className="announcement-item-box">
+                                    <div className="ann-title-line">
+                                        <h5>{ann.title}</h5>
+                                        <span>{ann.created_at ? new Date(ann.created_at).toLocaleDateString() : ""}</span>
                                     </div>
-                                    <div className="interview-details">
-                                        <h5>{int.candidate || int.candidate_name || int.name || "Candidate"}</h5>
-                                        <p>{int.position || int.role || "Position"}</p>
-                                    </div>
-                                    <StatusBadge status={int.status || "Scheduled"} />
+                                    <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>
+                                        {ann.message}
+                                    </p>
                                 </div>
                             ))
                             : (
                                 <div style={{ color: "var(--text-secondary)", fontSize: 13, padding: "12px 0" }}>
-                                    No upcoming interviews found.
+                                    No notifications yet.
+                                </div>
+                            )
+                        }
+                    </div>
+                </Card>
+
+                {/* Recent AI Interviews (live) */}
+                <Card className="bottom-panel-item">
+                    <div className="panel-header-row">
+                        <h4>Recent AI Interviews</h4>
+                        <Link to="/company/interviews" className="view-all-link">
+                            View All <FaArrowRight />
+                        </Link>
+                    </div>
+                    <div className="panel-list-view">
+                        {recentInterviews.length > 0
+                            ? recentInterviews.map((interview) => (
+                                <div key={interview.id} className="simple-interview-row">
+                                    <div className="interview-datetime">
+                                        <strong>{interview.overall_score != null ? `${interview.overall_score}%` : "—"}</strong>
+                                        <span>Score</span>
+                                    </div>
+                                    <div className="interview-details">
+                                        <h5>{interview.candidate_id || "Candidate"}</h5>
+                                        <p>{interview.status || "—"}</p>
+                                    </div>
+                                    <StatusBadge status={interview.status || "Pending"} />
+                                </div>
+                            ))
+                            : (
+                                <div style={{ color: "var(--text-secondary)", fontSize: 13, padding: "12px 0" }}>
+                                    No interviews found.
                                 </div>
                             )
                         }

@@ -37,3 +37,14 @@ class AuditLogService:
 
     async def count_logs(self) -> int:
         return await self.repo.count()
+
+    async def get_company_logs(self, company_id: str, limit: int = 50, skip: int = 0):
+        # We assume entity_id is the company_id for company level logs or 
+        # that logs could just be filtered by user_id from that company.
+        # But looking at how we log: entity_type="company", entity_id=company_id
+        logs = await self.repo.get_many(
+            query={"entity_id": company_id},
+            limit=limit,
+            skip=skip,
+        )
+        return logs

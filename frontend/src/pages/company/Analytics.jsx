@@ -27,6 +27,7 @@ import {
 import PageHeader from "../../components/common/PageHeader";
 import Button from "../../components/common/Button";
 import StatsCard from "../../components/common/StatsCard";
+import FeatureGuard from "../../components/common/FeatureGuard";
 import analyticsService from "../../services/company/analyticsService";
 
 import "../../styles/company/Analytics.css";
@@ -239,8 +240,9 @@ export default function Analytics() {
     }
 
     return (
-        <div className="analytics-page">
-            <PageHeader
+        <FeatureGuard featureName="analytics">
+            <div className="analytics-page">
+                <PageHeader
                 title="Analytics"
                 subtitle="Hiring insights and performance metrics."
                 icon={<FaChartLine />}
@@ -513,5 +515,6 @@ export default function Analytics() {
                 </table>
             </motion.div>
         </div>
+        </FeatureGuard>
     );
 }
