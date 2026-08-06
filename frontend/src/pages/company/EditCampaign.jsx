@@ -226,9 +226,6 @@ export default function EditCampaign() {
             setSubmitting(true);
 
             await campaignService.updateCampaign(id, {
-
-                company_id: user.companyId,
-
                 name: formData.name.trim(),
 
                 department: formData.department.trim(),

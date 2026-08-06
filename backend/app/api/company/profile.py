@@ -26,28 +26,26 @@ user_repo = UserRepository()
 company_repo = CompanyRepository()
 
 
-class ProfileResponse(BaseModel):
+class CompanyProfileResponse(BaseModel):
     id: str
-    name: str
-    email: str
-    company_name: str = ""
-    phone: Optional[str] = ""
-    location: Optional[str] = ""
-    linkedin: Optional[str] = ""
-    title: Optional[str] = ""
-    department: Optional[str] = ""
-    bio: Optional[str] = ""
-    joined_date: Optional[str] = ""
+    company_name: str
+    logo: Optional[str] = None
+    industry: Optional[str] = None
+    subscription: Optional[dict] = None
+    contact_email: Optional[str] = None
+    contact_person: Optional[str] = None
+    phone: Optional[str] = None
+    website: Optional[str] = None
+    status: Optional[str] = None
 
 
 class ProfileUpdateRequest(BaseModel):
-    name: Optional[str] = None
+    company_name: Optional[str] = None
+    industry: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_person: Optional[str] = None
     phone: Optional[str] = None
-    location: Optional[str] = None
-    linkedin: Optional[str] = None
-    title: Optional[str] = None
-    department: Optional[str] = None
-    bio: Optional[str] = None
+    website: Optional[str] = None
 
 
 class PasswordChangeRequest(BaseModel):
@@ -56,55 +54,43 @@ class PasswordChangeRequest(BaseModel):
     confirm_password: str
 
 
-@router.get("", response_model=ProfileResponse, summary="Get Current User Profile")
+@router.get("", response_model=CompanyProfileResponse, summary="Get Current Company Profile")
 async def get_profile(
     current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
 ):
     """
-    Return the profile of the currently authenticated user.
+    Return the profile of the currently authenticated company.
     """
-    user = await user_repo.get_by_id(current_user.sub)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
+    company = await company_repo.get_by_id(current_user.sub)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found.")
 
-    company_name = ""
-    if current_user.company_id:
-        company = await company_repo.get_by_id(current_user.company_id)
-        if company:
-            company_name = (
-                company.get("company_name")
-                or company.get("general", {}).get("name", "")
-                or company.get("name", "")
-            )
+    general = company.get("general", {})
+    company_name = (
+        company.get("company_name") or general.get("name") or company.get("name") or ""
+    )
 
-    created = user.get("created_at")
-    if isinstance(created, datetime):
-        joined_date = created.strftime("%B %Y")
-    else:
-        joined_date = ""
-
-    return ProfileResponse(
-        id=str(user["_id"]),
-        name=user.get("name", ""),
-        email=user.get("email", ""),
+    return CompanyProfileResponse(
+        id=str(company["_id"]),
         company_name=company_name,
-        phone=user.get("phone", ""),
-        location=user.get("location", ""),
-        linkedin=user.get("linkedin", ""),
-        title=user.get("title", ""),
-        department=user.get("department", ""),
-        bio=user.get("bio", ""),
-        joined_date=joined_date,
+        logo=general.get("logo_url") or company.get("logo"),
+        industry=general.get("industry") or company.get("industry"),
+        subscription=company.get("subscription", {}),
+        contact_email=general.get("contact_email") or company.get("contact_email"),
+        contact_person=general.get("contact_person") or company.get("contact_person"),
+        phone=general.get("phone") or company.get("phone"),
+        website=general.get("website") or company.get("website"),
+        status=company.get("status")
     )
 
 
-@router.patch("", response_model=ProfileResponse, summary="Update Current User Profile")
+@router.patch("", response_model=CompanyProfileResponse, summary="Update Current Company Profile")
 async def update_profile(
     payload: ProfileUpdateRequest,
     current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
 ):
     """
-    Update editable profile fields for the authenticated user.
+    Update editable profile fields for the authenticated company.
     """
     updates = {k: v for k, v in payload.dict().items() if v is not None}
     if not updates:
@@ -112,9 +98,9 @@ async def update_profile(
 
     updates["updated_at"] = datetime.now(UTC)
 
-    success = await user_repo.update(current_user.sub, updates)
+    success = await company_repo.update(current_user.sub, updates)
     if not success:
-        raise HTTPException(status_code=404, detail="User not found.")
+        raise HTTPException(status_code=404, detail="Company not found.")
 
     return await get_profile(current_user)
 
@@ -127,11 +113,12 @@ async def change_password(
     """
     Verify current password, then update to a new password.
     """
-    user = await user_repo.get_by_id(current_user.sub)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
+    company = await company_repo.get_by_id(current_user.sub)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found.")
 
-    hashed = user.get("password_hash") or user.get("hashed_password") or user.get("password", "")
+    creds = company.get("credentials", {})
+    hashed = creds.get("password_hash", "")
     if not hashed or not pwd_ctx.verify(payload.current_password, hashed):
         raise HTTPException(status_code=400, detail="Current password is incorrect.")
 
@@ -142,10 +129,10 @@ async def change_password(
         raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
 
     new_hash = pwd_ctx.hash(payload.new_password)
-    await user_repo.update(
+    await company_repo.update(
         current_user.sub,
         {
-            "password_hash": new_hash,
+            "credentials": {**creds, "password_hash": new_hash},
             "updated_at": datetime.now(UTC),
         },
     )

@@ -1,8 +1,12 @@
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, HTTPException, Query, Response, Depends
 from bson import ObjectId
+
+from app.auth.jwt_handler import TokenPayload
+from app.rbac.models import UserRole
+from app.rbac.permissions import require_role
 
 from app.repositories.report_repository import ReportRepository
 from app.repositories.candidate_repository import CandidateRepository
@@ -94,13 +98,14 @@ async def seed_reports_if_empty():
 @router.get("", response_model=List[ReportResponse], summary="Get Company Reports")
 async def get_reports(
     type: Optional[str] = Query(None),
-    search: Optional[str] = Query(None)
+    search: Optional[str] = Query(None),
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY))
 ):
     """
     Fetch all generated reports from MongoDB. Seed initial entries if collection is empty.
     """
     await seed_reports_if_empty()
-    query = {}
+    query = {"company_id": ObjectId(current_user.sub)}
 
     docs = await report_repo.get_many(query=query, limit=100)
 
@@ -130,17 +135,20 @@ async def get_reports(
 
 
 @router.get("/statistics", response_model=ReportStatisticsResponse, summary="Get Live Report Statistics")
-async def get_report_statistics():
+async def get_report_statistics(
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY))
+):
     """
     Compute live aggregation statistics directly from MongoDB candidates, interviews, jobs, and campaigns.
     """
-    total_candidates = await candidate_repo.count()
-    total_interviews = await session_repo.count()
-    selections = await candidate_repo.count({"status": "Selected"})
-    active_campaigns = await campaign_repo.count({"status": "Active"})
+    company_query = {"company_id": ObjectId(current_user.sub)}
+    total_candidates = await candidate_repo.count(company_query)
+    total_interviews = await session_repo.count(company_query)
+    selections = await candidate_repo.count({"status": "Selected", **company_query})
+    active_campaigns = await campaign_repo.count({"status": "Active", **company_query})
 
     # Compute average AI score across all completed interviews
-    sessions = await session_repo.get_many({"status": "Completed"})
+    sessions = await session_repo.get_many({"status": "Completed", **company_query})
     scores = [s.get("overall_score", 0) for s in sessions if s.get("overall_score") is not None]
     avg_ai_score = round(sum(scores) / len(scores), 1) if scores else 84.5
 
@@ -155,7 +163,10 @@ async def get_report_statistics():
 
 
 @router.post("", response_model=ReportResponse, summary="Generate New Report")
-async def generate_report(payload: ReportCreateRequest):
+async def generate_report(
+    payload: ReportCreateRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY))
+):
     """
     Generate a new report and store it in MongoDB.
     """
@@ -164,6 +175,7 @@ async def generate_report(payload: ReportCreateRequest):
     report_name = payload.name or f"{title_type} Report - {datetime.utcnow().strftime('%B %Y')}"
 
     doc = {
+        "company_id": ObjectId(current_user.sub),
         "name": report_name,
         "type": f"{title_type} Report",
         "generatedBy": "Sarah Jenkins",
@@ -191,12 +203,15 @@ async def generate_report(payload: ReportCreateRequest):
 
 
 @router.get("/download/{report_id}", summary="Download Generated Report File")
-async def download_report(report_id: str):
+async def download_report(
+    report_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY))
+):
     """
     Download report file payload. Increments the download counter.
     """
     report = await report_repo.get_by_id(report_id)
-    if not report:
+    if not report or str(report.get("company_id")) != current_user.sub:
         raise HTTPException(status_code=404, detail="Report not found")
 
     # Increment download count
@@ -219,10 +234,17 @@ async def download_report(report_id: str):
 
 
 @router.delete("/{report_id}", summary="Delete Report")
-async def delete_report(report_id: str):
+async def delete_report(
+    report_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY))
+):
     """
     Delete a report by ID.
     """
+    report = await report_repo.get_by_id(report_id)
+    if not report or str(report.get("company_id")) != current_user.sub:
+        raise HTTPException(status_code=404, detail="Report not found or already deleted")
+
     deleted = await report_repo.delete(report_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Report not found or already deleted")

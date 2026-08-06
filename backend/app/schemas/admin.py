@@ -1,4 +1,5 @@
 from typing import Optional, List, Dict, Any
+from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -100,9 +101,9 @@ class CompanyResponse(BaseModel):
     allowed_interview_modes: List[str] = Field(default_factory=list)
     allowed_llm_tiers: List[str] = Field(default_factory=list)
     
-    created_at: str = "2026-01-01T00:00:00Z"
-    updated_at: str = "2026-01-01T00:00:00Z"
-    deleted_at: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    deleted_at: Optional[datetime] = None
 
 class StrategyCreateRequest(BaseModel):
     strategy_id: str

@@ -140,14 +140,9 @@ export default function NewCampaign() {
         setSubmitting(true);
 
         await campaignService.createCampaign({
-            company_id: user.companyId,
-
             name: formData.name.trim(),
-
             department: formData.department.trim(),
-
             location: formData.location.trim(),
-
             deadline: formData.deadline,
 
             salary: formData.salary.trim(),

@@ -13,12 +13,6 @@ import profileService from "../../services/company/profileService";
 
 import "../../styles/company/Profile.css";
 
-const SKILLS = [
-    "Talent Acquisition", "AI Sourcing", "Pipeline Management",
-    "Behavioral Interviews", "Employer Branding", "Technical Recruiting",
-    "Diversity & Inclusion", "ATS Optimization"
-];
-
 const cardVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: (i) => ({ opacity: 1, y: 0, transition: { delay: i * 0.1 } })
@@ -39,7 +33,7 @@ function Toast({ message, type = "success" }) {
 }
 
 export default function Profile() {
-    const { user } = useAuthContext();
+    const { user, setCompanyProfile } = useAuthContext();
 
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -49,14 +43,11 @@ export default function Profile() {
 
     // Controlled form fields
     const [formData, setFormData] = useState({
-        firstName: "",
-        lastName: "",
+        company_name: "",
+        contact_person: "",
         phone: "",
-        location: "",
-        linkedin: "",
-        bio: "",
-        title: "",
-        department: "",
+        industry: "",
+        website: "",
     });
 
     const [pwdData, setPwdData] = useState({
@@ -76,28 +67,22 @@ export default function Profile() {
         profileService.getProfile()
             .then(data => {
                 setProfile(data);
-                const nameParts = (data.name || "").split(" ");
                 setFormData({
-                    firstName: nameParts[0] || "",
-                    lastName: nameParts.slice(1).join(" ") || "",
+                    company_name: data.company_name || "",
+                    contact_person: data.contact_person || "",
                     phone: data.phone || "",
-                    location: data.location || "",
-                    linkedin: data.linkedin || "",
-                    bio: data.bio || "",
-                    title: data.title || "",
-                    department: data.department || "",
+                    industry: data.industry || "",
+                    website: data.website || "",
                 });
             })
             .catch(() => {
                 // Fallback: use JWT-decoded user data
                 if (user) {
-                    const nameParts = (user.name || "").split(" ");
                     setFormData(prev => ({
                         ...prev,
-                        firstName: nameParts[0] || "",
-                        lastName: nameParts.slice(1).join(" ") || "",
+                        company_name: user.name || "",
                     }));
-                    setProfile({ name: user.name, email: user.email });
+                    setProfile({ company_name: user.name, contact_email: user.email });
                 }
             })
             .finally(() => setLoading(false));
@@ -110,17 +95,15 @@ export default function Profile() {
     const handleSave = async () => {
         setSaving(true);
         try {
-            const fullName = [formData.firstName, formData.lastName].filter(Boolean).join(" ");
             const updated = await profileService.updateProfile({
-                name: fullName || undefined,
+                company_name: formData.company_name || undefined,
+                contact_person: formData.contact_person || undefined,
                 phone: formData.phone || undefined,
-                location: formData.location || undefined,
-                linkedin: formData.linkedin || undefined,
-                bio: formData.bio || undefined,
-                title: formData.title || undefined,
-                department: formData.department || undefined,
+                industry: formData.industry || undefined,
+                website: formData.website || undefined,
             });
             setProfile(updated);
+            if (setCompanyProfile) setCompanyProfile(updated);
             showToast("Profile saved successfully!");
         } catch (err) {
             showToast(err?.response?.data?.detail || "Failed to save profile.", "error");
@@ -147,9 +130,9 @@ export default function Profile() {
     };
 
     // Derived display values
-    const displayName = profile?.name || user?.name || "User";
-    const displayEmail = profile?.email || user?.email || "";
-    const initials = displayName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
+    const displayName = profile?.company_name || user?.name || "Company";
+    const displayEmail = profile?.contact_email || user?.email || "";
+    const initials = displayName.split(" ").filter(Boolean).map(n => n[0]).join("").slice(0, 2).toUpperCase();
 
     return (
         <div className="profile-page">
@@ -195,10 +178,14 @@ export default function Profile() {
                         </div>
 
                         <div className="profile-name">{displayName}</div>
-                        <div className="profile-title">{profile?.title || formData.title || "—"}</div>
-                        <div className="profile-dept-badge">{profile?.department || formData.department || "—"}</div>
+                        <div className="profile-title">{profile?.industry || formData.industry || "—"}</div>
+                        <div className="profile-dept-badge">{profile?.status || "Active"}</div>
 
                         <div className="profile-contact-list">
+                            <div className="profile-contact-item">
+                                <FaUser />
+                                <span>{formData.contact_person || "—"}</span>
+                            </div>
                             <div className="profile-contact-item">
                                 <FaEnvelope />
                                 <span>{displayEmail}</span>
@@ -209,18 +196,8 @@ export default function Profile() {
                             </div>
                             <div className="profile-contact-item">
                                 <FaMapMarkerAlt />
-                                <span>{formData.location || "—"}</span>
+                                <span>{formData.website || "—"}</span>
                             </div>
-                            <div className="profile-contact-item">
-                                <FaLinkedin />
-                                <span>{formData.linkedin || "—"}</span>
-                            </div>
-                            {profile?.joined_date && (
-                                <div className="profile-contact-item">
-                                    <FaCalendarAlt />
-                                    <span>Joined {profile.joined_date}</span>
-                                </div>
-                            )}
                         </div>
                     </motion.div>
 
@@ -229,29 +206,29 @@ export default function Profile() {
                         {/* Personal Info */}
                         <motion.div className="edit-panel" custom={0} variants={cardVariants} initial="hidden" animate="visible">
                             <div className="edit-panel-header">
-                                <h4>Personal Information</h4>
+                                <h4>Company Information</h4>
                                 <FaEdit style={{ color: "var(--text-secondary)", fontSize: 14 }} />
                             </div>
                             <div className="edit-panel-body">
                                 <div className="form-grid-2">
                                     <div className="form-field">
-                                        <label>First Name</label>
+                                        <label>Company Name</label>
                                         <input
                                             type="text"
-                                            value={formData.firstName}
-                                            onChange={e => handleChange("firstName", e.target.value)}
+                                            value={formData.company_name}
+                                            onChange={e => handleChange("company_name", e.target.value)}
                                         />
                                     </div>
                                     <div className="form-field">
-                                        <label>Last Name</label>
+                                        <label>Contact Person</label>
                                         <input
                                             type="text"
-                                            value={formData.lastName}
-                                            onChange={e => handleChange("lastName", e.target.value)}
+                                            value={formData.contact_person}
+                                            onChange={e => handleChange("contact_person", e.target.value)}
                                         />
                                     </div>
                                     <div className="form-field">
-                                        <label>Email</label>
+                                        <label>Contact Email</label>
                                         <input type="email" value={displayEmail} disabled style={{ opacity: 0.6 }} />
                                     </div>
                                     <div className="form-field">
@@ -263,62 +240,23 @@ export default function Profile() {
                                         />
                                     </div>
                                     <div className="form-field">
-                                        <label>Job Title</label>
+                                        <label>Industry</label>
                                         <input
                                             type="text"
-                                            value={formData.title}
-                                            onChange={e => handleChange("title", e.target.value)}
-                                            placeholder="e.g. Director of Talent Acquisition"
+                                            value={formData.industry}
+                                            onChange={e => handleChange("industry", e.target.value)}
+                                            placeholder="e.g. Technology"
                                         />
                                     </div>
                                     <div className="form-field">
-                                        <label>Department</label>
+                                        <label>Website</label>
                                         <input
                                             type="text"
-                                            value={formData.department}
-                                            onChange={e => handleChange("department", e.target.value)}
-                                            placeholder="e.g. Human Resources"
+                                            value={formData.website}
+                                            onChange={e => handleChange("website", e.target.value)}
+                                            placeholder="e.g. https://example.com"
                                         />
                                     </div>
-                                    <div className="form-field">
-                                        <label>Location</label>
-                                        <input
-                                            type="text"
-                                            value={formData.location}
-                                            onChange={e => handleChange("location", e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="form-field">
-                                        <label>LinkedIn</label>
-                                        <input
-                                            type="text"
-                                            value={formData.linkedin}
-                                            onChange={e => handleChange("linkedin", e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="form-field full-width">
-                                        <label>Bio</label>
-                                        <textarea
-                                            value={formData.bio}
-                                            onChange={e => handleChange("bio", e.target.value)}
-                                            rows={4}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </motion.div>
-
-                        {/* Professional Skills */}
-                        <motion.div className="edit-panel" custom={1} variants={cardVariants} initial="hidden" animate="visible">
-                            <div className="edit-panel-header">
-                                <h4>Professional Skills</h4>
-                            </div>
-                            <div className="edit-panel-body">
-                                <div className="skills-tag-list">
-                                    {SKILLS.map(skill => (
-                                        <span key={skill} className="skill-tag">{skill}</span>
-                                    ))}
-                                    <span className="skill-tag" style={{ borderStyle: "dashed", opacity: 0.6 }}>+ Add Skill</span>
                                 </div>
                             </div>
                         </motion.div>

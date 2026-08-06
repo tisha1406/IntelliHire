@@ -5,6 +5,7 @@ from app.schemas.response import APIResponse, success_response, PaginationMeta
 from app.auth.jwt_handler import TokenPayload
 from app.rbac.permissions import require_role
 from app.rbac.models import UserRole
+from app.db.mongo import serialize_mongo_doc
 
 router = APIRouter(
     prefix="/admin/candidates",
@@ -32,12 +33,10 @@ async def get_all_candidates(
     candidates = await repo.get_many(query=query, limit=limit, skip=offset)
     total = await repo.count(query)
 
-    for c in candidates:
-        c["id"] = str(c["_id"])
-        del c["_id"]
+    serialized_candidates = serialize_mongo_doc(candidates)
 
     return success_response(
-        data=candidates,
+        data=serialized_candidates,
         pagination=PaginationMeta(total=total, limit=limit, skip=offset, has_more=(offset + limit) < total),
         message="Candidates retrieved successfully."
     )
@@ -53,7 +52,6 @@ async def get_candidate(
     if not candidate:
         raise HTTPException(status_code=404, detail="Candidate not found.")
 
-    candidate["id"] = str(candidate["_id"])
-    del candidate["_id"]
+    serialized_candidate = serialize_mongo_doc(candidate)
 
-    return success_response(data=candidate)
+    return success_response(data=serialized_candidate)

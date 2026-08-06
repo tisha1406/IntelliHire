@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Query, Depends, HTTPException
 from typing import Optional
+from bson import ObjectId
 from app.schemas.response import APIResponse, success_response, PaginationMeta
 from app.auth.jwt_handler import TokenPayload
 from app.rbac.permissions import require_role
@@ -15,6 +16,17 @@ router = APIRouter(
     prefix="/admin/users",
     tags=["Admin - Users"]
 )
+
+def clean_user_doc(user: dict) -> dict:
+    if not user:
+        return user
+    user["id"] = str(user["_id"])
+    user.pop("_id", None)
+    user.pop("password_hash", None)
+    for k, v in list(user.items()):
+        if isinstance(v, ObjectId):
+            user[k] = str(v)
+    return user
 
 @router.get("", response_model=APIResponse[list[dict]])
 async def get_users(
@@ -42,11 +54,7 @@ async def get_users(
     users = await user_repo.get_many(query=query, limit=limit, skip=offset)
     total = await user_repo.count(query=query)
     
-    for u in users:
-        u["id"] = str(u["_id"])
-        del u["_id"]
-        # Remove sensitive data
-        u.pop("password_hash", None)
+    users = [clean_user_doc(u) for u in users]
 
     return success_response(
         data=users,
@@ -65,9 +73,7 @@ async def get_user_by_id(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
-    user["id"] = str(user["_id"])
-    del user["_id"]
-    user.pop("password_hash", None)
+    user = clean_user_doc(user)
     
     return success_response(
         data=user,

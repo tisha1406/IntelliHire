@@ -7,6 +7,8 @@ import {
     FaChartLine,
     FaMicrophone,
     FaArrowRight,
+    FaEye,
+    FaEyeSlash,
 } from "react-icons/fa";
 
 import { useState } from "react";
@@ -25,6 +27,7 @@ export default function Login() {
     const [error, setError] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
 
     // ============================
@@ -221,30 +224,46 @@ export default function Login() {
 
                 </div>
 
-                <form onSubmit={handleLogin}>
+                <form onSubmit={handleLogin} className="login-form">
 
                     {/* Email */}
                     <div className="input-group">
-                        <FaEnvelope />
-                        <input
-                            type="email"
-                            placeholder="Email Address"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                        />
+                        <div className="icon-container">
+                            <FaEnvelope className="input-icon" />
+                        </div>
+                        <div className="input-wrapper">
+                            <input
+                                type="email"
+                                placeholder="Email Address"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                required
+                            />
+                        </div>
                     </div>
 
                     {/* Password */}
                     <div className="input-group">
-                        <FaLock />
-                        <input
-                            type="password"
-                            placeholder="Password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                        />
+                        <div className="icon-container">
+                            <FaLock className="input-icon" />
+                        </div>
+                        <div className="input-wrapper">
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                placeholder="Password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                            />
+                            <button
+                                type="button"
+                                className="password-toggle"
+                                onClick={() => setShowPassword(!showPassword)}
+                                aria-label={showPassword ? "Hide password" : "Show password"}
+                            >
+                                {showPassword ? <FaEyeSlash /> : <FaEye />}
+                            </button>
+                        </div>
                     </div>
 
                     {/* Options row */}
@@ -269,42 +288,39 @@ export default function Login() {
 
                     {/* Error message */}
                     {error && (
-                        <div className="login-error">
+                        <div className="login-error" role="alert">
                             {error}
                         </div>
                     )}
 
                     {/* Primary submit */}
-                    <button
-                        type="submit"
-                        className="login-button"
-                        disabled={loading}
-                    >
-                        {loading ? (
-                            "Signing In..."
-                        ) : (
-                            <>
-                                <span>Sign In</span>
-                                <FaArrowRight />
-                            </>
-                        )}
-                    </button>
+                    <div className="button-group">
+                        <button
+                            type="submit"
+                            className="login-button primary"
+                            disabled={loading}
+                        >
+                            {loading ? (
+                                "Signing In..."
+                            ) : (
+                                <>
+                                    <span>Sign In</span>
+                                    <FaArrowRight />
+                                </>
+                            )}
+                        </button>
 
-                    {/* Demo Candidate Login */}
-                    <button
-                        type="button"
-                        className="login-button"
-                        style={{
-                            marginTop: 12,
-                            background: "linear-gradient(135deg, #10B981 0%, #3B82F6 100%)",
-                            boxShadow: "0 4px 12px rgba(16,185,129,0.3)",
-                        }}
-                        onClick={handleDemoLogin}
-                        disabled={loading}
-                    >
-                        <span>Demo Candidate Login</span>
-                        <FaArrowRight />
-                    </button>
+                        {/* Demo Candidate Login */}
+                        <button
+                            type="button"
+                            className="login-button secondary"
+                            onClick={handleDemoLogin}
+                            disabled={loading}
+                        >
+                            <span>Demo Candidate Login</span>
+                            <FaArrowRight />
+                        </button>
+                    </div>
 
                 </form>
 

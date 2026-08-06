@@ -2,7 +2,12 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 from typing import Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
+from bson import ObjectId
+
+from app.auth.jwt_handler import TokenPayload
+from app.rbac.models import UserRole
+from app.rbac.permissions import require_role
 
 from app.repositories.candidate_repository import CandidateRepository
 from app.repositories.job_repository import JobRepository
@@ -92,20 +97,23 @@ FALLBACK_COMPARISON = [
 # ─── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.get("/kpis", summary="Get Live KPI Metrics")
-async def get_kpis():
+async def get_kpis(
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY))
+):
     """
     Return real-time KPI metrics computed from MongoDB collections.
     Falls back to representative static values when collections are empty.
     """
-    total_candidates = await candidate_repo.count()
-    total_interviews = await session_repo.count()
-    total_selected = await candidate_repo.count({"status": "Selected"})
+    company_query = {"company_id": ObjectId(current_user.sub)}
+    total_candidates = await candidate_repo.count(company_query)
+    total_interviews = await session_repo.count(company_query)
+    total_selected = await candidate_repo.count({"status": "Selected", **company_query})
 
     if total_candidates == 0:
         return FALLBACK_KPI
 
     # Average time-to-hire: estimate from created_at → updated_at of Selected candidates
-    selected_candidates = await candidate_repo.get_many({"status": "Selected"}, limit=200)
+    selected_candidates = await candidate_repo.get_many({"status": "Selected", "company_id": ObjectId(current_user.sub)}, limit=200)
     time_deltas = []
     for c in selected_candidates:
         created = c.get("created_at")
@@ -119,7 +127,7 @@ async def get_kpis():
     avg_time_str = f"{avg_time} days"
 
     # Offer acceptance rate: (Selected / Offered) * 100
-    offered = await candidate_repo.count({"status": "Offered"})
+    offered = await candidate_repo.count({"status": "Offered", "company_id": ObjectId(current_user.sub)})
     acceptance_rate = round((total_selected / offered) * 100, 1) if offered > 0 else 87.6
     acceptance_str = f"{acceptance_rate}%"
 
@@ -133,17 +141,20 @@ async def get_kpis():
 
 
 @router.get("/hiring-trend", summary="Get Monthly Hiring Trend")
-async def get_hiring_trend():
+async def get_hiring_trend(
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY))
+):
     """
     Aggregate monthly application and selection counts for the current year.
     Falls back to representative static data when collections are empty.
     """
-    total = await candidate_repo.count()
+    company_query = {"company_id": ObjectId(current_user.sub)}
+    total = await candidate_repo.count(company_query)
     if total == 0:
         return FALLBACK_HIRING_TREND
 
     current_year = datetime.utcnow().year
-    all_candidates = await candidate_repo.get_many(limit=5000)
+    all_candidates = await candidate_repo.get_many(query=company_query, limit=5000)
 
     monthly_apps = defaultdict(int)
     monthly_sel = defaultdict(int)
@@ -172,12 +183,15 @@ async def get_hiring_trend():
 
 
 @router.get("/candidate-sources", summary="Get Candidate Source Breakdown")
-async def get_candidate_sources():
+async def get_candidate_sources(
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY))
+):
     """
     Breakdown of candidates by source channel from MongoDB.
     Falls back to static data if source field is not populated.
     """
-    all_candidates = await candidate_repo.get_many(limit=5000)
+    company_query = {"company_id": ObjectId(current_user.sub)}
+    all_candidates = await candidate_repo.get_many(query=company_query, limit=5000)
 
     if not all_candidates:
         return FALLBACK_SOURCES
@@ -214,11 +228,14 @@ async def get_candidate_sources():
 
 
 @router.get("/hiring-funnel", summary="Get Hiring Funnel Stages")
-async def get_hiring_funnel():
+async def get_hiring_funnel(
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY))
+):
     """
     Compute candidate pipeline conversion rates across status stages.
     """
-    total = await candidate_repo.count()
+    company_query = {"company_id": ObjectId(current_user.sub)}
+    total = await candidate_repo.count(company_query)
     if total == 0:
         return FALLBACK_FUNNEL
 
@@ -235,7 +252,7 @@ async def get_hiring_funnel():
     for stage_label, statuses in STATUS_STAGES:
         count = 0
         for status in statuses:
-            count += await candidate_repo.count({"status": status})
+            count += await candidate_repo.count({"status": status, "company_id": ObjectId(current_user.sub)})
         stage_counts[stage_label] = count
 
     applied = stage_counts.get("Applied", 0) or total
@@ -260,12 +277,15 @@ async def get_hiring_funnel():
 
 
 @router.get("/department-breakdown", summary="Get Department Hiring Breakdown")
-async def get_department_breakdown():
+async def get_department_breakdown(
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY))
+):
     """
     Aggregate open jobs, applicants, and hires per department.
     """
-    jobs = await job_repo.get_many(limit=500)
-    candidates = await candidate_repo.get_many(limit=5000)
+    company_query = {"company_id": ObjectId(current_user.sub)}
+    jobs, _ = await job_repo.get_many(query=company_query, limit=500)
+    candidates = await candidate_repo.get_many(query=company_query, limit=5000)
 
     if not jobs and not candidates:
         return FALLBACK_DEPT
@@ -312,13 +332,16 @@ async def get_department_breakdown():
 
 
 @router.get("/recruiter-performance", summary="Get Recruiter Performance Scorecard")
-async def get_recruiter_performance():
+async def get_recruiter_performance(
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY))
+):
     """
     Per-recruiter placement metrics computed from campaigns and candidates.
     Falls back to static scorecard when recruiter data is not populated.
     """
-    campaigns = await campaign_repo.get_many(limit=500)
-    candidates = await candidate_repo.get_many(limit=5000)
+    company_query = {"company_id": ObjectId(current_user.sub)}
+    campaigns = await campaign_repo.get_many(query=company_query, limit=500)
+    candidates = await candidate_repo.get_many(query=company_query, limit=5000)
 
     recruiter_campaigns = defaultdict(int)
     recruiter_selections = defaultdict(int)
@@ -362,11 +385,14 @@ async def get_recruiter_performance():
 
 
 @router.get("/yearly-comparison", summary="Get Year-over-Year Applications Comparison")
-async def get_yearly_comparison():
+async def get_yearly_comparison(
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY))
+):
     """
     Monthly application counts for 2025 vs 2026.
     """
-    all_candidates = await candidate_repo.get_many(limit=5000)
+    company_query = {"company_id": ObjectId(current_user.sub)}
+    all_candidates = await candidate_repo.get_many(query=company_query, limit=5000)
 
     if not all_candidates:
         return FALLBACK_COMPARISON

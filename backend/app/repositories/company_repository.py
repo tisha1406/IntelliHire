@@ -129,3 +129,47 @@ class CompanyRepository(BaseRepository):
             skip=skip,
             include_deleted=include_deleted,
         )
+
+    # ==========================================================
+    # Authentication Support
+    # ==========================================================
+
+    async def store_refresh_token(
+        self,
+        company_id: str,
+        refresh_token_hash: str,
+    ) -> bool:
+        from datetime import UTC, datetime
+        return await self.update(
+            company_id,
+            {
+                "refresh_token_hash": refresh_token_hash,
+                "updated_at": datetime.now(UTC),
+            },
+        )
+
+    async def clear_refresh_token(
+        self,
+        company_id: str,
+    ) -> bool:
+        from datetime import UTC, datetime
+        return await self.update(
+            company_id,
+            {
+                "refresh_token_hash": None,
+                "updated_at": datetime.now(UTC),
+            },
+        )
+
+    async def update_last_login(
+        self,
+        company_id: str,
+    ) -> bool:
+        from datetime import UTC, datetime
+        return await self.update(
+            company_id,
+            {
+                "last_login": datetime.now(UTC),
+                "updated_at": datetime.now(UTC),
+            },
+        )

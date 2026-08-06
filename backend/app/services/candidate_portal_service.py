@@ -50,16 +50,16 @@ class CandidatePortalService:
         
         campaign_id = str(candidate.get("campaign_id"))
         campaign = await self.campaign_repo.get_by_id(campaign_id)
-        company_id = str(campaign.get("company_id"))
-        company = await self.company_repo.get_by_id(company_id)
+        company_id = str(campaign.get("company_id")) if campaign else None
+        company = await self.company_repo.get_by_id(company_id) if company_id else None
 
         workflow = await self.workflow_repo.get_by_candidate(candidate_id)
         if not workflow:
             # Create default if missing (should be created during invite, but just in case)
             await self.workflow_repo.upsert(candidate_id, {
                 "user_id": ObjectId(candidate.get("user_id")),
-                "company_id": ObjectId(company_id),
-                "campaign_id": ObjectId(campaign_id),
+                "company_id": ObjectId(company_id) if company_id else None,
+                "campaign_id": ObjectId(campaign_id) if campaign_id else None,
                 "stage": "RESUME_UPLOAD_REQUIRED",
                 "next_action": "UPLOAD_RESUME",
                 "created_at": datetime.now(UTC)
@@ -68,47 +68,49 @@ class CandidatePortalService:
 
         # Compute readiness score
         score = 0
-        if workflow.get("resume_uploaded"): score += 25
-        if workflow.get("resume_analysed"): score += 25
-        if workflow.get("practice_completed"): score += 25
-        if workflow.get("system_check_completed"): score += 15
+        if workflow and workflow.get("resume_uploaded"): score += 25
+        if workflow and workflow.get("resume_analysed"): score += 25
+        if workflow and workflow.get("practice_completed"): score += 25
+        if workflow and workflow.get("system_check_completed"): score += 15
         if score == 90: score = 100 # all checks done bonus
 
         # Compute steps
-        steps = [
-            WorkflowStepOut(
-                key="resume",
-                label="Resume Analysed",
-                status="completed" if workflow.get("resume_analysed") else ("in_progress" if workflow.get("resume_uploaded") else "available"),
-                completed_at=str(workflow.get("resume_analysed_at")) if workflow.get("resume_analysed_at") else None
-            ),
-            WorkflowStepOut(
-                key="practice",
-                label="Practice Interview",
-                status="completed" if workflow.get("practice_completed") else ("available" if workflow.get("resume_analysed") else "locked"),
-                completed_at=str(workflow.get("practice_completed_at")) if workflow.get("practice_completed_at") else None
-            ),
-            WorkflowStepOut(
-                key="official",
-                label="Official Interview",
-                status="completed" if workflow.get("official_completed") else ("available" if workflow.get("practice_completed") else "locked"),
-                completed_at=str(workflow.get("official_completed_at")) if workflow.get("official_completed_at") else None
-            )
-        ]
+        steps = []
+        if workflow:
+            steps = [
+                WorkflowStepOut(
+                    key="resume",
+                    label="Resume Analysed",
+                    status="completed" if workflow.get("resume_analysed") else ("in_progress" if workflow.get("resume_uploaded") else "available"),
+                    completed_at=str(workflow.get("resume_analysed_at")) if workflow.get("resume_analysed_at") else None
+                ),
+                WorkflowStepOut(
+                    key="practice",
+                    label="Practice Interview",
+                    status="completed" if workflow.get("practice_completed") else ("available" if workflow.get("resume_analysed") else "locked"),
+                    completed_at=str(workflow.get("practice_completed_at")) if workflow.get("practice_completed_at") else None
+                ),
+                WorkflowStepOut(
+                    key="official",
+                    label="Official Interview",
+                    status="completed" if workflow.get("official_completed") else ("available" if workflow.get("practice_completed") else "locked"),
+                    completed_at=str(workflow.get("official_completed_at")) if workflow.get("official_completed_at") else None
+                )
+            ]
 
         return DashboardResponse(
             candidate_name=candidate.get("name", ""),
             candidate_email=candidate.get("email", ""),
-            company_name=company.get("general", {}).get("name", ""),
-            campaign_name=campaign.get("general", {}).get("name", ""),
-            job_position=campaign.get("general", {}).get("job_position", ""),
-            deadline=campaign.get("settings", {}).get("deadline", ""),
-            interview_duration=f'{campaign.get("settings", {}).get("duration_minutes", 45)} min',
-            interview_type=campaign.get("settings", {}).get("interview_mode", "Technical"),
-            interview_language=campaign.get("settings", {}).get("language", "English"),
-            interview_strategy=campaign.get("settings", {}).get("strategy", "Balanced"),
-            stage=workflow.get("stage", ""),
-            next_action=workflow.get("next_action", ""),
+            company_name=company.get("general", {}).get("name", "") if company else "",
+            campaign_name=campaign.get("general", {}).get("name", "") if campaign else "",
+            job_position=campaign.get("general", {}).get("job_position", "") if campaign else "",
+            deadline=campaign.get("settings", {}).get("deadline", "") if campaign else "",
+            interview_duration=f'{campaign.get("settings", {}).get("duration_minutes", 45)} min' if campaign else "45 min",
+            interview_type=campaign.get("settings", {}).get("interview_mode", "Technical") if campaign else "Technical",
+            interview_language=campaign.get("settings", {}).get("language", "English") if campaign else "English",
+            interview_strategy=campaign.get("settings", {}).get("strategy", "Balanced") if campaign else "Balanced",
+            stage=workflow.get("stage", "") if workflow else "",
+            next_action=workflow.get("next_action", "") if workflow else "",
             readiness_score=score,
             steps=steps
         )
@@ -143,17 +145,17 @@ class CandidatePortalService:
             
         campaign_id = str(candidate.get("campaign_id"))
         campaign = await self.campaign_repo.get_by_id(campaign_id)
-        company_id = str(campaign.get("company_id"))
-        company = await self.company_repo.get_by_id(company_id)
+        company_id = str(campaign.get("company_id")) if campaign else None
+        company = await self.company_repo.get_by_id(company_id) if company_id else None
         
         return ProfileResponse(
             candidate_id=candidate_id,
             name=candidate.get("name", ""),
             email=candidate.get("email", ""),
             phone=candidate.get("phone", ""),
-            company_name=company.get("general", {}).get("name", ""),
-            campaign_name=campaign.get("general", {}).get("name", ""),
-            job_position=campaign.get("general", {}).get("job_position", ""),
+            company_name=company.get("general", {}).get("name", "") if company else "",
+            campaign_name=campaign.get("general", {}).get("name", "") if campaign else "",
+            job_position=campaign.get("general", {}).get("job_position", "") if campaign else "",
             member_since=str(candidate.get("created_at")),
             avatar_url=candidate.get("avatar_url")
         )
