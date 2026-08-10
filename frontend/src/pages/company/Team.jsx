@@ -38,6 +38,7 @@ export default function Team() {
     const [toast, setToast] = useState(null);
     const [teamMembers, setTeamMembers] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [newMemberData, setNewMemberData] = useState(null);
 
     const showToast = (message, type = "success") => setToast({ message, type });
 
@@ -75,15 +76,23 @@ export default function Team() {
         }
         try {
             setInviting(true);
-            await teamService.inviteMember(inviteForm);
+            const res = await teamService.inviteMember(inviteForm);
+            
+            if (res.data?.temporary_password) {
+                setNewMemberData(res.data);
+            }
+            
             setInvited(true);
-            showToast(`Invitation sent to ${inviteForm.email}`, "success");
+            showToast(`Invitation created for ${inviteForm.email}`, "success");
             fetchTeam();
-            setTimeout(() => {
-                setInvited(false);
-                setShowInviteModal(false);
-                setInviteForm({ name: "", email: "", role: "Recruiter" });
-            }, 1500);
+            
+            if (!res.data?.temporary_password) {
+                setTimeout(() => {
+                    setInvited(false);
+                    setShowInviteModal(false);
+                    setInviteForm({ name: "", email: "", role: "Recruiter" });
+                }, 1500);
+            }
         } catch (err) {
             console.error("Invite failed:", err);
             showToast(err?.response?.data?.detail || "Failed to send invite", "error");
@@ -120,11 +129,11 @@ export default function Team() {
             {/* Stats */}
             <div className="team-stats-row">
                 {[
-                    { title: "Total Members", value: teamMembers.length, icon: <FaUsers />, iconColor: "#3B82F6" },
-                    { title: "Active", value: totalActive, icon: <FaCheck />, iconColor: "#10B981" },
-                    { title: "Recruiters", value: totalRecruiters, icon: <FaUsers />, iconColor: "#8B5CF6" },
-                    { title: "Hiring Managers", value: totalManagers, icon: <FaUsers />, iconColor: "#F59E0B" },
-                    { title: "Admins", value: totalAdmins, icon: <FaUsers />, iconColor: "#EC4899" },
+                    { title: "Total Members", value: teamMembers.length, icon: <FaUsers />, color: "#3B82F6" },
+                    { title: "Active", value: totalActive, icon: <FaCheck />, color: "#10B981" },
+                    { title: "Recruiters", value: totalRecruiters, icon: <FaUsers />, color: "#8B5CF6" },
+                    { title: "Hiring Managers", value: totalManagers, icon: <FaUsers />, color: "#F59E0B" },
+                    { title: "Admins", value: totalAdmins, icon: <FaUsers />, color: "#EC4899" },
                 ].map((s, i) => (
                     <motion.div key={s.title} custom={i} variants={cardVariants} initial="hidden" animate="visible">
                         <StatsCard {...s} />
@@ -385,17 +394,39 @@ export default function Team() {
                                 </div>
 
                                 <div style={{ display: "flex", gap: 10, marginTop: 16, justifyContent: "flex-end" }}>
-                                    <Button variant="outline" onClick={() => setShowInviteModal(false)}>Cancel</Button>
-                                    <Button
-                                        variant="primary"
-                                        icon={invited ? <FaCheck /> : inviting ? <FaSpinner /> : <FaUserPlus />}
-                                        onClick={handleInvite}
-                                        disabled={inviting}
-                                    >
-                                        {invited ? "Invitation Sent!" : inviting ? "Sending..." : "Send Invite"}
-                                    </Button>
+                                    <Button variant="outline" onClick={() => {
+                                        setShowInviteModal(false);
+                                        setNewMemberData(null);
+                                        setInvited(false);
+                                    }}>Close</Button>
+                                    {!newMemberData && (
+                                        <Button
+                                            variant="primary"
+                                            icon={invited ? <FaCheck /> : inviting ? <FaSpinner /> : <FaUserPlus />}
+                                            onClick={handleInvite}
+                                            disabled={inviting}
+                                        >
+                                            {invited ? "Created!" : inviting ? "Creating..." : "Create Member"}
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
+                            
+                            {newMemberData && newMemberData.temporary_password && (
+                                <div style={{ marginTop: 24, padding: 16, background: "rgba(16, 185, 129, 0.1)", borderRadius: 8, border: "1px solid rgba(16, 185, 129, 0.2)" }}>
+                                    <h4 style={{ color: "#10B981", marginBottom: 8 }}>Recruiter Created Successfully</h4>
+                                    <p style={{ fontSize: 14, color: "var(--text-secondary)", marginBottom: 12 }}>
+                                        Please share these login credentials securely with the new recruiter. They will be forced to change this password on their first login.
+                                    </p>
+                                    <div style={{ background: "var(--bg)", padding: 12, borderRadius: 6, border: "1px solid var(--border)", fontFamily: "monospace" }}>
+                                        <div><strong>Email:</strong> {newMemberData.email}</div>
+                                        <div style={{ marginTop: 8 }}><strong>Temporary Password:</strong> {newMemberData.temporary_password}</div>
+                                    </div>
+                                    <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 12 }}>
+                                        Login URL: {window.location.origin}/login
+                                    </p>
+                                </div>
+                            )}
                         </motion.div>
                     </motion.div>
                 )}

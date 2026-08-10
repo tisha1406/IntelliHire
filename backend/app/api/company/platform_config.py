@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.auth.jwt_handler import TokenPayload
 from app.rbac.models import UserRole
-from app.rbac.permissions import require_role
+from app.rbac.permissions import require_company_or_recruiter
 from app.repositories.company_repository import CompanyRepository
 
 router = APIRouter(
@@ -13,13 +13,20 @@ company_repo = CompanyRepository()
 
 @router.get("", summary="Get Platform Configuration")
 async def get_platform_config(
-    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY))
+    current_user: TokenPayload = Depends(require_company_or_recruiter)
 ):
     """
     Returns the unified platform configuration for the authenticated company tenant.
     Aggregates features, limits, subscription, and allowed capabilities.
+    - Company Admin: resolved from sub
+    - Recruiter: resolved from token.company_id
     """
-    company = await company_repo.get_by_id(current_user.sub)
+    resolved_company_id = (
+        current_user.company_id
+        if current_user.role.upper() == UserRole.RECRUITER.value.upper()
+        else current_user.sub
+    )
+    company = await company_repo.get_by_id(resolved_company_id)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found.")
 

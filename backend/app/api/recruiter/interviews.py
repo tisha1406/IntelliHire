@@ -16,10 +16,11 @@ router = APIRouter(
 async def get_recruiter_interviews(
     token: TokenPayload = Depends(require_recruiter_scope)
 ):
+    from bson import ObjectId
     # First get all candidates assigned to this recruiter
     candidate_repo = CandidateRepository()
-    candidates = await candidate_repo.get_many({"assigned_recruiter_id": token.recruiter_id})
-    candidate_ids = [str(c["_id"]) for c in candidates]
+    candidates = await candidate_repo.get_many({"assigned_recruiter_id": ObjectId(token.recruiter_id)})
+    candidate_ids = [c["_id"] for c in candidates]
     
     if not candidate_ids:
         return success_response(data=[])

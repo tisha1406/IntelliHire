@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { FaPlus, FaTh, FaList, FaSearch, FaTimesCircle, FaPlusCircle } from "react-icons/fa";
 
 import campaignService from "../../services/company/campaignService";
+import { useAuthContext } from "../../context/AuthContext";
 
 // Reusable components
 import PageHeader from "../../components/common/PageHeader";
@@ -21,6 +22,7 @@ import "../../styles/company/Campaign.css";
 
 export default function Campaigns() {
     const navigate = useNavigate();
+    const { isRecruiter } = useAuthContext();
 
     // Local Campaign list state
     const [campaigns, setCampaigns] = useState([]);
@@ -207,13 +209,15 @@ const handleDuplicate = async (id) => {
     return (
         <div className="campaigns-page-container">
             <PageHeader
-                title="Hiring Campaigns"
-                subtitle="Manage hiring campaigns."
+                title={isRecruiter ? "My Campaigns" : "Hiring Campaigns"}
+                subtitle={isRecruiter ? "Campaigns assigned to you" : "Manage hiring campaigns."}
                 breadcrumbs={[{ label: "Campaigns" }]}
                 actions={
-                    <Button variant="primary" iconLeft={<FaPlus />} onClick={() => navigate("/company/campaigns/new")}>
-                        Create Campaign
-                    </Button>
+                    !isRecruiter && (
+                        <Button variant="primary" iconLeft={<FaPlus />} onClick={() => navigate("/company/campaigns/new")}>
+                            Create Campaign
+                        </Button>
+                    )
                 }
             />
 

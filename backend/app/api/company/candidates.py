@@ -1,13 +1,13 @@
 from datetime import datetime, UTC
+# pyrefly: ignore [missing-import]
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-
 from app.repositories.candidate_repository import CandidateRepository
 from app.repositories.campaign_repository import CampaignRepository
 from app.repositories.interview_session_repository import InterviewSessionRepository
 from app.repositories.interview_report_repository import InterviewReportRepository
-from app.rbac.permissions import require_role
+from app.rbac.permissions import require_role, require_company_or_recruiter
 from app.auth.jwt_handler import TokenPayload
 from app.rbac.models import UserRole
 from app.middleware.limits import check_limit
@@ -45,23 +45,48 @@ router = APIRouter(
 async def invite_candidate(
     req: InviteCandidateRequest,
     current_user: TokenPayload = Depends(
-        require_role(UserRole.COMPANY)
+        require_company_or_recruiter
     ),
     _: TokenPayload = Depends(check_limit("max_candidates", "candidates_used")),
 ):
     service = InvitationService()
+    # Resolve company_id by role
+    company_id = (
+        current_user.company_id
+        if current_user.role.upper() == UserRole.RECRUITER.value.upper()
+        else current_user.sub
+    )
 
     try:
+        
+        assigned_recruiter_id = req.assigned_recruiter_id
+        if not assigned_recruiter_id and current_user.role.upper() == UserRole.RECRUITER.value.upper():
+            assigned_recruiter_id = current_user.recruiter_id
 
         invitation_token = await service.invite_candidate(
-            company_id=current_user.company_id,
+            company_id=company_id,
             campaign_id=req.campaign_id,
             name=req.name,
             email=req.email,
+            assigned_recruiter_id=assigned_recruiter_id
         )
 
         company_repo = CompanyRepository()
-        await company_repo.update_usage(current_user.sub, "candidates_used", 1)
+        await company_repo.update_usage(company_id, "candidates_used", 1)
+        
+        # Log action
+        from app.repositories.audit_log_repository import AuditLogRepository
+        audit_repo = AuditLogRepository()
+        await audit_repo.log_action(
+            company_id=company_id,
+            actor_id=current_user.sub,
+            actor_name=current_user.name,
+            actor_role=current_user.role,
+            action="CREATED_CANDIDATE",
+            target_entity="Candidate",
+            target_name=req.name,
+            metadata={"email": req.email, "campaign_id": req.campaign_id, "assigned_recruiter_id": assigned_recruiter_id}
+        )
 
     except HTTPException:
 
@@ -85,15 +110,18 @@ async def invite_candidate(
 
     )
 
-# ---------------------------------------------------------
-# GET ALL CANDIDATES
-# ---------------------------------------------------------
 @router.get("/")
 async def get_candidates(
-    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
 ):
     repo = CandidateRepository()
-    candidates = await repo.list({"company_id": ObjectId(current_user.company_id)})
+
+    if current_user.role.upper() == UserRole.RECRUITER.value.upper():
+        # Recruiter: only see candidates assigned to them
+        candidates = await repo.list({"assigned_recruiter_id": ObjectId(current_user.recruiter_id)})
+    else:
+        # Company Admin: see all company candidates
+        candidates = await repo.list({"company_id": ObjectId(current_user.company_id)})
 
     formatted = []
     for cand in candidates:
@@ -117,24 +145,95 @@ async def get_candidates(
             "timeline": cand.get("timeline", []),
             "aiRecommendations": cand.get("aiRecommendations", ""),
             "notes": cand.get("notes", ""),
+            "campaign_id": str(cand["campaign_id"]) if cand.get("campaign_id") else None,
+            "assigned_recruiter_id": str(cand["assigned_recruiter_id"]) if cand.get("assigned_recruiter_id") else None,
         })
     return formatted
+
+
+class BulkAssignCandidatesRequest(BaseModel):
+    candidate_ids: list[str]
+    recruiter_id: str
+
+
+@router.post("/bulk-assign")
+async def bulk_assign_candidates(
+    req: BulkAssignCandidatesRequest,
+    current_user: TokenPayload = Depends(require_company_or_recruiter)
+):
+    repo = CandidateRepository()
+    from app.repositories.recruiter_repository import RecruiterRepository
+    recruiter_repo = RecruiterRepository()
+    
+    recruiter = await recruiter_repo.get_by_id(req.recruiter_id)
+    if not recruiter or recruiter.get("company_id") != current_user.sub:
+        raise HTTPException(status_code=400, detail="Invalid recruiter ID.")
+
+    updated_count = 0
+    from app.repositories.audit_log_repository import AuditLogRepository
+    audit_repo = AuditLogRepository()
+
+    for cid in req.candidate_ids:
+        cand = await repo.get_by_id(cid)
+        if cand and str(cand.get("company_id")) == current_user.sub:
+            await repo.update(cid, {
+                "assigned_recruiter_id": ObjectId(req.recruiter_id),
+                "updated_at": datetime.now(UTC),
+                "updated_by": ObjectId(current_user.sub),
+                "updated_by_role": current_user.role
+            })
+            updated_count += 1
+            
+            # Log action
+            await audit_repo.log_action(
+                company_id=current_user.sub,
+                actor_id=current_user.sub,
+                actor_name=current_user.name,
+                actor_role=current_user.role,
+                action="ASSIGNED_CANDIDATE",
+                target_entity="Candidate",
+                target_id=cid,
+                target_name=cand.get("name"),
+                metadata={"new_recruiter_id": req.recruiter_id, "new_recruiter_name": recruiter.get("name")}
+            )
+
+    return success_response(data={"updated": updated_count}, message=f"Assigned {updated_count} candidates to {recruiter.get('name')}")
 
 
 # ---------------------------------------------------------
 # GET COMPANY INTERVIEWS & STATS
 # (MUST be before /{candidate_id} routes)
+
 # ---------------------------------------------------------
 @router.get("/interviews")
 async def get_company_interviews(
-    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
 ):
     session_repo = InterviewSessionRepository()
     report_repo = InterviewReportRepository()
     cand_repo = CandidateRepository()
     campaign_repo = CampaignRepository()
+    
+    # Resolve company_id by role
+    company_id = (
+        current_user.company_id
+        if current_user.role.upper() == UserRole.RECRUITER.value.upper()
+        else current_user.sub
+    )
 
-    sessions = await session_repo.get_many({"company_id": ObjectId(current_user.company_id)})
+    if current_user.role.upper() == UserRole.RECRUITER.value.upper():
+        # Get candidates assigned to this recruiter
+        my_candidates = await cand_repo.get_many({"assigned_recruiter_id": ObjectId(current_user.recruiter_id)})
+        my_candidate_ids = [c["_id"] for c in my_candidates]
+        if not my_candidate_ids:
+            sessions = []
+        else:
+            sessions = await session_repo.get_many({
+                "company_id": ObjectId(company_id),
+                "candidate_id": {"$in": my_candidate_ids}
+            })
+    else:
+        sessions = await session_repo.get_many({"company_id": ObjectId(company_id)})
 
     formatted_interviews = []
     upcoming_count = 0
@@ -253,7 +352,7 @@ async def get_company_interviews(
 @router.patch("/interviews/{session_id}/cancel")
 async def cancel_company_interview(
     session_id: str,
-    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
 ):
     session_repo = InterviewSessionRepository()
     cand_repo = CandidateRepository()
@@ -288,7 +387,7 @@ async def cancel_company_interview(
 @router.post("/interviews/schedule")
 async def schedule_new_company_interview(
     data: dict,
-    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
 ):
     cand_repo = CandidateRepository()
     campaign_repo = CampaignRepository()
@@ -301,8 +400,12 @@ async def schedule_new_company_interview(
         raise HTTPException(status_code=400, detail="candidate_id and campaign_id are required")
 
     cand = await cand_repo.get_by_id(candidate_id)
-    if not cand or str(cand.get("company_id")) != str(current_user.company_id):
+# Verify access
+    company_id = current_user.company_id if current_user.role.upper() == "RECRUITER" else current_user.sub
+    if not cand or str(cand.get("company_id")) != str(company_id):
         raise HTTPException(status_code=404, detail="Candidate not found")
+    if current_user.role.upper() == "RECRUITER" and str(cand.get("assigned_recruiter_id")) != str(current_user.recruiter_id):
+        raise HTTPException(status_code=404, detail="Candidate not found (not assigned)")
 
     camp = await campaign_repo.get_by_id(campaign_id)
     if not camp or str(camp.get("company_id")) != str(current_user.company_id):
@@ -363,12 +466,16 @@ async def schedule_new_company_interview(
 @router.get("/{candidate_id}")
 async def get_candidate(
     candidate_id: str,
-    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
 ):
     repo = CandidateRepository()
     cand = await repo.get(candidate_id)
-    if not cand or str(cand.get("company_id")) != str(current_user.company_id):
+# Verify access
+    company_id = current_user.company_id if current_user.role.upper() == "RECRUITER" else current_user.sub
+    if not cand or str(cand.get("company_id")) != str(company_id):
         raise HTTPException(status_code=404, detail="Candidate not found")
+    if current_user.role.upper() == "RECRUITER" and str(cand.get("assigned_recruiter_id")) != str(current_user.recruiter_id):
+        raise HTTPException(status_code=404, detail="Candidate not found (not assigned)")
 
     return {
         "id": str(cand["_id"]),
@@ -399,13 +506,18 @@ async def get_candidate(
 @router.post("/")
 async def create_candidate(
     candidate: dict,
-    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
     _: TokenPayload = Depends(check_limit("max_candidates", "candidates_used")),
 ):
     repo = CandidateRepository()
-    candidate["company_id"] = ObjectId(current_user.company_id)
-    if "campaign_id" in candidate:
+    company_id = current_user.company_id if current_user.role.upper() == "RECRUITER" else current_user.sub
+    candidate["company_id"] = ObjectId(company_id)
+    if current_user.role.upper() == "RECRUITER":
+        candidate["assigned_recruiter_id"] = ObjectId(current_user.recruiter_id)
+    if "campaign_id" in candidate and candidate["campaign_id"]:
         candidate["campaign_id"] = ObjectId(candidate["campaign_id"])
+    if "assigned_recruiter_id" in candidate and candidate["assigned_recruiter_id"]:
+        candidate["assigned_recruiter_id"] = ObjectId(candidate["assigned_recruiter_id"])
 
     candidate.setdefault("aiMatch", 0)
     candidate.setdefault("resumeScore", 0)
@@ -415,7 +527,8 @@ async def create_candidate(
     cand_id = await repo.create(candidate)
     
     company_repo = CompanyRepository()
-    await company_repo.update_usage(current_user.sub, "candidates_used", 1)
+    company_id = current_user.company_id if current_user.role.upper() == "RECRUITER" else current_user.sub
+    await company_repo.update_usage(company_id, "candidates_used", 1)
     
     return {
         "message": "Candidate created",
@@ -430,18 +543,24 @@ async def create_candidate(
 async def update_candidate(
     candidate_id: str,
     data: dict,
-    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
 ):
     repo = CandidateRepository()
     cand = await repo.get(candidate_id)
-    if not cand or str(cand.get("company_id")) != str(current_user.company_id):
+# Verify access
+    company_id = current_user.company_id if current_user.role.upper() == "RECRUITER" else current_user.sub
+    if not cand or str(cand.get("company_id")) != str(company_id):
         raise HTTPException(status_code=404, detail="Candidate not found")
+    if current_user.role.upper() == "RECRUITER" and str(cand.get("assigned_recruiter_id")) != str(current_user.recruiter_id):
+        raise HTTPException(status_code=404, detail="Candidate not found (not assigned)")
 
     data.pop("_id", None)
     data.pop("id", None)
     data.pop("company_id", None)
-    if "campaign_id" in data:
+    if "campaign_id" in data and data["campaign_id"]:
         data["campaign_id"] = ObjectId(data["campaign_id"])
+    if "assigned_recruiter_id" in data and data["assigned_recruiter_id"]:
+        data["assigned_recruiter_id"] = ObjectId(data["assigned_recruiter_id"])
 
     await repo.update(candidate_id, data)
     return {"message": "Candidate updated"}
@@ -453,17 +572,22 @@ async def update_candidate(
 @router.delete("/{candidate_id}")
 async def delete_candidate(
     candidate_id: str,
-    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
 ):
     repo = CandidateRepository()
     cand = await repo.get(candidate_id)
-    if not cand or str(cand.get("company_id")) != str(current_user.company_id):
+# Verify access
+    company_id = current_user.company_id if current_user.role.upper() == "RECRUITER" else current_user.sub
+    if not cand or str(cand.get("company_id")) != str(company_id):
         raise HTTPException(status_code=404, detail="Candidate not found")
+    if current_user.role.upper() == "RECRUITER" and str(cand.get("assigned_recruiter_id")) != str(current_user.recruiter_id):
+        raise HTTPException(status_code=404, detail="Candidate not found (not assigned)")
 
     await repo.delete(candidate_id)
 
     company_repo = CompanyRepository()
-    await company_repo.update_usage(current_user.sub, "candidates_used", -1)
+    company_id = current_user.company_id if current_user.role.upper() == "RECRUITER" else current_user.sub
+    await company_repo.update_usage(company_id, "candidates_used", -1)
 
     return {"message": "Candidate deleted"}
 
@@ -474,12 +598,16 @@ async def delete_candidate(
 @router.patch("/{candidate_id}/shortlist")
 async def shortlist_candidate(
     candidate_id: str,
-    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
 ):
     repo = CandidateRepository()
     cand = await repo.get(candidate_id)
-    if not cand or str(cand.get("company_id")) != str(current_user.company_id):
+# Verify access
+    company_id = current_user.company_id if current_user.role.upper() == "RECRUITER" else current_user.sub
+    if not cand or str(cand.get("company_id")) != str(company_id):
         raise HTTPException(status_code=404, detail="Candidate not found")
+    if current_user.role.upper() == "RECRUITER" and str(cand.get("assigned_recruiter_id")) != str(current_user.recruiter_id):
+        raise HTTPException(status_code=404, detail="Candidate not found (not assigned)")
 
     update_data = {
         "status": "Shortlisted",
@@ -506,12 +634,16 @@ async def shortlist_candidate(
 @router.patch("/{candidate_id}/reject")
 async def reject_candidate(
     candidate_id: str,
-    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
 ):
     repo = CandidateRepository()
     cand = await repo.get(candidate_id)
-    if not cand or str(cand.get("company_id")) != str(current_user.company_id):
+# Verify access
+    company_id = current_user.company_id if current_user.role.upper() == "RECRUITER" else current_user.sub
+    if not cand or str(cand.get("company_id")) != str(company_id):
         raise HTTPException(status_code=404, detail="Candidate not found")
+    if current_user.role.upper() == "RECRUITER" and str(cand.get("assigned_recruiter_id")) != str(current_user.recruiter_id):
+        raise HTTPException(status_code=404, detail="Candidate not found (not assigned)")
 
     update_data = {
         "status": "Rejected",
@@ -538,12 +670,16 @@ async def reject_candidate(
 @router.patch("/{candidate_id}/schedule")
 async def schedule_interview(
     candidate_id: str,
-    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
 ):
     repo = CandidateRepository()
     cand = await repo.get(candidate_id)
-    if not cand or str(cand.get("company_id")) != str(current_user.company_id):
+# Verify access
+    company_id = current_user.company_id if current_user.role.upper() == "RECRUITER" else current_user.sub
+    if not cand or str(cand.get("company_id")) != str(company_id):
         raise HTTPException(status_code=404, detail="Candidate not found")
+    if current_user.role.upper() == "RECRUITER" and str(cand.get("assigned_recruiter_id")) != str(current_user.recruiter_id):
+        raise HTTPException(status_code=404, detail="Candidate not found (not assigned)")
 
     update_data = {
         "currentStage": "Interview Scheduled",
@@ -602,12 +738,16 @@ class ReassignRequest(BaseModel):
 async def reassign_candidate(
     candidate_id: str,
     request: ReassignRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
 ):
     repo = CandidateRepository()
     cand = await repo.get(candidate_id)
-    if not cand or str(cand.get("company_id")) != str(current_user.company_id):
+# Verify access
+    company_id = current_user.company_id if current_user.role.upper() == "RECRUITER" else current_user.sub
+    if not cand or str(cand.get("company_id")) != str(company_id):
         raise HTTPException(status_code=404, detail="Candidate not found")
+    if current_user.role.upper() == "RECRUITER" and str(cand.get("assigned_recruiter_id")) != str(current_user.recruiter_id):
+        raise HTTPException(status_code=404, detail="Candidate not found (not assigned)")
 
     # Verify the new recruiter belongs to the company
     from app.repositories.recruiter_repository import RecruiterRepository

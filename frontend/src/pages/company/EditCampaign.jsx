@@ -10,6 +10,7 @@ import {
 
 import { useAuthContext } from "../../context/AuthContext";
 import campaignService from "../../services/company/campaignService";
+import recruiterManagementService from "../../services/company/recruiterManagementService";
 
 // Common components
 import PageHeader from "../../components/common/PageHeader";
@@ -63,10 +64,12 @@ export default function EditCampaign() {
         requirements: [],
         interviewDuration: 45,
         strictness: "High",
-        interviewType: "Technical"
+        interviewType: "Technical",
+        assigned_recruiter_ids: []
     });
 
     const [reqInput, setReqInput] = useState("");
+    const [recruiters, setRecruiters] = useState([]);
     const [errors, setErrors] = useState({});
     const [toastMessage, setToastMessage] = useState(null);
 
@@ -79,6 +82,13 @@ export default function EditCampaign() {
     ];
 
     useEffect(() => {
+        const loadRecruiters = async () => {
+            try {
+                const res = await recruiterManagementService.getRecruiters();
+                setRecruiters(res.data?.data || res.data || []);
+            } catch (err) {}
+        };
+        loadRecruiters();
         loadCampaign();
     }, [id]);
 
@@ -109,7 +119,8 @@ export default function EditCampaign() {
                 strictness:
                     campaign.interview_settings?.strictness || "High",
                 interviewType:
-                    campaign.interview_settings?.type || "Technical"
+                    campaign.interview_settings?.type || "Technical",
+                assigned_recruiter_ids: campaign.assigned_recruiter_ids || []
             });
             console.log("FORM:", formData);
             
@@ -235,6 +246,7 @@ export default function EditCampaign() {
                 description: formData.description.trim(),
 
                 employment_type: formData.employmentType.trim(),
+                assigned_recruiter_ids: formData.assigned_recruiter_ids,
 
                 requirements: formData.requirements,
 
@@ -400,6 +412,32 @@ export default function EditCampaign() {
                                         error={errors.deadline}
                                     />
 
+                                </div>
+
+
+                                <div style={{ marginTop: 24 }}>
+                                    <h4 style={{ marginBottom: 12, fontSize: 16, color: "var(--text)" }}>Assign Recruiters</h4>
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                                        {recruiters.map(r => (
+                                            <label key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", background: "var(--bg)", padding: "10px 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={formData.assigned_recruiter_ids.includes(r.id)} 
+                                                    onChange={(e) => {
+                                                        const isChecked = e.target.checked;
+                                                        setFormData(prev => ({
+                                                            ...prev,
+                                                            assigned_recruiter_ids: isChecked 
+                                                                ? [...prev.assigned_recruiter_ids, r.id]
+                                                                : prev.assigned_recruiter_ids.filter(id => id !== r.id)
+                                                        }));
+                                                    }}
+                                                />
+                                                <span>{r.first_name} {r.last_name}</span>
+                                            </label>
+                                        ))}
+                                        {recruiters.length === 0 && <span style={{ color: "var(--text-muted)", fontSize: 14 }}>No recruiters found.</span>}
+                                    </div>
                                 </div>
 
                             </div>

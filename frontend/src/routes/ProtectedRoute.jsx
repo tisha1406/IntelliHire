@@ -61,6 +61,16 @@ export default function ProtectedRoute({
 
     }
 
+    // ======================================
+    // Intercept Recruiter First Login
+    // ======================================
+    if (user?.role === "recruiter" && user?.must_change_password) {
+        const currentPath = window.location.pathname;
+        if (currentPath !== "/company/change-password") {
+            return <Navigate to="/company/change-password" replace />;
+        }
+    }
+
     return children;
 
 }

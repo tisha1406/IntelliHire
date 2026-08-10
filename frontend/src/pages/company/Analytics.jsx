@@ -277,7 +277,7 @@ export default function Analytics() {
                             change={kpi.change}
                             positive={kpi.positive}
                             icon={kpi.icon}
-                            iconColor={kpi.color}
+                            color={kpi.color}
                         />
                     </motion.div>
                 ))}

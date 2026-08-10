@@ -33,6 +33,7 @@ class InvitationService:
         campaign_id: str,
         name: str,
         email: str,
+        assigned_recruiter_id: str = None
     ) -> str:
         """
         Creates a candidate invitation.
@@ -83,6 +84,9 @@ class InvitationService:
             "created_at": datetime.now(UTC),
             "updated_at": datetime.now(UTC),
         }
+        if assigned_recruiter_id:
+            candidate_data["assigned_recruiter_id"] = ObjectId(assigned_recruiter_id)
+            
         candidate_id = await self.candidate_repo.create(candidate_data)
 
         # Update User with Candidate ID

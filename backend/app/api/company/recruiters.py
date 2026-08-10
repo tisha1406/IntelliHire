@@ -34,7 +34,10 @@ class RecruiterUpdateRequest(BaseModel):
     phone: Optional[str] = None
     department: Optional[str] = None
     designation: Optional[str] = None
-    status: Optional[str] = None
+    account_status: Optional[str] = None
+
+class CampaignAssignRequest(BaseModel):
+    campaign_ids: List[str]
 
 def generate_temp_password(length=12):
     chars = string.ascii_letters + string.digits + "!@#$%^&*"
@@ -46,10 +49,20 @@ async def get_company_recruiters(
     token: TokenPayload = Depends(require_own_company)
 ):
     repo = RecruiterRepository()
+    user_repo = UserRepository()
+    
     recruiters = await repo.get_many({"company_id": company_id})
     for r in recruiters:
         r["id"] = str(r["_id"])
         r.pop("_id", None)
+        
+        # Merge user info
+        if r.get("user_id"):
+            user = await user_repo.get_by_id(str(r["user_id"]))
+            if user:
+                r["last_login"] = user.get("last_login")
+                r["must_change_password"] = user.get("must_change_password", False)
+                
     return success_response(data=recruiters, message="Recruiters fetched successfully")
 
 @router.post("/", response_model=APIResponse[dict])
@@ -92,7 +105,7 @@ async def create_recruiter(
         "phone": request.phone,
         "department": request.department,
         "designation": request.designation,
-        "status": request.status,
+        "account_status": "Active",
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
     }
@@ -142,10 +155,10 @@ async def update_recruiter(
     
     await repo.update(recruiter_id, update_data)
     
-    # If status changed, update user status as well
-    if "status" in update_data:
+    # If account_status changed, update user status as well
+    if "account_status" in update_data:
         user_repo = UserRepository()
-        is_active = update_data["status"] == "active"
+        is_active = update_data["account_status"] == "Active"
         if recruiter.get("user_id"):
             await user_repo.update(str(recruiter["user_id"]), {"is_active": is_active})
 
@@ -199,3 +212,140 @@ async def reset_recruiter_password(
         },
         message="Password reset successfully"
     )
+
+@router.post("/{recruiter_id}/suspend", response_model=APIResponse[dict])
+async def suspend_recruiter(
+    company_id: str,
+    recruiter_id: str,
+    token: TokenPayload = Depends(require_own_company)
+):
+    """Suspend a recruiter account (disables login)."""
+    repo = RecruiterRepository()
+    recruiter = await repo.get_by_id(recruiter_id)
+    if not recruiter or str(recruiter.get("company_id")) != company_id:
+        raise HTTPException(status_code=404, detail="Recruiter not found")
+    
+    await repo.update(recruiter_id, {
+        "account_status": "Suspended",
+        "updated_at": datetime.now(UTC)
+    })
+    
+    if recruiter.get("user_id"):
+        user_repo = UserRepository()
+        await user_repo.update(str(recruiter["user_id"]), {"is_active": False})
+    
+    return success_response(message="Recruiter suspended successfully")
+
+@router.post("/{recruiter_id}/activate", response_model=APIResponse[dict])
+async def activate_recruiter(
+    company_id: str,
+    recruiter_id: str,
+    token: TokenPayload = Depends(require_own_company)
+):
+    """Reactivate a suspended recruiter account."""
+    repo = RecruiterRepository()
+    recruiter = await repo.get_by_id(recruiter_id)
+    if not recruiter or str(recruiter.get("company_id")) != company_id:
+        raise HTTPException(status_code=404, detail="Recruiter not found")
+    
+    await repo.update(recruiter_id, {
+        "account_status": "Active",
+        "updated_at": datetime.now(UTC)
+    })
+    
+    if recruiter.get("user_id"):
+        user_repo = UserRepository()
+        await user_repo.update(str(recruiter["user_id"]), {"is_active": True})
+    
+    return success_response(message="Recruiter activated successfully")
+
+@router.post("/{recruiter_id}/force-reset", response_model=APIResponse[dict])
+async def force_password_reset(
+    company_id: str,
+    recruiter_id: str,
+    token: TokenPayload = Depends(require_own_company)
+):
+    """Force the recruiter to change their password on next login."""
+    repo = RecruiterRepository()
+    recruiter = await repo.get_by_id(recruiter_id)
+    if not recruiter or str(recruiter.get("company_id")) != company_id:
+        raise HTTPException(status_code=404, detail="Recruiter not found")
+    
+    if not recruiter.get("user_id"):
+        raise HTTPException(status_code=400, detail="Recruiter has no associated user account")
+    
+    user_repo = UserRepository()
+    await user_repo.update(str(recruiter["user_id"]), {
+        "must_change_password": True,
+        "updated_at": datetime.now(UTC)
+    })
+    
+    return success_response(message="Recruiter will be required to change password on next login")
+
+@router.get("/{recruiter_id}/campaigns", response_model=APIResponse[list])
+async def get_recruiter_campaigns(
+    company_id: str,
+    recruiter_id: str,
+    token: TokenPayload = Depends(require_own_company)
+):
+    from app.repositories.campaign_repository import CampaignRepository
+    from bson import ObjectId
+    
+    repo = RecruiterRepository()
+    recruiter = await repo.get_by_id(recruiter_id)
+    if not recruiter or str(recruiter.get("company_id")) != company_id:
+        raise HTTPException(status_code=404, detail="Recruiter not found")
+        
+    campaign_repo = CampaignRepository()
+    campaigns = await campaign_repo.get_many({
+        "company_id": ObjectId(company_id),
+        "assigned_recruiter_ids": recruiter_id
+    })
+    
+    for c in campaigns:
+        c["_id"] = str(c["_id"])
+        c["company_id"] = str(c["company_id"])
+        
+    return success_response(data=campaigns)
+
+@router.post("/{recruiter_id}/campaigns", response_model=APIResponse[dict])
+async def update_recruiter_campaigns(
+    company_id: str,
+    recruiter_id: str,
+    request: CampaignAssignRequest,
+    token: TokenPayload = Depends(require_own_company)
+):
+    from app.repositories.campaign_repository import CampaignRepository
+    from bson import ObjectId
+    
+    repo = RecruiterRepository()
+    recruiter = await repo.get_by_id(recruiter_id)
+    if not recruiter or str(recruiter.get("company_id")) != company_id:
+        raise HTTPException(status_code=404, detail="Recruiter not found")
+        
+    campaign_repo = CampaignRepository()
+    
+    # First, remove this recruiter from all campaigns they currently have in this company
+    current_campaigns = await campaign_repo.get_many({
+        "company_id": ObjectId(company_id),
+        "assigned_recruiter_ids": recruiter_id
+    })
+    
+    for c in current_campaigns:
+        camp_id = str(c["_id"])
+        assigned = c.get("assigned_recruiter_ids", [])
+        if recruiter_id in assigned:
+            assigned.remove(recruiter_id)
+            await campaign_repo.update(camp_id, {"assigned_recruiter_ids": assigned})
+            
+    # Now, add them to the requested campaigns
+    for camp_id in request.campaign_ids:
+        c = await campaign_repo.get_by_id(camp_id)
+        if c and str(c.get("company_id")) == company_id:
+            assigned = c.get("assigned_recruiter_ids", [])
+            if recruiter_id not in assigned:
+                assigned.append(recruiter_id)
+                await campaign_repo.update(camp_id, {"assigned_recruiter_ids": assigned})
+                
+    return success_response(message="Campaign assignments updated successfully")
+

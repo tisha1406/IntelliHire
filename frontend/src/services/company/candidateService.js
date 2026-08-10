@@ -35,6 +35,14 @@ const candidateService = {
     scheduleInterview(id) {
         return api.patch(`${BASE}/${id}/schedule`);
     },
+
+    sendInvite(id) {
+        return api.post(`${BASE}/${id}/send-invite`);
+    },
+
+    bulkAssignCandidates(candidateIds, recruiterId) {
+        return api.post(`${BASE}/bulk-assign`, { candidate_ids: candidateIds, recruiter_id: recruiterId });
+    }
 };
 
 export default candidateService;

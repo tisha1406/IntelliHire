@@ -8,8 +8,8 @@ import { PermissionsProvider } from "./context/PermissionsContext";
 import AdminLayout from "./layouts/AdminLayout";
 import CompanyLayout from "./layouts/CompanyLayout";
 import CandidateLayout from "./layouts/CandidateLayout";
-import RecruiterLayout from "./layouts/RecruiterLayout";
 
+// Company / Shared Portal Pages (used by both Company Admin and Recruiter)
 import Dashboard from "./pages/company/Dashboard";
 import Campaigns from "./pages/company/Campaigns";
 import CampaignDetail from "./pages/company/CampaignDetail";
@@ -30,16 +30,8 @@ import Team from "./pages/company/Team";
 import Notifications from "./pages/company/Notifications";
 import RecruiterProfile from "./pages/company/RecruiterProfile";
 import EditCampaign from "./pages/company/EditCampaign";
-
-// Recruiter Pages
-import RecruiterDashboard from "./pages/recruiter/Dashboard";
-import RecruiterCandidates from "./pages/recruiter/MyCandidates";
-import RecruiterCampaigns from "./pages/recruiter/MyCampaigns";
-import RecruiterInterviews from "./pages/recruiter/InterviewSessions";
-import RecruiterReports from "./pages/recruiter/InterviewReports";
-import RecruiterNotifications from "./pages/recruiter/RecruiterNotifications";
-import RecruiterProfilePage from "./pages/recruiter/RecruiterProfilePage";
-import ChangePassword from "./pages/recruiter/ChangePassword";
+import Recruiters from "./pages/company/Recruiters";
+import ChangePassword from "./pages/company/ChangePassword";
 
 function App() {
     return (
@@ -59,10 +51,15 @@ function App() {
                 }
             />
 
+            {/*
+             * Company Portal — shared by both Company Admins and Recruiters.
+             * The backend scopes data by JWT role automatically.
+             * The frontend shows/hides UI elements based on role.
+             */}
             <Route
                 path="/company"
                 element={
-                    <ProtectedRoute role="company">
+                    <ProtectedRoute roles={["company", "recruiter"]}>
                         <PermissionsProvider>
                             <CompanyLayout />
                         </PermissionsProvider>
@@ -116,6 +113,22 @@ function App() {
                 />
 
                 <Route
+                    path="interviews"
+                    element={<Interviews />}
+                />
+
+                <Route
+                    path="reports"
+                    element={<Reports />}
+                />
+
+                <Route
+                    path="notifications"
+                    element={<Notifications />}
+                />
+
+                {/* Company Admin only routes (hidden from recruiter sidebar, 403 if directly accessed) */}
+                <Route
                     path="analytics"
                     element={<Analytics />}
                 />
@@ -123,21 +136,6 @@ function App() {
                 <Route
                     path="exports"
                     element={<Exports />}
-                />
-
-                <Route
-                    path="profile"
-                    element={<Profile />}
-                />
-
-                <Route
-                    path="settings"
-                    element={<Settings />}
-                />
-
-                <Route
-                    path="activity"
-                    element={<Activity />}
                 />
 
                 <Route
@@ -156,49 +154,43 @@ function App() {
                 />
 
                 <Route
-                    path="interviews"
-                    element={<Interviews />}
-                />
-
-                <Route
-                    path="reports"
-                    element={<Reports />}
-                />
-
-                <Route
                     path="team"
                     element={<Team />}
                 />
 
                 <Route
-                    path="notifications"
-                    element={<Notifications />}
+                    path="recruiters"
+                    element={<Recruiters />}
                 />
 
+                <Route
+                    path="activity"
+                    element={<Activity />}
+                />
+
+                <Route
+                    path="settings"
+                    element={<Settings />}
+                />
+
+                {/* Profile — renders Company profile for admins, Recruiter profile for recruiters */}
+                <Route
+                    path="profile"
+                    element={<Profile />}
+                />
+
+                {/* Recruiter-specific: view own profile (also linked from sidebar) */}
                 <Route
                     path="recruiter"
                     element={<RecruiterProfile />}
                 />
 
-            </Route>
+                {/* First-login password change for recruiters */}
+                <Route
+                    path="change-password"
+                    element={<ChangePassword />}
+                />
 
-            <Route
-                path="/recruiter"
-                element={
-                    <ProtectedRoute role="recruiter">
-                        <RecruiterLayout />
-                    </ProtectedRoute>
-                }
-            >
-                <Route index element={<RecruiterDashboard />} />
-                <Route path="dashboard" element={<RecruiterDashboard />} />
-                <Route path="candidates" element={<RecruiterCandidates />} />
-                <Route path="campaigns" element={<RecruiterCampaigns />} />
-                <Route path="interviews" element={<RecruiterInterviews />} />
-                <Route path="reports" element={<RecruiterReports />} />
-                <Route path="notifications" element={<RecruiterNotifications />} />
-                <Route path="profile" element={<RecruiterProfilePage />} />
-                <Route path="change-password" element={<ChangePassword />} />
             </Route>
 
             <Route

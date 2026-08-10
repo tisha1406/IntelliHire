@@ -7,6 +7,7 @@ import {
 
 import { jwtDecode } from "jwt-decode";
 import profileService from "../services/company/profileService";
+import recruiterService from "../services/recruiter/recruiterService";
 
 const AuthContext = createContext();
 
@@ -23,6 +24,8 @@ export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
 
     const [companyProfile, setCompanyProfile] = useState(null);
+
+    const [recruiterProfile, setRecruiterProfile] = useState(null);
 
     const [loading, setLoading] = useState(true);
 
@@ -67,6 +70,8 @@ export function AuthProvider({ children }) {
 
                 campaignId: decoded.campaign_id || null,
 
+                must_change_password: decoded.must_change_password || false,
+
                 exp: decoded.exp,
 
             });
@@ -76,6 +81,21 @@ export function AuthProvider({ children }) {
                     setCompanyProfile(profile);
                 }).catch(err => {
                     console.error("Failed to fetch company profile:", err);
+                });
+            } else if (decoded.role === "recruiter") {
+                // Fetch recruiter's personal profile
+                recruiterService.getProfile().then(res => {
+                    setRecruiterProfile(res.data?.data || res.data);
+                }).catch(err => {
+                    console.error("Failed to fetch recruiter profile:", err);
+                });
+                // Fetch the company profile for the recruiter's workspace.
+                // The backend now allows recruiter role on GET /company/profile,
+                // resolving company_id from the JWT's company_id claim.
+                profileService.getProfile().then(profile => {
+                    setCompanyProfile(profile);
+                }).catch(err => {
+                    console.error("Failed to fetch company profile for recruiter:", err);
                 });
             } else {
                 setCompanyProfile(null);
@@ -143,6 +163,7 @@ export function AuthProvider({ children }) {
 
         setUser(null);
         setCompanyProfile(null);
+        setRecruiterProfile(null);
 
     };
 
@@ -172,6 +193,8 @@ export function AuthProvider({ children }) {
 
                 campaignId: decoded.campaign_id || null,
 
+                must_change_password: decoded.must_change_password || false,
+
                 exp: decoded.exp,
 
             });
@@ -182,6 +205,24 @@ export function AuthProvider({ children }) {
                 }).catch(err => {
                     console.error("Failed to fetch company profile:", err);
                 });
+            }
+
+            if (decoded.role === "recruiter") {
+                if (!recruiterProfile) {
+                    recruiterService.getProfile().then(res => {
+                        setRecruiterProfile(res.data?.data || res.data);
+                    }).catch(err => {
+                        console.error("Failed to fetch recruiter profile:", err);
+                    });
+                }
+                if (!companyProfile) {
+                    // Reload company context for recruiter workspace
+                    profileService.getProfile().then(profile => {
+                        setCompanyProfile(profile);
+                    }).catch(err => {
+                        console.error("Failed to fetch company profile for recruiter:", err);
+                    });
+                }
             }
 
         }
@@ -222,7 +263,11 @@ export function AuthProvider({ children }) {
 
                 companyProfile,
 
+                recruiterProfile,
+
                 setCompanyProfile,
+
+                setRecruiterProfile,
 
                 loading,
 

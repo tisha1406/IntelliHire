@@ -46,6 +46,7 @@ from app.api.company.dashboard import router as company_dashboard_router
 from app.api.company.notifications import router as company_notifications_router
 from app.api.company.platform_config import router as company_platform_config_router
 from app.api.company.recruiters import router as company_recruiters_router
+from app.api.company.audit_logs import router as company_audit_logs_router
 
 # ===========================
 # Authentication
@@ -163,6 +164,7 @@ app.include_router(company_dashboard_router)
 app.include_router(company_notifications_router)
 app.include_router(company_platform_config_router)
 app.include_router(company_recruiters_router)
+app.include_router(company_audit_logs_router)
 
 # ---------- Authentication ----------
 app.include_router(auth_router)

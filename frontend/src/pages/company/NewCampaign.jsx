@@ -6,6 +6,7 @@ import { FaArrowLeft, FaArrowRight, FaCheckCircle, FaTrash, FaPlus } from "react
 import { useAuthContext } from "../../context/AuthContext";
 
 import campaignService from "../../services/company/campaignService";
+import recruiterManagementService from "../../services/company/recruiterManagementService";
 // Common components
 
 import PageHeader from "../../components/common/PageHeader";
@@ -56,10 +57,12 @@ export default function NewCampaign() {
         requirements: ["React experience", "TypeScript fluency"],
         interviewDuration: 45,
         strictness: "High",
-        interviewType: "Technical"
+        interviewType: "Technical",
+        assigned_recruiter_ids: []
     });
 
     const [reqInput, setReqInput] = useState("");
+    const [recruiters, setRecruiters] = useState([]);
     const [errors, setErrors] = useState({});
     const [toastMessage, setToastMessage] = useState(null);
     const [submitting, setSubmitting] = useState(false);
@@ -146,6 +149,7 @@ export default function NewCampaign() {
             description: formData.description.trim(),
 
             employment_type: formData.employmentType.trim(),
+                assigned_recruiter_ids: formData.assigned_recruiter_ids,
 
             requirements: formData.requirements,
 

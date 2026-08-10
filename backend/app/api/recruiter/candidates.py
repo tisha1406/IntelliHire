@@ -26,8 +26,9 @@ class CandidateCreateRequest(BaseModel):
 async def get_recruiter_candidates(
     token: TokenPayload = Depends(require_recruiter_scope)
 ):
+    from bson import ObjectId
     repo = CandidateRepository()
-    candidates = await repo.get_many({"assigned_recruiter_id": token.recruiter_id})
+    candidates = await repo.get_many({"assigned_recruiter_id": ObjectId(token.recruiter_id)})
     for c in candidates:
         c["id"] = str(c["_id"])
         c.pop("_id", None)
@@ -49,10 +50,11 @@ async def create_candidate(
         
     repo = CandidateRepository()
     
+    from bson import ObjectId
     candidate_doc = {
-        "company_id": token.company_id,
-        "campaign_id": request.campaign_id,
-        "assigned_recruiter_id": token.recruiter_id,
+        "company_id": ObjectId(token.company_id) if token.company_id else None,
+        "campaign_id": ObjectId(request.campaign_id),
+        "assigned_recruiter_id": ObjectId(token.recruiter_id),
         "name": request.name,
         "email": request.email,
         "phone": request.phone,

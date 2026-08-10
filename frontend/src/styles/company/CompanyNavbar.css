@@ -26,7 +26,7 @@
 
 }
 
-/* LEFT */
+/* LEFT — Company Brand */
 
 .navbar-left {
 
@@ -34,65 +34,141 @@
 
     align-items: center;
 
-}
-
-.nav-search-wrapper {
-
-    position: relative;
-
-    width: 340px;
+    gap: 12px;
 
 }
 
-.nav-search-icon {
+/* Hamburger — visible on all sizes, triggers sidebar open */
+.navbar-hamburger {
 
-    position: absolute;
-
-    left: 14px;
-
-    top: 50%;
-
-    transform: translateY(-50%);
-
-    color: var(--text-secondary);
-
-    font-size: 14px;
+    flex-shrink: 0;
 
 }
 
-.nav-search-wrapper input {
+/* Brand block */
+.navbar-brand {
 
-    width: 100%;
+    display: flex;
 
-    height: 40px;
+    align-items: center;
+
+    gap: 10px;
+
+    cursor: default;
+
+    user-select: none;
+
+}
+
+.navbar-company-logo {
+
+    width: 38px;
+
+    height: 38px;
 
     border-radius: 10px;
 
-    border: 1px solid var(--border);
+    background: linear-gradient(135deg, var(--primary, #3B82F6), #6366F1);
 
-    background: var(--input-bg);
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    flex-shrink: 0;
+
+    overflow: hidden;
+
+}
+
+.navbar-logo-img {
+
+    width: 100%;
+
+    height: 100%;
+
+    object-fit: cover;
+
+}
+
+.navbar-logo-initials {
+
+    color: #fff;
+
+    font-size: 16px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+}
+
+.navbar-brand-text {
+
+    display: flex;
+
+    flex-direction: column;
+
+    line-height: 1.15;
+
+}
+
+.navbar-company-name {
+
+    font-size: 15px;
+
+    font-weight: 700;
 
     color: var(--text);
 
-    padding-left: 42px;
-
-    padding-right: 16px;
-
-    font-size: 14px;
-
-    transition: .2s;
+    letter-spacing: -0.2px;
 
 }
 
-.nav-search-wrapper input:focus {
+.navbar-portal-label {
 
-    outline: none;
+    font-size: 11px;
 
-    border-color: var(--primary);
+    color: var(--text-secondary);
 
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, .15);
+    display: flex;
+
+    align-items: center;
+
+    gap: 6px;
+
+    font-weight: 500;
 
 }
+
+.navbar-role-badge {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    padding: 1px 7px;
+
+    border-radius: 20px;
+
+    font-size: 10px;
+
+    font-weight: 700;
+
+    letter-spacing: 0.3px;
+
+    text-transform: uppercase;
+
+    background: linear-gradient(135deg, #3B82F6, #6366F1);
+
+    color: #fff;
+
+}
+
+
 
 /* RIGHT */
 
@@ -308,25 +384,16 @@
 
 }
 
-@media(max-width:768px) {
+@media (max-width: 640px) {
 
-    .nav-search-wrapper {
-
-        width: 220px;
-
-    }
-
-}
-
-@media(max-width:640px) {
-
-    .nav-search-wrapper {
+    .navbar-brand-text {
 
         display: none;
 
     }
 
 }
+
 
 .nav-icon-btn svg {
     width: 18px;

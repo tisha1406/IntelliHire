@@ -10,6 +10,9 @@ import {
     FaCog,
     FaSignOutAlt,
     FaCheckDouble,
+    FaLock,
+    FaBars,
+    FaRobot,
 } from "react-icons/fa";
 
 import { useTheme } from "../../context/ThemeContext";
@@ -17,11 +20,27 @@ import { useAuthContext } from "../../context/AuthContext";
 
 import "../../styles/company/CompanyNavbar.css";
 
-function CompanyNavbar() {
+function CompanyNavbar({ sidebarOpen, setSidebarOpen }) {
 
     const navigate = useNavigate();
     const { toggleTheme } = useTheme();
-    const { user, logout, companyProfile } = useAuthContext();
+    const { user, logout, companyProfile, recruiterProfile, isRecruiter } = useAuthContext();
+
+    // ── Company branding ───────────────────────────────────────────────────
+    // Both Company Admin and Recruiter share the same companyProfile from AuthContext.
+    // For recruiters, companyProfile is fetched from /company/profile using company_id.
+    const companyName = companyProfile?.company_name || "Company Portal";
+    const companyLogo = companyProfile?.logo || null;
+    const roleBadgeLabel = isRecruiter ? "Recruiter" : "Company Admin";
+
+    // Derive initials from company name for the logo fallback
+    const companyInitials = companyName
+        .split(" ")
+        .filter(Boolean)
+        .map(w => w[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
 
     const [showNotifications, setShowNotifications] = useState(false);
     const [showProfile, setShowProfile] = useState(false);
@@ -63,9 +82,22 @@ function CompanyNavbar() {
         navigate("/login");
     };
 
-    // Derive display values from the real authenticated user
-    const displayName = companyProfile?.company_name || user?.name || "Company";
-    const displayEmail = companyProfile?.contact_email || user?.email || "";
+    // ── Identity display ───────────────────────────────────────────────────
+    // Recruiter: show recruiter's name from profile or JWT
+    // Company Admin: show company name from companyProfile
+    let displayName, displayEmail;
+
+    if (isRecruiter) {
+        const rp = recruiterProfile;
+        displayName = rp
+            ? `${rp.first_name || ""} ${rp.last_name || ""}`.trim()
+            : user?.name || "Recruiter";
+        displayEmail = rp?.email || user?.email || "";
+    } else {
+        displayName = companyProfile?.company_name || user?.name || "Company";
+        displayEmail = companyProfile?.contact_email || user?.email || "";
+    }
+
     const initials = displayName
         .split(" ")
         .filter(Boolean)
@@ -74,23 +106,53 @@ function CompanyNavbar() {
         .slice(0, 2)
         .toUpperCase();
 
+    // ── Profile dropdown navigation ────────────────────────────────────────
+    const handleProfileNav = () => {
+        navigate("/company/profile");
+        setShowProfile(false);
+    };
+
+    const handleSettingsNav = () => {
+        if (isRecruiter) {
+            navigate("/company/change-password");
+        } else {
+            navigate("/company/settings");
+        }
+        setShowProfile(false);
+    };
+
     return (
 
         <header className="company-navbar">
 
             <div className="navbar-left">
-                <div className="nav-search-wrapper">
-                    <FaSearch className="nav-search-icon" />
-                    <input
-                        type="text"
-                        placeholder="Search candidates, jobs..."
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter" && e.target.value.trim()) {
-                                navigate(`/company/candidates?search=${encodeURIComponent(e.target.value.trim())}`);
-                            }
-                        }}
-                    />
+
+                {/* Mobile sidebar toggle */}
+                <button
+                    className="nav-icon-btn navbar-hamburger"
+                    onClick={() => setSidebarOpen && setSidebarOpen(!sidebarOpen)}
+                    aria-label="Toggle sidebar"
+                >
+                    <FaBars />
+                </button>
+
+                {/* Company Branding */}
+                <div className="navbar-brand">
+                    <div className="navbar-company-logo">
+                        {companyLogo
+                            ? <img src={companyLogo} alt={companyName} className="navbar-logo-img" />
+                            : <span className="navbar-logo-initials"><FaRobot /></span>
+                        }
+                    </div>
+                    <div className="navbar-brand-text">
+                        <span className="navbar-company-name">{companyName}</span>
+                        <span className="navbar-portal-label">
+                            Company Portal
+                            <span className="navbar-role-badge">{roleBadgeLabel}</span>
+                        </span>
+                    </div>
                 </div>
+
             </div>
 
             <div className="navbar-right">
@@ -174,23 +236,34 @@ function CompanyNavbar() {
                                 <div>
                                     <h5>{displayName}</h5>
                                     <span>{displayEmail}</span>
+                                    {isRecruiter && (
+                                        <span style={{
+                                            display: "block",
+                                            fontSize: 11,
+                                            color: "var(--primary)",
+                                            fontWeight: 600,
+                                            marginTop: 2
+                                        }}>
+                                            Recruiter
+                                        </span>
+                                    )}
                                 </div>
                             </div>
 
                             <div
                                 className="dropdown-item"
-                                onClick={() => { navigate("/company/profile"); setShowProfile(false); }}
+                                onClick={handleProfileNav}
                             >
                                 <FaUser />
-                                Profile
+                                {isRecruiter ? "My Profile" : "Profile"}
                             </div>
 
                             <div
                                 className="dropdown-item"
-                                onClick={() => { navigate("/company/settings"); setShowProfile(false); }}
+                                onClick={handleSettingsNav}
                             >
-                                <FaCog />
-                                Settings
+                                {isRecruiter ? <FaLock /> : <FaCog />}
+                                {isRecruiter ? "Change Password" : "Settings"}
                             </div>
 
                             <div className="dropdown-divider" />

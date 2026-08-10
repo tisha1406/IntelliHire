@@ -4,6 +4,8 @@ import {  FaList, FaUserPlus, FaCheck, FaTimes, FaUserSlash, FaFilePdf, FaRobot 
 
 import { useEffect } from "react";
 import candidateService from "../../services/company/candidateService";
+import { useAuthContext } from "../../context/AuthContext";
+import campaignService from "../../services/company/campaignService";
 
 import PageHeader from "../../components/common/PageHeader";
 import SearchBar from "../../components/common/SearchBar";
@@ -25,12 +27,19 @@ import "../../styles/company/Candidates.css";
 
 export default function Candidates() {
     const USE_MOCK_DATA = false;
+    const { isRecruiter } = useAuthContext();
 
     const [candidates, setCandidates] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [selectedStage, setSelectedStage] = useState("");
     const [selectedMatch, setSelectedMatch] = useState("");
+
+    // Recruiter: Add Candidate modal state
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [assignedCampaigns, setAssignedCampaigns] = useState([]);
+    const [addForm, setAddForm] = useState({ name: "", email: "", phone: "", campaign_id: "", interview_type: "ai" });
+    const [addLoading, setAddLoading] = useState(false);
 
     // Detail drawer state
     const [selectedCand, setSelectedCand] = useState(null);
@@ -223,7 +232,29 @@ export default function Candidates() {
 
     useEffect(() => {
         fetchCandidates();
-    }, []);
+        // Recruiter: pre-load their assigned campaigns for create form
+        if (isRecruiter) {
+            campaignService.getCampaigns()
+                .then(res => setAssignedCampaigns(res.data || []))
+                .catch(() => {});
+        }
+    }, [isRecruiter]);
+
+    const handleAddCandidate = async (e) => {
+        e.preventDefault();
+        setAddLoading(true);
+        try {
+            await candidateService.createCandidate(addForm);
+            setShowAddModal(false);
+            setAddForm({ name: "", email: "", phone: "", campaign_id: "", interview_type: "ai" });
+            showToast("Candidate added successfully", "success");
+            fetchCandidates();
+        } catch (err) {
+            showToast(err.response?.data?.detail || "Failed to add candidate", "error");
+        } finally {
+            setAddLoading(false);
+        }
+    };
 
     const fetchCandidates = async () => {
 
@@ -255,10 +286,76 @@ export default function Candidates() {
     return (
         <div className="candidates-page-wrapper">
             <PageHeader
-                title="Candidates (ATS)"
-                subtitle="Manage candidate pipelines and AI screening."
+                title={isRecruiter ? "My Candidates" : "Candidates (ATS)"}
+                subtitle={isRecruiter ? "Candidates assigned to you" : "Manage candidate pipelines and AI screening."}
                 breadcrumbs={[{ label: "Candidates" }]}
+                actions={
+                    isRecruiter && (
+                        <Button variant="primary" iconLeft={<FaUserPlus />} onClick={() => setShowAddModal(true)}>
+                            Add Candidate
+                        </Button>
+                    )
+                }
             />
+
+            {/* Recruiter: Add Candidate Modal */}
+            {isRecruiter && showAddModal && (
+                <div style={{
+                    position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                    background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center",
+                    justifyContent: "center", zIndex: 1000
+                }}>
+                    <div style={{
+                        background: "var(--card)", padding: 32, borderRadius: "var(--radius-lg)",
+                        width: "100%", maxWidth: 480, border: "1px solid var(--border)",
+                        boxShadow: "0 20px 40px rgba(0,0,0,0.25)"
+                    }}>
+                        <h2 style={{ marginBottom: 24, fontSize: 20, fontWeight: 700 }}>Add Candidate</h2>
+                        <form onSubmit={handleAddCandidate} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                            <input
+                                required placeholder="Full Name"
+                                value={addForm.name} onChange={e => setAddForm({...addForm, name: e.target.value})}
+                                style={{ padding: "10px 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text)" }}
+                            />
+                            <input
+                                required type="email" placeholder="Email Address"
+                                value={addForm.email} onChange={e => setAddForm({...addForm, email: e.target.value})}
+                                style={{ padding: "10px 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text)" }}
+                            />
+                            <input
+                                required placeholder="Phone Number"
+                                value={addForm.phone} onChange={e => setAddForm({...addForm, phone: e.target.value})}
+                                style={{ padding: "10px 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text)" }}
+                            />
+                            <select
+                                required value={addForm.campaign_id}
+                                onChange={e => setAddForm({...addForm, campaign_id: e.target.value})}
+                                style={{ padding: "10px 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text)" }}
+                            >
+                                <option value="">Select Campaign</option>
+                                {assignedCampaigns.map(c => (
+                                    <option key={c._id} value={c._id}>{c.name || c.title || "Untitled"}</option>
+                                ))}
+                            </select>
+                            <select
+                                value={addForm.interview_type}
+                                onChange={e => setAddForm({...addForm, interview_type: e.target.value})}
+                                style={{ padding: "10px 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text)" }}
+                            >
+                                <option value="ai">AI Interview</option>
+                                <option value="manual">Manual Interview</option>
+                            </select>
+                            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 8 }}>
+                                <Button type="button" variant="outline" onClick={() => setShowAddModal(false)}>Cancel</Button>
+                                <Button type="submit" variant="primary" disabled={addLoading}>
+                                    {addLoading ? "Adding..." : "Add Candidate"}
+                                </Button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
 
             {/* Filters panel */}
             <Card className="candidates-filter-panel">

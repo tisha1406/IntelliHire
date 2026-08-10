@@ -2,40 +2,47 @@ import api from "../api";
 
 const dashboardService = {
     /**
-     * Fetch all dashboard data in one aggregated call.
-     * The backend endpoint /company/dashboard computes everything from MongoDB
-     * scoped to the authenticated company — no multiple round-trips needed.
+     * Company Admin: fetch all dashboard data aggregated for the company.
      */
     getDashboard() {
         return api.get("/company/dashboard");
     },
 
-    // ── Legacy individual calls kept for Analytics page compatibility ────────
+    /**
+     * Recruiter: fetch recruiter-scoped dashboard stats.
+     * Backend scopes by recruiter_id from JWT automatically.
+     */
+    getRecruiterDashboard() {
+        return api.get("/company/dashboard");
+    },
 
-    /** KPI metrics (used by Analytics page) */
+    // ── Analytics page endpoints ─────────────────────────────────────────────
+
+    /** KPI metrics */
     getStats() {
         return api.get("/company/analytics/kpis");
     },
 
-    /** Monthly hiring trend (used by Analytics page) */
+    /** Monthly hiring trend */
     getHiringTrend() {
         return api.get("/company/analytics/hiring-trend");
     },
 
-    /** Hiring funnel (used by Analytics page) */
+    /** Hiring funnel */
     getHiringFunnel() {
         return api.get("/company/analytics/hiring-funnel");
     },
 
-    /** Department breakdown (used by Analytics page) */
+    /** Department breakdown */
     getDepartmentBreakdown() {
         return api.get("/company/analytics/department-breakdown");
     },
 
-    /** Recruiter performance (used by Analytics page) */
+    /** Recruiter performance */
     getRecruiterPerformance() {
         return api.get("/company/analytics/recruiter-performance");
     },
 };
 
 export default dashboardService;
+

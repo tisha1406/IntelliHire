@@ -5,7 +5,7 @@ import platformConfigService from '../services/company/platformConfigService';
 const PermissionsContext = createContext();
 
 export const PermissionsProvider = ({ children }) => {
-    const { isCompany, loading: authLoading, token } = useAuthContext();
+    const { isCompany, isRecruiter, loading: authLoading, token } = useAuthContext();
     const [platformConfig, setPlatformConfig] = useState(null);
     const [configLoading, setConfigLoading] = useState(true);
 
@@ -16,7 +16,9 @@ export const PermissionsProvider = ({ children }) => {
             return;
         }
         
-        if (isCompany) {
+        if (isCompany || isRecruiter) {
+            // Both Company Admins and Recruiters share the same workspace config.
+            // The backend resolves company_id from the JWT for both roles.
             platformConfigService.getPlatformConfig()
                 .then(data => {
                     setPlatformConfig(data);
@@ -28,10 +30,12 @@ export const PermissionsProvider = ({ children }) => {
                     setConfigLoading(false);
                 });
         } else {
+            // Other roles (admin, candidate) don't need company platform config
             setPlatformConfig(null);
             setConfigLoading(false);
         }
-    }, [isCompany, token]);
+    }, [isCompany, isRecruiter, token]);
+
 
     const permissions = useMemo(() => {
         if (!platformConfig) {

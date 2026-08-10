@@ -11,7 +11,7 @@ from bson import ObjectId
 
 from app.auth.jwt_handler import TokenPayload
 from app.rbac.models import UserRole
-from app.rbac.permissions import require_role
+from app.rbac.permissions import require_role, require_company_or_recruiter
 from app.middleware.feature_guard import require_feature
 
 from app.repositories.report_repository import ReportRepository
@@ -44,13 +44,18 @@ async def get_reports(
     search: Optional[str] = Query(None),
     limit: int = Query(100, ge=1),
     offset: int = Query(0, ge=0),
-    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
 ):
     """
-    Fetch all reports that belong to the authenticated company.
-    No seeding — returns an empty list if the company has no reports.
+    Fetch all reports that belong to the authenticated company workspace.
+    Both Company Admin and Recruiter can view reports in their company.
     """
-    query: dict = {"company_id": ObjectId(current_user.sub)}
+    company_id = (
+        current_user.company_id
+        if current_user.role.upper() == UserRole.RECRUITER.value.upper()
+        else current_user.sub
+    )
+    query: dict = {"company_id": ObjectId(company_id)}
 
     docs = await report_repo.get_many(query=query, limit=limit, skip=offset)
 
@@ -84,12 +89,18 @@ async def get_reports(
 
 @router.get("/statistics", response_model=ReportStatisticsResponse, summary="Get Live Report Statistics")
 async def get_report_statistics(
-    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
 ):
     """
     Compute live aggregation statistics from MongoDB — no fallback values.
+    Scoped to the authenticated company workspace.
     """
-    company_filter = {"company_id": ObjectId(current_user.sub)}
+    company_id = (
+        current_user.company_id
+        if current_user.role.upper() == UserRole.RECRUITER.value.upper()
+        else current_user.sub
+    )
+    company_filter = {"company_id": ObjectId(company_id)}
 
     total_candidates = await candidate_repo.count(company_filter)
     total_interviews = await session_repo.count(company_filter)
@@ -99,7 +110,6 @@ async def get_report_statistics(
     })
     active_campaigns = await campaign_repo.count({"status": {"$in": ["active", "Active"]}, **company_filter})
 
-    # Average AI score from completed interview sessions
     sessions = await session_repo.get_many({"status": {"$in": ["completed", "Completed"]}, **company_filter})
     scores = [s.get("overall_score", 0) for s in sessions if s.get("overall_score") is not None]
     avg_ai_score = round(sum(scores) / len(scores), 1) if scores else 0.0
@@ -110,7 +120,7 @@ async def get_report_statistics(
         selections=selections,
         active_campaigns=active_campaigns,
         avg_ai_score=avg_ai_score,
-        avg_time_to_hire_days=0,   # Will be computed in a later phase
+        avg_time_to_hire_days=0,
     )
 
 
@@ -121,20 +131,27 @@ async def get_report_statistics(
 @router.post("", response_model=ReportResponse, summary="Generate New Report")
 async def generate_report(
     payload: ReportCreateRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
 ):
     """
     Generate a new report and store it in MongoDB linked to this company.
+    Both Company Admin and Recruiter can generate reports.
     """
+    company_id = (
+        current_user.company_id
+        if current_user.role.upper() == UserRole.RECRUITER.value.upper()
+        else current_user.sub
+    )
     today_str = datetime.utcnow().strftime("%Y-%m-%d")
     title_type = payload.type.capitalize()
     report_name = payload.name or f"{title_type} Report - {datetime.utcnow().strftime('%B %Y')}"
+    generated_by = "Recruiter" if current_user.role.upper() == UserRole.RECRUITER.value.upper() else "Company"
 
     doc = {
-        "company_id": ObjectId(current_user.sub),
+        "company_id": ObjectId(company_id),
         "name": report_name,
         "type": f"{title_type} Report",
-        "generatedBy": "Company",          # Will be recruiter name once recruiter auth is added
+        "generatedBy": generated_by,
         "date": today_str,
         "status": "Ready",
         "size": "2.1 MB" if payload.format.upper() == "PDF" else "1.4 MB",
@@ -165,13 +182,18 @@ async def generate_report(
 @router.get("/download/{report_id}", summary="Download Report File")
 async def download_report(
     report_id: str,
-    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
 ):
     """
     Download report. Enforces company ownership before serving.
     """
+    company_id = (
+        current_user.company_id
+        if current_user.role.upper() == UserRole.RECRUITER.value.upper()
+        else current_user.sub
+    )
     report = await report_repo.get_by_id(report_id)
-    if not report or str(report.get("company_id")) != current_user.sub:
+    if not report or str(report.get("company_id")) != company_id:
         raise HTTPException(status_code=404, detail="Report not found.")
 
     current_count = report.get("downloadCount", 0) + 1

@@ -13,6 +13,7 @@ class InviteCandidateRequest(BaseModel):
     campaign_id: str
     target_role: str
     experience_level: str = "mid"
+    assigned_recruiter_id: Optional[str] = None
 
 
 class InviteCandidateResponse(BaseModel):
