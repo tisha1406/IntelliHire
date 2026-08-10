@@ -220,6 +220,10 @@ class VoiceConfig(BaseModel):
 class InterviewCampaign(MongoBaseModel):
     company_id: PyObjectId
     created_by: Optional[PyObjectId] = None
+    updated_by: Optional[PyObjectId] = None
+    created_by_role: Optional[str] = None
+    updated_by_role: Optional[str] = None
+    assigned_recruiter_ids: List[PyObjectId] = Field(default_factory=list)
 
     name: str
 
@@ -344,6 +348,12 @@ class Candidate(MongoBaseModel):
     campaign_id: PyObjectId
 
     company_id: PyObjectId
+    assigned_recruiter_id: Optional[PyObjectId] = None
+
+    created_by: Optional[PyObjectId] = None
+    updated_by: Optional[PyObjectId] = None
+    created_by_role: Optional[str] = None
+    updated_by_role: Optional[str] = None
 
     name: str
 
@@ -358,6 +368,11 @@ class Candidate(MongoBaseModel):
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC)
     )
+
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC)
+    )
+
 
 # ==========================================================
 # Interview Session Models
@@ -511,6 +526,11 @@ class InterviewSession(MongoBaseModel):
     campaign_id: PyObjectId
 
     candidate_id: PyObjectId
+
+    created_by: Optional[PyObjectId] = None
+    updated_by: Optional[PyObjectId] = None
+    created_by_role: Optional[str] = None
+    updated_by_role: Optional[str] = None
 
     language: str
 
@@ -856,6 +876,25 @@ class ActivityLogEntry(MongoBaseModel):
     event: str   # e.g. "LOGIN", "RESUME_UPLOADED", "PRACTICE_STARTED"
     description: str
     metadata: dict = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+# ==========================================================
+# Audit Log (Company Side)
+# ==========================================================
+
+class AuditLog(MongoBaseModel):
+    company_id: PyObjectId
+    actor_id: PyObjectId
+    actor_name: str
+    actor_role: str
+    action: str  # e.g., "CREATED_CANDIDATE", "DELETED_RECRUITER", "ASSIGNED_CAMPAIGN"
+    target_entity: str  # e.g., "Candidate", "Recruiter", "Campaign"
+    target_id: Optional[str] = None
+    target_name: Optional[str] = None
+    metadata: dict = Field(default_factory=dict)
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 

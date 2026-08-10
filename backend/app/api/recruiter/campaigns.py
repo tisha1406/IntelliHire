@@ -15,8 +15,9 @@ router = APIRouter(
 async def get_recruiter_campaigns(
     token: TokenPayload = Depends(require_recruiter_scope)
 ):
+    from bson import ObjectId
     repo = CampaignRepository()
-    campaigns = await repo.get_many({"assigned_recruiter_ids": token.recruiter_id})
+    campaigns = await repo.get_many({"assigned_recruiter_ids": ObjectId(token.recruiter_id)})
     for c in campaigns:
         c["id"] = str(c["_id"])
         c.pop("_id", None)

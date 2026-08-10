@@ -107,6 +107,7 @@ class AuthService:
             campaign_id=campaign_id,
             candidate_id=candidate_id,
             recruiter_id=recruiter_id if 'recruiter_id' in locals() else None,
+            must_change_password=user.get("must_change_password", False),
         )
 
         refresh_token = create_refresh_token()

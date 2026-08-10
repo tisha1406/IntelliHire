@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends
 
 from app.auth.jwt_handler import TokenPayload
 from app.rbac.models import UserRole
-from app.rbac.permissions import require_role
+from app.rbac.permissions import require_company_or_recruiter
 from app.schemas.response import APIResponse, success_response
 
 from app.repositories.company_repository import CompanyRepository
@@ -28,16 +28,33 @@ router = APIRouter(
 
 @router.get("", response_model=APIResponse[dict])
 async def get_company_dashboard(
-    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
 ):
     """
     Aggregated company dashboard.
     Returns all data the frontend dashboard needs in one call.
-    Every query is scoped to the authenticated company's company_id.
+    - Company Admin: scoped by sub (their own company)
+    - Recruiter: scoped by company_id from JWT (the company they belong to)
     """
-    company_id_str = current_user.sub          # company _id stored in JWT sub
+    # Resolve company_id based on role
+    if current_user.role.upper() == UserRole.RECRUITER.value.upper():
+        company_id_str = current_user.company_id
+    else:
+        company_id_str = current_user.sub
+
+    if not company_id_str:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="company_id not found in token.")
+
     company_oid = ObjectId(company_id_str)
+    
     company_filter = {"company_id": company_oid}
+    campaign_filter = {"company_id": company_oid}
+    candidate_filter = {"company_id": company_oid}
+    
+    if current_user.role.upper() == UserRole.RECRUITER.value.upper():
+        campaign_filter["assigned_recruiter_ids"] = ObjectId(current_user.recruiter_id)
+        candidate_filter["assigned_recruiter_id"] = ObjectId(current_user.recruiter_id)
 
     # ── Repositories ──────────────────────────────────────────────────
     company_repo = CompanyRepository()
@@ -68,12 +85,21 @@ async def get_company_dashboard(
 
     # ── 2. Live usage counts (dynamic — no stored counters yet) ───────
     total_recruiters = await recruiter_repo.count({"company_id": company_id_str})
-    total_campaigns = await campaign_repo.count(company_filter)
-    total_candidates = await candidate_repo.count(company_filter)
-    total_interviews = await session_repo.count(company_filter)
-    completed_interviews = await session_repo.count({**company_filter, "status": "completed"})
-    active_campaigns = await campaign_repo.count({**company_filter, "status": "active"})
-    hired_candidates = await candidate_repo.count({**company_filter, "status": {"$in": ["hired", "Hired", "Selected"]}})
+    total_campaigns = await campaign_repo.count(campaign_filter)
+    total_candidates = await candidate_repo.count(candidate_filter)
+    
+    # For interviews, we need to query by candidate_ids
+    if current_user.role.upper() == UserRole.RECRUITER.value.upper():
+        candidate_docs = await candidate_repo.get_many(candidate_filter)
+        candidate_ids = [c["_id"] for c in candidate_docs]
+        interview_filter = {"company_id": company_oid, "candidate_id": {"$in": candidate_ids}}
+    else:
+        interview_filter = {"company_id": company_oid}
+        
+    total_interviews = await session_repo.count(interview_filter)
+    completed_interviews = await session_repo.count({**interview_filter, "status": "completed"})
+    active_campaigns = await campaign_repo.count({**campaign_filter, "status": "active"})
+    hired_candidates = await candidate_repo.count({**candidate_filter, "status": {"$in": ["hired", "Hired", "Selected"]}})
 
     usage = {
         "recruiters_used": total_recruiters,
@@ -99,7 +125,7 @@ async def get_company_dashboard(
 
     # ── 4. Recent campaigns (last 5) ─────────────────────────────────
     raw_campaigns = await campaign_repo.get_many(
-        query=company_filter,
+        query=campaign_filter,
         limit=5,
     )
     recent_campaigns = []
@@ -115,7 +141,7 @@ async def get_company_dashboard(
     # ── 5. Recent candidates (last 5) ────────────────────────────────
     raw_candidates_cursor = (
         candidate_repo.collection
-        .find(company_filter)
+        .find(candidate_filter)
         .sort("created_at", -1)
         .limit(5)
     )
@@ -134,7 +160,7 @@ async def get_company_dashboard(
     # ── 6. Recent interviews (last 5) ────────────────────────────────
     raw_interviews_cursor = (
         session_repo.collection
-        .find(company_filter)
+        .find(interview_filter)
         .sort("created_at", -1)
         .limit(5)
     )
@@ -176,27 +202,22 @@ async def get_company_dashboard(
         target_date = today - timedelta(days=30 * i)
         month_idx = target_date.month - 1
         year = target_date.year
+        
+        base_date_query = {
+            "created_at": {
+                "$gte": datetime(year, target_date.month, 1),
+                "$lt": (
+                    datetime(year + 1, 1, 1) if target_date.month == 12
+                    else datetime(year, target_date.month + 1, 1)
+                ),
+            }
+        }
 
-        apps = await candidate_repo.collection.count_documents({
-            "company_id": company_oid,
-            "created_at": {
-                "$gte": datetime(year, target_date.month, 1),
-                "$lt": (
-                    datetime(year + 1, 1, 1) if target_date.month == 12
-                    else datetime(year, target_date.month + 1, 1)
-                ),
-            }
-        })
+        apps = await candidate_repo.collection.count_documents({**candidate_filter, **base_date_query})
         selected = await candidate_repo.collection.count_documents({
-            "company_id": company_oid,
-            "status": {"$in": ["hired", "Hired", "Selected", "selected"]},
-            "created_at": {
-                "$gte": datetime(year, target_date.month, 1),
-                "$lt": (
-                    datetime(year + 1, 1, 1) if target_date.month == 12
-                    else datetime(year, target_date.month + 1, 1)
-                ),
-            }
+            **candidate_filter,
+            **base_date_query,
+            "status": {"$in": ["hired", "Hired", "Selected"]}
         })
         hiring_trend.append({
             "month": month_labels[month_idx],
@@ -217,7 +238,7 @@ async def get_company_dashboard(
     hiring_funnel = []
     for stage_label, statuses in STATUS_STAGES:
         count = await candidate_repo.count({
-            "company_id": company_oid,
+            **candidate_filter,
             "status": {"$in": statuses},
         })
         pct = round((count / funnel_total) * 100, 1)
@@ -225,6 +246,58 @@ async def get_company_dashboard(
             "stage": stage_label,
             "count": count,
             "percentage": min(pct, 100),
+        })
+
+    # ── 10. Recruiter Workload ────────────────────────────────────────
+    recruiters = await recruiter_repo.get_many(company_filter)
+    recruiter_workload = []
+    
+    # Pre-fetch all candidates and sessions to avoid N+1 queries if possible
+    # For now, simple aggregation per recruiter
+    for rec in recruiters:
+        rec_id = ObjectId(rec["_id"])
+        r_candidates = await candidate_repo.count({"company_id": company_oid, "assigned_recruiter_id": rec_id})
+        r_campaigns = await campaign_repo.count({"company_id": company_oid, "assigned_recruiter_ids": rec_id})
+        
+        # Today's interviews
+        start_of_day = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        end_of_day = start_of_day + timedelta(days=1)
+        
+        r_sessions = await session_repo.get_many({
+            "company_id": company_oid,
+        })
+        # Find candidates for this recruiter
+        all_cands = await candidate_repo.get_many({"company_id": company_oid, "assigned_recruiter_id": rec_id})
+        invited = len([c for c in all_cands if c.get("status", "").lower() in ["invited", "pending"]])
+        evaluating = len([c for c in all_cands if c.get("status", "").lower() in ["evaluating", "interviewing", "interviewed"]])
+        shortlisted = len([c for c in all_cands if c.get("status", "").lower() == "shortlisted"])
+        hired = len([c for c in all_cands if c.get("status", "").lower() in ["hired", "selected"]])
+        rejected = len([c for c in all_cands if c.get("status", "").lower() == "rejected"])
+
+        r_candidate_ids = [c["_id"] for c in all_cands]
+        
+        todays_interviews = 0
+        scores = []
+        for s in r_sessions:
+            if s.get("candidate_id") in r_candidate_ids:
+                if s.get("overall_score") is not None:
+                    scores.append(s.get("overall_score"))
+                
+                # check if scheduled today
+                sch = s.get("scheduled_at")
+                if sch and isinstance(sch, datetime) and start_of_day <= sch < end_of_day:
+                    todays_interviews += 1
+                    
+        r_avg_score = round(sum(scores) / len(scores), 1) if scores else 0.0
+        
+        recruiter_workload.append({
+            "id": str(rec["_id"]),
+            "name": rec.get("name", f"{rec.get('first_name', '')} {rec.get('last_name', '')}".strip()),
+            "status": rec.get("status", rec.get("account_status", "active")),
+            "candidates_count": r_candidates,
+            "campaigns_count": r_campaigns,
+            "interviews_today": todays_interviews,
+            "avg_score": r_avg_score
         })
 
     # ── Assemble response ─────────────────────────────────────────────
@@ -242,6 +315,7 @@ async def get_company_dashboard(
             "unread_notifications": unread_notifications,
             "hiring_trend": hiring_trend,
             "hiring_funnel": hiring_funnel,
+            "recruiter_workload": recruiter_workload,
         },
         message="Dashboard data retrieved successfully.",
     )

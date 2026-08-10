@@ -8,9 +8,11 @@ import {
 } from "react-icons/fa";
 
 import candidateService from "../../services/company/candidateService";
+import recruiterManagementService from "../../services/company/recruiterManagementService";
 import PageHeader from "../../components/common/PageHeader";
 import Button from "../../components/common/Button";
 import StatusBadge from "../../components/common/StatusBadge";
+import Toast from "../../components/common/Toast";
 
 const STAGE_COLORS = {
     Applied: "#64748B",
@@ -24,17 +26,24 @@ const STAGE_COLORS = {
 export default function CandidateDetails() {
     const { id } = useParams();
     const [candidate, setCandidate] = useState(null);
+    const [recruiters, setRecruiters] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [toast, setToast] = useState({ message: "", type: "success" });
+    const [assigning, setAssigning] = useState(false);
 
     useEffect(() => {
         const fetchCandidate = async () => {
             try {
                 setLoading(true);
-                const res = await candidateService.getCandidate(id);
-                setCandidate(res.data);
+                const [candRes, teamRes] = await Promise.all([
+                    candidateService.getCandidate(id),
+                    recruiterManagementService.getRecruiters()
+                ]);
+                setCandidate(candRes.data);
+                setRecruiters(teamRes.data?.data || teamRes.data || []);
             } catch (err) {
-                console.error("Failed to fetch candidate:", err);
+                console.error("Failed to fetch data:", err);
                 setError("Candidate not found or server error.");
             } finally {
                 setLoading(false);
@@ -70,12 +79,38 @@ export default function CandidateDetails() {
         <div style={{ display: "flex", flexDirection: "column", gap: 28, animation: "fadeInPage 0.4s ease-out" }}>
             <style>{`@keyframes fadeInPage { from { opacity:0; transform:translateY(12px);} to {opacity:1; transform:translateY(0);}}`}</style>
 
+            <Toast message={toast.message} type={toast.type} />
             <PageHeader
                 title={candidate.name}
                 subtitle={candidate.experience}
                 icon={<FaUser />}
                 actions={
-                    <div style={{ display: "flex", gap: 10 }}>
+                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                        <select 
+                            style={{ padding: "8px 12px", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text)", fontSize: 13 }}
+                            value={candidate.assigned_recruiter_id || ""}
+                            onChange={async (e) => {
+                                const newId = e.target.value;
+                                if (!newId) return;
+                                setAssigning(true);
+                                try {
+                                    await candidateService.bulkAssignCandidates([id], newId);
+                                    setCandidate({...candidate, assigned_recruiter_id: newId});
+                                    setToast({ message: "Recruiter reassigned successfully", type: "success" });
+                                } catch (err) {
+                                    setToast({ message: "Failed to reassign recruiter", type: "error" });
+                                } finally {
+                                    setAssigning(false);
+                                    setTimeout(() => setToast({message:""}), 3000);
+                                }
+                            }}
+                            disabled={assigning}
+                        >
+                            <option value="">Assign Recruiter...</option>
+                            {recruiters.map(r => (
+                                <option key={r.id} value={r.id}>{r.name}</option>
+                            ))}
+                        </select>
                         <Link to="/company/candidates">
                             <Button variant="outline" icon={<FaArrowLeft />} size="sm">Back</Button>
                         </Link>

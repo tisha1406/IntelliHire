@@ -39,6 +39,23 @@ class TeamMemberResponse(BaseModel):
     status: str
     company_id: Optional[str] = None
     created_at: Optional[str] = None
+    temporary_password: Optional[str] = None
+    
+    # Advanced Profile Fields
+    employee_id: Optional[str] = None
+    joining_date: Optional[str] = None
+    skills: List[str] = []
+    timezone: Optional[str] = None
+    language: Optional[str] = None
+    profile_photo: Optional[str] = None
+    signature: Optional[str] = None
+    bio: Optional[str] = None
+    
+    # Status tracking
+    last_active: Optional[str] = None
+    last_login: Optional[str] = None
+    is_online: bool = False
+    is_deleted: bool = False
 
 
 class InviteMemberRequest(BaseModel):
@@ -57,6 +74,16 @@ class UpdateMemberRequest(BaseModel):
     department: Optional[str] = None
     phone: Optional[str] = None
     status: Optional[str] = None
+    
+    # Advanced Profile Fields
+    employee_id: Optional[str] = None
+    joining_date: Optional[str] = None
+    skills: Optional[List[str]] = None
+    timezone: Optional[str] = None
+    language: Optional[str] = None
+    profile_photo: Optional[str] = None
+    signature: Optional[str] = None
+    bio: Optional[str] = None
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -81,6 +108,19 @@ def _format_member(doc: dict) -> TeamMemberResponse:
         status=doc.get("status", "active"),
         company_id=doc.get("company_id"),
         created_at=created_str,
+        temporary_password=doc.get("temporary_password"),
+        employee_id=doc.get("employee_id"),
+        joining_date=str(doc.get("joining_date")) if doc.get("joining_date") else None,
+        skills=doc.get("skills", []),
+        timezone=doc.get("timezone"),
+        language=doc.get("language"),
+        profile_photo=doc.get("profile_photo"),
+        signature=doc.get("signature"),
+        bio=doc.get("bio"),
+        last_active=str(doc.get("last_active")) if doc.get("last_active") else None,
+        last_login=str(doc.get("last_login")) if doc.get("last_login") else None,
+        is_online=doc.get("is_online", False),
+        is_deleted=doc.get("is_deleted", False)
     )
 
 
@@ -114,6 +154,10 @@ async def get_team(
         query["role"] = {"$regex": f"^{role}$", "$options": "i"}
     if status_filter:
         query["status"] = status_filter
+        
+    # By default, do not return deleted recruiters unless requested
+    if "is_deleted" not in query:
+        query["is_deleted"] = {"$ne": True}
 
     members = await repo.get_many(query=query, limit=limit, skip=offset)
     return [_format_member(m) for m in members]
@@ -143,6 +187,23 @@ async def invite_team_member(
             detail="A team member with this email already exists in your company.",
         )
 
+    # 1. Generate a temporary password
+    import secrets
+    import string
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    temp_password = "".join(secrets.choice(alphabet) for _ in range(12))
+
+    # 2. Check if user exists in global users collection
+    from app.repositories.user_repository import UserRepository
+    from app.auth.jwt_handler import hash_password
+    user_repo = UserRepository()
+    existing_user = await user_repo.get_by_email(payload.email)
+    if existing_user:
+        raise HTTPException(
+            status_code=400,
+            detail="User with this email already exists globally."
+        )
+
     doc = {
         "name": payload.name,
         "email": payload.email,
@@ -158,6 +219,23 @@ async def invite_team_member(
 
     inserted_id = await repo.create(doc)
     doc["_id"] = ObjectId(inserted_id)
+
+    # 3. Create the user record
+    user_doc = {
+        "email": payload.email,
+        "password_hash": hash_password(temp_password),
+        "role": "recruiter",
+        "company_id": ObjectId(current_user.sub),
+        "recruiter_id": ObjectId(inserted_id),
+        "is_active": True,
+        "must_change_password": True,
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc)
+    }
+    await user_repo.create(user_doc)
+
+    # Return temp password so company admin can share it
+    doc["temporary_password"] = temp_password
 
     company_repo = CompanyRepository()
     await company_repo.update_usage(current_user.sub, "recruiters_used", 1)
@@ -214,11 +292,347 @@ async def remove_team_member(
     if not member or member.get("company_id") != current_user.sub:
         raise HTTPException(status_code=404, detail="Team member not found.")
 
-    deleted = await repo.delete(member_id)
+    # Soft Delete Instead of Hard Delete
+    update_data = {
+        "is_deleted": True,
+        "status": "inactive",
+        "deleted_at": datetime.now(timezone.utc),
+        "deleted_by": current_user.sub,
+        "updated_at": datetime.now(timezone.utc)
+    }
+    
+    deleted = await repo.update(member_id, update_data)
     if not deleted:
         raise HTTPException(status_code=404, detail="Team member not found.")
+        
+    # Deactivate associated user record
+    from app.repositories.user_repository import UserRepository
+    user_repo = UserRepository()
+    user = await user_repo.get_by_email(member.get("email", ""))
+    if user:
+        await user_repo.update(str(user["_id"]), {"is_active": False})
 
     company_repo = CompanyRepository()
     await company_repo.update_usage(current_user.sub, "recruiters_used", -1)
 
     return {"message": "Team member removed successfully.", "id": member_id}
+
+
+class ReassignRequest(BaseModel):
+    new_recruiter_id: str
+
+
+@router.post("/{member_id}/reassign", summary="Reassign entities to another recruiter")
+async def reassign_team_member(
+    member_id: str,
+    payload: ReassignRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+):
+    """
+    Reassign all campaigns and candidates from `member_id` to `new_recruiter_id`.
+    Used during soft deletion to ensure data isn't orphaned.
+    """
+    repo = RecruiterRepository()
+    old_member = await repo.get_by_id(member_id)
+    new_member = await repo.get_by_id(payload.new_recruiter_id)
+
+    if not old_member or old_member.get("company_id") != current_user.sub:
+        raise HTTPException(status_code=404, detail="Source team member not found.")
+        
+    if not new_member or new_member.get("company_id") != current_user.sub or new_member.get("is_deleted"):
+        raise HTTPException(status_code=400, detail="Target team member is invalid or deleted.")
+        
+    # Reassign candidates
+    from app.repositories.candidate_repository import CandidateRepository
+    candidate_repo = CandidateRepository()
+    await candidate_repo.collection.update_many(
+        {"assigned_recruiter_id": ObjectId(member_id)},
+        {"$set": {"assigned_recruiter_id": ObjectId(payload.new_recruiter_id), "updated_at": datetime.now(timezone.utc)}}
+    )
+    
+    # Reassign campaigns (array)
+    from app.repositories.campaign_repository import CampaignRepository
+    campaign_repo = CampaignRepository()
+    
+    # First, pull old member from assigned_recruiter_ids
+    await campaign_repo.collection.update_many(
+        {"assigned_recruiter_ids": ObjectId(member_id)},
+        {"$pull": {"assigned_recruiter_ids": ObjectId(member_id)}}
+    )
+    # Second, push new member to those campaigns (if not already there)
+    # In a perfect world, we'd only add if it's not there, but addToSet handles that.
+    await campaign_repo.collection.update_many(
+        {"assigned_recruiter_ids": {"$exists": True}},
+        {"$addToSet": {"assigned_recruiter_ids": ObjectId(payload.new_recruiter_id)}}
+    )
+    
+    return {"message": f"Successfully reassigned data to {new_member.get('name')}"}
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Additional Management Endpoints
+# ──────────────────────────────────────────────────────────────────────
+
+@router.post("/{member_id}/reset-password", summary="Reset Password")
+async def reset_recruiter_password(
+    member_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY))
+):
+    repo = RecruiterRepository()
+    member = await repo.get_by_id(member_id)
+    if not member or member.get("company_id") != current_user.sub:
+        raise HTTPException(status_code=404, detail="Team member not found.")
+        
+    import secrets
+    import string
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    temp_password = "".join(secrets.choice(alphabet) for _ in range(12))
+    
+    from app.auth.jwt_handler import hash_password
+    hashed_pwd = hash_password(temp_password)
+    
+    from app.repositories.user_repository import UserRepository
+    user_repo = UserRepository()
+    user = await user_repo.get_by_email(member.get("email", ""))
+    if not user:
+        raise HTTPException(status_code=400, detail="Team member has no associated user account")
+        
+    await user_repo.update(str(user["_id"]), {
+        "password_hash": hashed_pwd,
+        "must_change_password": True
+    })
+    
+    return {"temporary_password": temp_password, "message": "Password reset successfully"}
+
+
+@router.post("/{member_id}/suspend", summary="Suspend Team Member")
+async def suspend_recruiter(
+    member_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY))
+):
+    """Suspend a recruiter account (disables login)."""
+    repo = RecruiterRepository()
+    member = await repo.get_by_id(member_id)
+    if not member or member.get("company_id") != current_user.sub:
+        raise HTTPException(status_code=404, detail="Team member not found.")
+    
+    await repo.update(member_id, {
+        "status": "suspended",
+        "updated_at": datetime.now(timezone.utc)
+    })
+    
+    from app.repositories.user_repository import UserRepository
+    user_repo = UserRepository()
+    user = await user_repo.get_by_email(member.get("email", ""))
+    if user:
+        await user_repo.update(str(user["_id"]), {"is_active": False})
+    
+    return {"message": "Team member suspended successfully"}
+
+
+@router.post("/{member_id}/activate", summary="Activate Team Member")
+async def activate_recruiter(
+    member_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY))
+):
+    """Reactivate a suspended recruiter account."""
+    repo = RecruiterRepository()
+    member = await repo.get_by_id(member_id)
+    if not member or member.get("company_id") != current_user.sub:
+        raise HTTPException(status_code=404, detail="Team member not found.")
+    
+    await repo.update(member_id, {
+        "status": "active",
+        "updated_at": datetime.now(timezone.utc)
+    })
+    
+    from app.repositories.user_repository import UserRepository
+    user_repo = UserRepository()
+    user = await user_repo.get_by_email(member.get("email", ""))
+    if user:
+        await user_repo.update(str(user["_id"]), {"is_active": True})
+    
+    return {"message": "Team member activated successfully"}
+
+
+@router.post("/{member_id}/force-reset", summary="Force Password Reset")
+async def force_password_reset(
+    member_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY))
+):
+    """Force the recruiter to change their password on next login."""
+    repo = RecruiterRepository()
+    member = await repo.get_by_id(member_id)
+    if not member or member.get("company_id") != current_user.sub:
+        raise HTTPException(status_code=404, detail="Team member not found.")
+    
+    from app.repositories.user_repository import UserRepository
+    user_repo = UserRepository()
+    user = await user_repo.get_by_email(member.get("email", ""))
+    if not user:
+        raise HTTPException(status_code=400, detail="Team member has no associated user account")
+    
+    await user_repo.update(str(user["_id"]), {
+        "must_change_password": True,
+        "refresh_token_hash": None,
+        "updated_at": datetime.now(timezone.utc)
+    })
+    
+    return {"message": "Team member will be required to change password on next login"}
+
+
+@router.get("/{member_id}/campaigns", summary="Get Recruiter Campaigns")
+async def get_recruiter_campaigns(
+    member_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY))
+):
+    from app.repositories.campaign_repository import CampaignRepository
+    from bson import ObjectId
+    
+    repo = RecruiterRepository()
+    member = await repo.get_by_id(member_id)
+    if not member or member.get("company_id") != current_user.sub:
+        raise HTTPException(status_code=404, detail="Team member not found.")
+        
+    campaign_repo = CampaignRepository()
+    campaigns = await campaign_repo.get_many({
+        "company_id": ObjectId(current_user.sub),
+        "assigned_recruiter_ids": ObjectId(member_id)
+    })
+    
+    for c in campaigns:
+        c["_id"] = str(c["_id"])
+        c["company_id"] = str(c["company_id"])
+        c["assigned_recruiter_ids"] = [str(rid) for rid in c.get("assigned_recruiter_ids", [])]
+        
+    return campaigns
+
+
+class CampaignAssignRequest2(BaseModel):
+    campaign_ids: list[str]
+
+
+@router.post("/{member_id}/campaigns", summary="Update Recruiter Campaigns")
+async def assign_recruiter_campaigns(
+    member_id: str,
+    payload: CampaignAssignRequest2,
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY))
+):
+    from app.repositories.campaign_repository import CampaignRepository
+    from bson import ObjectId
+    
+    repo = RecruiterRepository()
+    member = await repo.get_by_id(member_id)
+    if not member or member.get("company_id") != current_user.sub:
+        raise HTTPException(status_code=404, detail="Team member not found.")
+        
+    campaign_repo = CampaignRepository()
+    
+    # Remove this recruiter from all campaigns they were assigned to
+    await campaign_repo.collection.update_many(
+        {"company_id": ObjectId(current_user.sub), "assigned_recruiter_ids": ObjectId(member_id)},
+        {"$pull": {"assigned_recruiter_ids": ObjectId(member_id)}}
+    )
+    
+    # Add recruiter to the selected campaigns
+    if payload.campaign_ids:
+        object_ids = [ObjectId(cid) for cid in payload.campaign_ids]
+        await campaign_repo.collection.update_many(
+            {"_id": {"$in": object_ids}, "company_id": ObjectId(current_user.sub)},
+            {"$addToSet": {"assigned_recruiter_ids": ObjectId(member_id)}}
+        )
+        
+    return {"message": "Campaigns updated successfully"}
+
+
+@router.get("/{member_id}/activity", summary="Get Recruiter Activity")
+async def get_recruiter_activity(
+    member_id: str,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY))
+):
+    repo = RecruiterRepository()
+    member = await repo.get_by_id(member_id)
+    if not member or member.get("company_id") != current_user.sub:
+        raise HTTPException(status_code=404, detail="Team member not found.")
+        
+    from app.repositories.audit_log_repository import AuditLogRepository
+    audit_repo = AuditLogRepository()
+    
+    logs = await audit_repo.get_by_actor(current_user.sub, member_id, limit=limit, skip=offset)
+    for log in logs:
+        log["id"] = str(log["_id"])
+        log.pop("_id", None)
+        log["actor_id"] = str(log["actor_id"])
+        log["company_id"] = str(log["company_id"])
+        
+    return logs
+
+
+@router.get("/{member_id}/candidates", summary="Get Recruiter Candidates")
+async def get_recruiter_candidates(
+    member_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY))
+):
+    from app.repositories.candidate_repository import CandidateRepository
+    from bson import ObjectId
+    
+    repo = RecruiterRepository()
+    member = await repo.get_by_id(member_id)
+    if not member or member.get("company_id") != current_user.sub:
+        raise HTTPException(status_code=404, detail="Team member not found.")
+        
+    candidate_repo = CandidateRepository()
+    candidates = await candidate_repo.get_many({
+        "company_id": ObjectId(current_user.sub),
+        "assigned_recruiter_id": ObjectId(member_id)
+    })
+    
+    for c in candidates:
+        c["_id"] = str(c["_id"])
+        c["company_id"] = str(c["company_id"])
+        c["campaign_id"] = str(c.get("campaign_id")) if c.get("campaign_id") else None
+        c["assigned_recruiter_id"] = str(c.get("assigned_recruiter_id")) if c.get("assigned_recruiter_id") else None
+        
+    return candidates
+
+
+@router.get("/{member_id}/interviews", summary="Get Recruiter Interviews")
+async def get_recruiter_interviews(
+    member_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY))
+):
+    from app.repositories.interview_session_repository import InterviewSessionRepository
+    from app.repositories.candidate_repository import CandidateRepository
+    from bson import ObjectId
+    
+    repo = RecruiterRepository()
+    member = await repo.get_by_id(member_id)
+    if not member or member.get("company_id") != current_user.sub:
+        raise HTTPException(status_code=404, detail="Team member not found.")
+        
+    candidate_repo = CandidateRepository()
+    candidates = await candidate_repo.get_many({
+        "company_id": ObjectId(current_user.sub),
+        "assigned_recruiter_id": ObjectId(member_id)
+    })
+    
+    candidate_ids = [c["_id"] for c in candidates]
+    
+    if not candidate_ids:
+        return []
+        
+    session_repo = InterviewSessionRepository()
+    sessions = await session_repo.get_many({
+        "company_id": ObjectId(current_user.sub),
+        "candidate_id": {"$in": candidate_ids}
+    })
+    
+    for s in sessions:
+        s["_id"] = str(s["_id"])
+        s["company_id"] = str(s["company_id"])
+        s["candidate_id"] = str(s["candidate_id"])
+        s["campaign_id"] = str(s.get("campaign_id")) if s.get("campaign_id") else None
+        
+    return sessions

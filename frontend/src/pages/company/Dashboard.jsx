@@ -80,12 +80,13 @@ const colorMap = {
 
 export default function Dashboard() {
     const navigate = useNavigate();
-    const { companyProfile } = useAuthContext();
+    const { companyProfile, isRecruiter } = useAuthContext();
     const { subscription, limits, features, platform } = usePermissions();
 
     // Live data state from /company/dashboard
     const [dashboardData, setDashboardData] = useState(null);
     const [stats, setStats] = useState(null);
+    const [recruiterStats, setRecruiterStats] = useState(null);
     const [recentCandidates, setRecentCandidates] = useState([]);
     const [recentInterviews, setRecentInterviews] = useState([]);
     const [recentNotifications, setRecentNotifications] = useState([]);
@@ -98,23 +99,29 @@ export default function Dashboard() {
         const loadDashboard = async () => {
             setLoading(true);
             try {
-                const res = await dashboardService.getDashboard();
-                const data = res.data?.data || res.data || {};
+                if (isRecruiter) {
+                    // ── Recruiter: fetch personal scoped stats ──────────────────
+                    const res = await dashboardService.getRecruiterDashboard();
+                    setRecruiterStats(res.data?.data || res.data || {});
+                } else {
+                    // ── Company Admin: fetch full company dashboard ──────────────
+                    const res = await dashboardService.getDashboard();
+                    const data = res.data?.data || res.data || {};
 
-                setDashboardData(data);
-                setStats(data.kpis || null);
-                setRecentCandidates(data.recent_candidates || []);
-                setRecentInterviews(data.recent_interviews || []);
-                setRecentNotifications(data.recent_notifications || []);
-                setHiringTrend(data.hiring_trend || []);
-                setHiringFunnel(data.hiring_funnel || []);
+                    setDashboardData(data);
+                    setStats(data.kpis || null);
+                    setRecentCandidates(data.recent_candidates || []);
+                    setRecentInterviews(data.recent_interviews || []);
+                    setRecentNotifications(data.recent_notifications || []);
+                    setHiringTrend(data.hiring_trend || []);
+                    setHiringFunnel(data.hiring_funnel || []);
 
-                // Recruiter performance comes from analytics endpoint separately
-                try {
-                    const recRes = await dashboardService.getRecruiterPerformance();
-                    setRecruiterPerf(recRes.data?.data || recRes.data || []);
-                } catch { /* no recruiter data yet */ }
-
+                    // Recruiter performance from analytics
+                    try {
+                        const recRes = await dashboardService.getRecruiterPerformance();
+                        setRecruiterPerf(recRes.data?.data || recRes.data || []);
+                    } catch { /* no recruiter data yet */ }
+                }
             } catch (err) {
                 console.error("Dashboard load error:", err);
             } finally {
@@ -122,12 +129,46 @@ export default function Dashboard() {
             }
         };
         loadDashboard();
-    }, []);
+    }, [isRecruiter]);
 
+    // ── Recruiter Stat Cards ────────────────────────────────────────────────
+    const rs = recruiterStats || {};
+    const recruiterStatCards = recruiterStats
+        ? [
+            {
+                id: "r-stat-1", title: "Assigned Campaigns",
+                value: rs.campaignsAssigned ?? "0",
+                change: "", icon: "campaign", positive: true,
+            },
+            {
+                id: "r-stat-2", title: "Assigned Candidates",
+                value: rs.candidatesAssigned ?? "0",
+                change: "", icon: "users", positive: true,
+            },
+            {
+                id: "r-stat-3", title: "Interviews Scheduled",
+                value: rs.interviewsScheduled ?? "0",
+                change: "", icon: "robot", positive: true,
+            },
+            {
+                id: "r-stat-4", title: "Acceptance Rate",
+                value: `${rs.acceptanceRate ?? 0}%`,
+                change: "", icon: "chart", positive: true,
+            },
+            {
+                id: "r-stat-5", title: "Completed Interviews",
+                value: rs.completedInterviews ?? "0",
+                change: "", icon: "robot", positive: true,
+            },
+            {
+                id: "r-stat-6", title: "Pending Invitations",
+                value: rs.pendingInvitations ?? "0",
+                change: "", icon: "campaign", positive: true,
+            },
+        ]
+        : [];
 
-
-
-    // Build live stat cards from backend KPIs
+    // ── Company Admin Stat Cards ────────────────────────────────────────────
     const kpis = stats || {};
     const statCards = stats
         ? [
@@ -157,6 +198,8 @@ export default function Dashboard() {
             },
         ]
         : [];
+
+
 
     // ─── Chart: Applications Trend (Line) ─────────────────────────────────────
     const lineData = {
@@ -216,26 +259,28 @@ export default function Dashboard() {
             animate="show"
         >
             <PageHeader
-                title={`${companyProfile?.company_name || "Company"} Dashboard`}
-                subtitle="Recruitment overview"
+                title={isRecruiter ? "My Dashboard" : `${companyProfile?.company_name || "Company"} Dashboard`}
+                subtitle={isRecruiter ? "Your assigned campaigns, candidates and interviews" : "Recruitment overview"}
                 breadcrumbs={[]}
                 actions={
-                    <div className="header-dashboard-cta">
-                        <Button
-                            variant="primary"
-                            size="sm"
-                            iconLeft={<FaPlus />}
-                            onClick={() => navigate("/company/campaigns/new")}
-                        >
-                            New Campaign
-                        </Button>
-                    </div>
+                    !isRecruiter && (
+                        <div className="header-dashboard-cta">
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                iconLeft={<FaPlus />}
+                                onClick={() => navigate("/company/campaigns/new")}
+                            >
+                                New Campaign
+                            </Button>
+                        </div>
+                    )
                 }
             />
 
             {/* Statistics Cards */}
             <motion.div className="dashboard-stats-grid" variants={itemVariants}>
-                {statCards.map((stat) => (
+                {(isRecruiter ? recruiterStatCards : statCards).map((stat) => (
                     <StatsCard
                         key={stat.id}
                         title={stat.title}
@@ -395,15 +440,19 @@ export default function Dashboard() {
                     </div>
                     <div className="widget-list leaderboard-scroll">
                         {recruiterPerf.slice(0, 4).map((rec, index) => (
-                            <div key={index} className="leaderboard-item">
-                                <div className="leaderboard-rec-avatar">
-                                    {rec.name.split(" ").map(x => x[0]).join("")}
+                            <div key={index} className="leaderboard-item" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px", borderBottom: "1px solid var(--border)" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                    <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--primary-light)", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: 12 }}>
+                                        {rec.name.split(" ").map(x => x[0]).join("")}
+                                    </div>
+                                    <div className="leaderboard-meta">
+                                        <h5 style={{ margin: 0, fontSize: 13 }}>{rec.name}</h5>
+                                        <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{rec.candidatesAdded} Added</span>
+                                    </div>
                                 </div>
-                                <div className="leaderboard-meta">
-                                    <h5>{rec.name}</h5>
-                                </div>
-                                <div className="leaderboard-metrics-col">
-                                    <strong>{rec.selections}</strong>
+                                <div style={{ textAlign: "right" }}>
+                                    <div style={{ fontSize: 14, fontWeight: "bold", color: "var(--primary)" }}>{rec.conversionRate}%</div>
+                                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Conv. Rate</div>
                                 </div>
                             </div>
                         ))}
@@ -511,6 +560,87 @@ export default function Dashboard() {
                     </div>
                 </Card>
             </motion.div>
+
+            {/* Recruiter specific: Recent Activity */}
+            {isRecruiter && (
+                <motion.div className="dashboard-widgets-grid" variants={itemVariants} style={{ marginTop: 24, gridTemplateColumns: '1fr' }}>
+                    <Card className="widget-panel" style={{ width: '100%' }}>
+                        <div className="widget-header">
+                            <h4>Recent Activity</h4>
+                        </div>
+                        <div className="widget-list" style={{ maxHeight: 400, overflowY: 'auto' }}>
+                            {recruiterStats?.recentActivity?.length > 0 ? (
+                                recruiterStats.recentActivity.map((act, i) => (
+                                    <div key={i} style={{ display: 'flex', gap: 16, padding: '16px 0', borderBottom: '1px solid var(--border)' }}>
+                                        <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <FaTasks />
+                                        </div>
+                                        <div>
+                                            <div style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
+                                                {act.action} - {act.target_entity} {act.target_name ? `(${act.target_name})` : ''}
+                                            </div>
+                                            <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                                                {new Date(act.created_at).toLocaleString()}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div style={{ color: "var(--text-secondary)", fontSize: 13, padding: "12px 0", textAlign: 'center' }}>
+                                    No recent activity found.
+                                </div>
+                            )}
+                        </div>
+                    </Card>
+                </motion.div>
+            )}
+
+            {/* Company Admin specific: Recruiter Workload */}
+            {!isRecruiter && dashboardData?.recruiter_workload && dashboardData.recruiter_workload.length > 0 && (
+                <motion.div variants={itemVariants} style={{ marginTop: 24 }}>
+                    <h3 style={{ marginBottom: 16, fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>Recruiter Workload</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 20 }}>
+                        {dashboardData.recruiter_workload.map(rec => (
+                            <Card key={rec.id} style={{ padding: 20 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                        <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                                            {rec.name.split(" ").map(x => x[0]).join("").substring(0,2)}
+                                        </div>
+                                        <div>
+                                            <h4 style={{ margin: 0, fontSize: 15 }}>{rec.name}</h4>
+                                            <StatusBadge status={rec.status} />
+                                        </div>
+                                    </div>
+                                    <div style={{ textAlign: 'right' }}>
+                                        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--primary)' }}>{rec.avg_score}</div>
+                                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Avg Score</div>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                                    <div style={{ background: 'var(--bg)', padding: 12, borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                                        <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{rec.candidates_count}</div>
+                                        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Candidates</div>
+                                    </div>
+                                    <div style={{ background: 'var(--bg)', padding: 12, borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                                        <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{rec.campaigns_count}</div>
+                                        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Campaigns</div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13, color: 'var(--text-secondary)' }}>
+                                        <span>Interviews Today</span>
+                                        <span style={{ fontWeight: 600, color: 'var(--text)' }}>{rec.interviews_today}</span>
+                                    </div>
+                                    <div style={{ width: '100%', background: 'var(--border)', height: 6, borderRadius: 3, overflow: 'hidden' }}>
+                                        <div style={{ width: `${Math.min(100, rec.interviews_today * 20)}%`, height: '100%', background: rec.interviews_today > 0 ? 'var(--warning)' : 'var(--primary)' }} />
+                                    </div>
+                                </div>
+                            </Card>
+                        ))}
+                    </div>
+                </motion.div>
+            )}
         </motion.div>
     );
 }

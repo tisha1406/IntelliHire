@@ -178,6 +178,27 @@ export default function Notifications() {
                                             <span className="notif-time">{notif.time}</span>
                                         </div>
                                         <p className="notif-message">{notif.message}</p>
+                                        
+                                        {notif.action && notif.action.url && (
+                                            <div style={{ marginTop: 10 }}>
+                                                <a 
+                                                    href={notif.action.url}
+                                                    style={{ 
+                                                        fontSize: 12, fontWeight: 600, color: "var(--primary)", 
+                                                        textDecoration: "none", padding: "4px 10px", 
+                                                        background: "var(--primary-light)", borderRadius: 4,
+                                                        display: "inline-block"
+                                                    }}
+                                                    onClick={(e) => {
+                                                        // Prevent the notification itself from being clicked
+                                                        e.stopPropagation();
+                                                        markRead(notif.id);
+                                                    }}
+                                                >
+                                                    {notif.action.label || "View Details"}
+                                                </a>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {notif.unread && <div className="notif-unread-dot" />}

@@ -7,30 +7,15 @@ import {
 
 import PageHeader from "../../components/common/PageHeader";
 
-const ACTIVITY_LOG = [
-    { id: 1, type: "recruitment", user: "Sarah Jenkins", action: "Launched campaign", target: "DevOps & Infrastructure Lead", time: "2 hours ago", icon: <FaBriefcase /> },
-    { id: 2, type: "candidate", user: "Dev Patel", action: "Moved to Interview stage", target: "Priya Sharma", time: "3 hours ago", icon: <FaUser /> },
-    { id: 3, type: "candidate", user: "Anna Kovac", action: "Left a note on", target: "Marcus Dupont", time: "4 hours ago", icon: <FaUser /> },
-    { id: 4, type: "security", user: "System", action: "New login detected for", target: "Dev Patel", time: "5 hours ago", icon: <FaShieldAlt /> },
-    { id: 5, type: "recruitment", user: "Sarah Jenkins", action: "Closed campaign", target: "Product Designer (UX/UI)", time: "6 hours ago", icon: <FaBriefcase /> },
-    { id: 6, type: "system", user: "System", action: "Completed scheduled backup", target: "All databases", time: "7 hours ago", icon: <FaCog /> },
-    { id: 7, type: "candidate", user: "Marcus Vance", action: "Shortlisted", target: "Lukas Müller", time: "8 hours ago", icon: <FaUser /> },
-    { id: 8, type: "recruitment", user: "Dev Patel", action: "Updated job description for", target: "Senior AI Scientist", time: "9 hours ago", icon: <FaBriefcase /> },
-    { id: 9, type: "security", user: "System", action: "Password changed for", target: "Sarah Jenkins", time: "10 hours ago", icon: <FaShieldAlt /> },
-    { id: 10, type: "candidate", user: "Elena Rostova", action: "Moved to Rejected", target: "Nathan Drake", time: "11 hours ago", icon: <FaUser /> },
-    { id: 11, type: "recruitment", user: "Sarah Jenkins", action: "Published", target: "Growth Marketing Manager campaign", time: "1 day ago", icon: <FaBriefcase /> },
-    { id: 12, type: "candidate", user: "Barry Allen", action: "Scheduled AI interview for", target: "Aisha Diallo", time: "1 day ago", icon: <FaUser /> },
-    { id: 13, type: "system", user: "System", action: "AI model upgraded to", target: "IntelliGPT-4.5", time: "1 day ago", icon: <FaCog /> },
-    { id: 14, type: "security", user: "Dev Patel", action: "Generated new API key for", target: "Slack Integration", time: "2 days ago", icon: <FaShieldAlt /> },
-    { id: 15, type: "candidate", user: "Sarah Jenkins", action: "Extended offer to", target: "Lukas Müller", time: "2 days ago", icon: <FaUser /> },
-];
+import auditLogService from "../../services/company/auditLogService";
 
 const TYPE_META = {
-    recruitment: { color: "#6366F1", bg: "rgba(99,102,241,0.12)" },
-    candidate:   { color: "#10B981", bg: "rgba(16,185,129,0.12)" },
-    system:      { color: "#F59E0B", bg: "rgba(245,158,11,0.12)" },
-    security:    { color: "#EF4444", bg: "rgba(239,68,68,0.12)" },
+    recruitment: { color: "#6366F1", bg: "rgba(99,102,241,0.12)", icon: <FaBriefcase /> },
+    candidate:   { color: "#10B981", bg: "rgba(16,185,129,0.12)", icon: <FaUser /> },
+    system:      { color: "#F59E0B", bg: "rgba(245,158,11,0.12)", icon: <FaCog /> },
+    security:    { color: "#EF4444", bg: "rgba(239,68,68,0.12)", icon: <FaShieldAlt /> },
 };
+
 
 const FILTER_TYPES = ["All", "recruitment", "candidate", "system", "security"];
 
@@ -38,14 +23,36 @@ export default function Activity() {
     const [filter, setFilter] = useState("All");
     const [search, setSearch] = useState("");
 
-    const filtered = ACTIVITY_LOG.filter(a => {
+    const [logs, setLogs] = React.useState([]);
+    const [loading, setLoading] = React.useState(true);
+
+    React.useEffect(() => {
+        const fetchLogs = async () => {
+            try {
+                setLoading(true);
+                const res = await auditLogService.getLogs();
+                setLogs(res.data || []);
+            } catch (err) {
+                console.error("Failed to fetch logs:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchLogs();
+    }, []);
+
+    const filtered = logs.filter(a => {
         const matchType = filter === "All" || a.type === filter;
         const matchSearch = search === "" ||
-            a.action.toLowerCase().includes(search.toLowerCase()) ||
-            a.target.toLowerCase().includes(search.toLowerCase()) ||
-            a.user.toLowerCase().includes(search.toLowerCase());
+            a.action?.toLowerCase().includes(search.toLowerCase()) ||
+            a.target?.toLowerCase().includes(search.toLowerCase()) ||
+            a.user?.toLowerCase().includes(search.toLowerCase());
         return matchType && matchSearch;
     });
+
+    if (loading) {
+        return <div style={{ padding: 40, textAlign: "center", color: "var(--text-secondary)" }}>Loading activity logs...</div>;
+    }
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 28, animation: "fadeInPage 0.4s ease-out" }}>
@@ -128,12 +135,12 @@ export default function Activity() {
                                 {/* Icon + line */}
                                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
                                     <div style={{
-                                        width: 36, height: 36, borderRadius: "var(--radius-sm)",
+                                        width: 40, height: 40, borderRadius: "50%",
                                         background: meta.bg, color: meta.color,
                                         display: "flex", alignItems: "center", justifyContent: "center",
-                                        fontSize: 14
+                                        fontSize: 16
                                     }}>
-                                        {event.icon}
+                                        {meta.icon}
                                     </div>
                                     {i < filtered.length - 1 && (
                                         <div style={{
@@ -151,8 +158,8 @@ export default function Activity() {
                                             {" "}{event.action}{" "}
                                             <strong style={{ color: "var(--text)" }}>{event.target}</strong>
                                         </p>
-                                        <span style={{ fontSize: 11, color: "var(--text-secondary)", flexShrink: 0, marginLeft: 16, marginTop: 2 }}>
-                                            {event.time}
+                                        <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+                                            {event.time ? new Date(event.time).toLocaleString() : "Recently"}
                                         </span>
                                     </div>
                                 </div>

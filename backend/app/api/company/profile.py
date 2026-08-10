@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from app.auth.jwt_handler import TokenPayload
 from app.rbac.models import UserRole
-from app.rbac.permissions import require_role
+from app.rbac.permissions import require_role, require_company_or_recruiter
 from app.repositories.company_repository import CompanyRepository
 from app.repositories.user_repository import UserRepository
 
@@ -59,12 +59,25 @@ class PasswordChangeRequest(BaseModel):
 
 @router.get("", response_model=CompanyProfileResponse, summary="Get Current Company Profile")
 async def get_profile(
-    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
 ):
     """
-    Return the profile of the currently authenticated company.
+    Return the profile of the company workspace.
+    - Company Admin: company_id == sub
+    - Recruiter: company_id comes from token.company_id
+    Both roles share the same Company Workspace; data is scoped by company_id.
     """
-    company = await company_repo.get_by_id(current_user.sub)
+    # Resolve company_id based on role
+    if current_user.role.upper() == UserRole.RECRUITER.value.upper():
+        resolved_company_id = current_user.company_id
+    else:
+        resolved_company_id = current_user.sub
+
+    if not resolved_company_id:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="company_id not found in token.")
+
+    company = await company_repo.get_by_id(resolved_company_id)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found.")
 
@@ -86,7 +99,7 @@ async def get_profile(
         status=company.get("status"),
         features=company.get("features", {}),
         usage=company.get("usage", {}),
-        limits=company.get("limits", {})
+        limits=company.get("limits", {}),
     )
 
 

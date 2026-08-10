@@ -3,7 +3,7 @@ from typing import Callable
 
 from app.auth.jwt_handler import TokenPayload
 from app.rbac.models import UserRole
-from app.rbac.permissions import require_role
+from app.rbac.permissions import require_company_or_recruiter
 from app.repositories.company_repository import CompanyRepository
 
 def check_limit(limit_field: str, usage_field: str) -> Callable:
@@ -13,10 +13,11 @@ def check_limit(limit_field: str, usage_field: str) -> Callable:
     usage_field: The key in the usage subdocument (e.g. 'recruiters_used').
     """
     async def limit_dependency(
-        current_user: TokenPayload = Depends(require_role(UserRole.COMPANY))
+        current_user: TokenPayload = Depends(require_company_or_recruiter)
     ):
         company_repo = CompanyRepository()
-        company = await company_repo.get_by_id(current_user.sub)
+        company_id = current_user.company_id if current_user.role.upper() == UserRole.RECRUITER.value.upper() else current_user.sub
+        company = await company_repo.get_by_id(company_id)
         
         if not company:
             raise HTTPException(

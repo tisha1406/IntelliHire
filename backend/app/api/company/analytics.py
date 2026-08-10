@@ -257,56 +257,75 @@ async def get_recruiter_performance(
 ):
     """Per-recruiter placement metrics from campaigns and candidates."""
     company_filter = {"company_id": ObjectId(current_user.sub)}
-    campaigns = await campaign_repo.get_many(query=company_filter, limit=500)
-    candidates = await candidate_repo.get_many(query=company_filter, limit=5000)
+    campaigns = await campaign_repo.get_many(query=company_filter, limit=5000)
+    candidates = await candidate_repo.get_many(query=company_filter, limit=10000)
+    sessions = await session_repo.get_many(query=company_filter, limit=10000)
+    
+    from app.repositories.recruiter_repository import RecruiterRepository
+    from app.repositories.interview_report_repository import InterviewReportRepository
+    recruiter_repo = RecruiterRepository()
+    report_repo = InterviewReportRepository()
+    
+    recruiters = await recruiter_repo.get_many(query=company_filter)
+    recruiter_map = {str(r["_id"]): r for r in recruiters if not r.get("is_deleted")}
 
-    recruiter_campaigns: dict = defaultdict(int)
-    recruiter_selections: dict = defaultdict(int)
-    recruiter_offered: dict = defaultdict(int)
+    results = []
 
-    for camp in campaigns:
-        recruiter = (
-            camp.get("created_by")
-            or camp.get("recruiter")
-            or camp.get("recruiter_name")
+    for rid, rec in recruiter_map.items():
+        name = rec.get("name", "Unknown Recruiter")
+        
+        # 1. Assigned Campaigns
+        active_campaigns = sum(
+            1 for c in campaigns 
+            if ObjectId(rid) in c.get("assigned_recruiter_ids", []) and c.get("status", "").lower() in ("active", "open")
         )
-        if recruiter and camp.get("status", "").lower() in ("active", "open"):
-            recruiter_campaigns[recruiter] += 1
+        
+        # 2. Candidates Added (assigned to them)
+        assigned_candidates = [c for c in candidates if str(c.get("assigned_recruiter_id")) == rid]
+        candidates_added = len(assigned_candidates)
+        
+        # 3. Interviews Scheduled & Completed & Offer Rate
+        assigned_cand_ids = [str(c["_id"]) for c in assigned_candidates]
+        recruiter_sessions = [s for s in sessions if str(s.get("candidate_id")) in assigned_cand_ids]
+        
+        interviews_scheduled = len(recruiter_sessions)
+        interviews_completed = sum(1 for s in recruiter_sessions if s.get("status") == "completed")
+        
+        # 4. Avg AI Score
+        score_sum = 0
+        score_count = 0
+        for s in recruiter_sessions:
+            if s.get("status") == "completed":
+                rep = await report_repo.get_one({"session_id": s["_id"]})
+                if rep and rep.get("overall_score") is not None:
+                    score_sum += rep["overall_score"]
+                    score_count += 1
+                    
+        avg_score = round(score_sum / score_count, 1) if score_count > 0 else 0
+        
+        # 5. Offer Rate & Conversion Rate
+        offered = sum(1 for c in assigned_candidates if c.get("status", "").lower() in ("offered", "selected", "hired"))
+        hired = sum(1 for c in assigned_candidates if c.get("status", "").lower() in ("hired"))
+        
+        offer_rate = round((offered / candidates_added) * 100) if candidates_added > 0 else 0
+        acceptance_rate = round((hired / offered) * 100) if offered > 0 else 0
+        conversion_rate = round((hired / candidates_added) * 100) if candidates_added > 0 else 0
 
-    for c in candidates:
-        recruiter = (
-            c.get("assigned_to")
-            or c.get("recruiter")
-            or c.get("recruiter_name")
-        )
-        if recruiter:
-            if c.get("status") in ("Selected", "Hired", "hired", "selected"):
-                recruiter_selections[recruiter] += 1
-            if c.get("status") in ("Offered", "Selected", "Hired", "offered"):
-                recruiter_offered[recruiter] += 1
-
-    all_recruiters = set(
-        list(recruiter_campaigns.keys()) +
-        list(recruiter_selections.keys())
-    )
-
-    if not all_recruiters:
-        return []
-
-    result = []
-    for name in sorted(all_recruiters):
-        selected = recruiter_selections.get(name, 0)
-        offered = recruiter_offered.get(name, 0)
-        acceptance_rate = round((selected / offered) * 100) if offered > 0 else 0
-        result.append({
+        results.append({
+            "id": rid,
             "name": name,
-            "activeCampaigns": recruiter_campaigns.get(name, 0),
-            "averageTimeToHire": "N/A",
-            "selections": selected,
-            "offerAcceptanceRate": acceptance_rate,
+            "activeCampaigns": active_campaigns,
+            "candidatesAdded": candidates_added,
+            "interviewsScheduled": interviews_scheduled,
+            "interviewsCompleted": interviews_completed,
+            "averageAiScore": avg_score,
+            "offerRate": offer_rate,
+            "acceptanceRate": acceptance_rate,
+            "conversionRate": conversion_rate
         })
 
-    return result[:10]
+    return sorted(results, key=lambda x: x["candidatesAdded"], reverse=True)
+
 
 
 # ──────────────────────────────────────────────────────────────────────

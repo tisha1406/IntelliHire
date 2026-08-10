@@ -10,8 +10,10 @@ import { useAuthContext } from "../../context/AuthContext";
 import PageHeader from "../../components/common/PageHeader";
 import Button from "../../components/common/Button";
 import profileService from "../../services/company/profileService";
+import recruiterService from "../../services/recruiter/recruiterService";
 
 import "../../styles/company/Profile.css";
+
 
 const cardVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -33,7 +35,14 @@ function Toast({ message, type = "success" }) {
 }
 
 export default function Profile() {
-    const { user, setCompanyProfile } = useAuthContext();
+    const { user, setCompanyProfile, isRecruiter, recruiterProfile, setRecruiterProfile } = useAuthContext();
+
+    // ── Recruiter profile view ────────────────────────────────────────────────
+    if (isRecruiter) {
+        return <RecruiterProfileView user={user} recruiterProfile={recruiterProfile} setRecruiterProfile={setRecruiterProfile} />;
+    }
+
+    // ── Company Admin profile view (existing) ─────────────────────────────────
 
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -317,3 +326,217 @@ export default function Profile() {
         </div>
     );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Recruiter Profile View — rendered when isRecruiter === true
+// ─────────────────────────────────────────────────────────────────────────────
+function RecruiterProfileView({ user, recruiterProfile, setRecruiterProfile }) {
+    const [formData, setFormData] = useState({
+        first_name: "",
+        last_name: "",
+        phone: "",
+        designation: "",
+        department: "",
+        employee_id: "",
+        timezone: "",
+        language: "",
+        bio: "",
+        skills: "",
+    });
+    const [editing, setEditing] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [toast, setToast] = useState({ message: "", type: "success" });
+
+    useEffect(() => {
+        if (recruiterProfile) {
+            let parsedSkills = recruiterProfile.skills;
+            if (Array.isArray(parsedSkills)) parsedSkills = parsedSkills.join(", ");
+            else if (!parsedSkills) parsedSkills = "";
+            
+            setFormData({
+                first_name: recruiterProfile.first_name || recruiterProfile.name?.split(' ')[0] || "",
+                last_name: recruiterProfile.last_name || recruiterProfile.name?.split(' ').slice(1).join(' ') || "",
+                phone: recruiterProfile.phone || "",
+                designation: recruiterProfile.designation || "",
+                department: recruiterProfile.department || "",
+                employee_id: recruiterProfile.employee_id || "",
+                timezone: recruiterProfile.timezone || "",
+                language: recruiterProfile.language || "",
+                bio: recruiterProfile.bio || "",
+                skills: parsedSkills,
+            });
+        }
+    }, [recruiterProfile]);
+
+    const handleSave = async (e) => {
+        e.preventDefault();
+        setSaving(true);
+        try {
+            const submitData = { 
+                ...formData, 
+                name: `${formData.first_name} ${formData.last_name}`.trim(),
+                skills: formData.skills.split(',').map(s => s.trim()).filter(Boolean)
+            };
+            const res = await recruiterService.updateProfile(submitData);
+            setRecruiterProfile(res.data?.data || res.data || formData);
+            setEditing(false);
+            setToast({ message: "Profile updated successfully!", type: "success" });
+        } catch {
+            setToast({ message: "Failed to update profile.", type: "error" });
+        } finally {
+            setSaving(false);
+            setTimeout(() => setToast({ message: "" }), 3000);
+        }
+    };
+
+    const initials = `${formData.first_name?.[0] || ""}${formData.last_name?.[0] || ""}`.toUpperCase() || "R";
+
+    return (
+        <div className="profile-page">
+            <Toast message={toast.message} type={toast.type} />
+            <PageHeader
+                title="My Profile"
+                subtitle="Manage your recruiter profile"
+                breadcrumbs={[{ label: "Profile" }]}
+                actions={
+                    !editing ? (
+                        <Button variant="outline" iconLeft={<FaEdit />} onClick={() => setEditing(true)}>
+                            Edit Profile
+                        </Button>
+                    ) : null
+                }
+            />
+            <div className="profile-grid">
+                {/* Avatar card */}
+                <motion.div
+                    className="profile-avatar-card"
+                    variants={cardVariants}
+                    custom={0}
+                    initial="hidden"
+                    animate="visible"
+                >
+                    <div className="profile-avatar-large">{initials}</div>
+                    <h3>{formData.first_name} {formData.last_name}</h3>
+                    <span style={{ color: "var(--text-muted)", fontSize: 14 }}>{formData.designation}</span>
+                    <span style={{ display: "block", color: "var(--primary)", fontSize: 13, marginTop: 4 }}>
+                        {formData.department}
+                    </span>
+                    <span style={{ display: "block", color: "var(--text-muted)", fontSize: 12, marginTop: 6 }}>
+                        {user?.email}
+                    </span>
+                </motion.div>
+
+                {/* Edit form */}
+                <motion.div
+                    className="profile-form-card"
+                    variants={cardVariants}
+                    custom={1}
+                    initial="hidden"
+                    animate="visible"
+                >
+                    <h4><FaUser style={{ marginRight: 8 }} />Personal Information</h4>
+                    <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 16 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                            <div>
+                                <label style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6, display: "block" }}>First Name</label>
+                                <input
+                                    value={formData.first_name}
+                                    onChange={e => setFormData({ ...formData, first_name: e.target.value })}
+                                    disabled={!editing}
+                                    style={{ width: "100%", padding: "10px 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6, display: "block" }}>Last Name</label>
+                                <input
+                                    value={formData.last_name}
+                                    onChange={e => setFormData({ ...formData, last_name: e.target.value })}
+                                    disabled={!editing}
+                                    style={{ width: "100%", padding: "10px 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" }}
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6, display: "block" }}>Phone</label>
+                            <input
+                                value={formData.phone}
+                                onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                                disabled={!editing}
+                                style={{ width: "100%", padding: "10px 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" }}
+                            />
+                        </div>
+                        <div>
+                            <label style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6, display: "block" }}>Designation</label>
+                            <input
+                                value={formData.designation}
+                                onChange={e => setFormData({ ...formData, designation: e.target.value })}
+                                disabled={!editing}
+                                style={{ width: "100%", padding: "10px 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" }}
+                            />
+                        </div>
+                        <div>
+                            <label style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6, display: "block" }}>Department</label>
+                            <input
+                                value={formData.department}
+                                onChange={e => setFormData({ ...formData, department: e.target.value })}
+                                disabled={!editing}
+                                style={{ width: "100%", padding: "10px 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" }}
+                            />
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                            <div>
+                                <label style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6, display: "block" }}>Timezone</label>
+                                <input
+                                    value={formData.timezone}
+                                    onChange={e => setFormData({ ...formData, timezone: e.target.value })}
+                                    disabled={!editing}
+                                    placeholder="e.g. UTC, PST, IST"
+                                    style={{ width: "100%", padding: "10px 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6, display: "block" }}>Language</label>
+                                <input
+                                    value={formData.language}
+                                    onChange={e => setFormData({ ...formData, language: e.target.value })}
+                                    disabled={!editing}
+                                    placeholder="e.g. English"
+                                    style={{ width: "100%", padding: "10px 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" }}
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6, display: "block" }}>Skills (comma separated)</label>
+                            <input
+                                value={formData.skills}
+                                onChange={e => setFormData({ ...formData, skills: e.target.value })}
+                                disabled={!editing}
+                                placeholder="e.g. Technical Recruiting, Sourcing, JavaScript"
+                                style={{ width: "100%", padding: "10px 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" }}
+                            />
+                        </div>
+                        <div>
+                            <label style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6, display: "block" }}>Bio / Signature</label>
+                            <textarea
+                                value={formData.bio}
+                                onChange={e => setFormData({ ...formData, bio: e.target.value })}
+                                disabled={!editing}
+                                rows={3}
+                                placeholder="Tell candidates about yourself..."
+                                style={{ width: "100%", padding: "10px 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text)", boxSizing: "border-box", resize: "vertical" }}
+                            />
+                        </div>
+                        {editing && (
+                            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+                                <Button type="button" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
+                                <Button type="submit" variant="primary" disabled={saving}>
+                                    {saving ? "Saving..." : "Save Changes"}
+                                </Button>
+                            </div>
+                        )}
+                    </form>
+                </motion.div>
+            </div>
+        </div>
+    );
+}
