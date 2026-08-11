@@ -56,7 +56,6 @@ from app.api.auth import router as auth_router
 # ===========================
 # Candidate APIs
 # ===========================
-from app.api.candidates import router as candidates_router
 from app.api.candidate_portal import router as candidate_portal_router
 from app.api.resume import router as resume_router
 from app.api.interview import router as interview_router
@@ -170,7 +169,6 @@ app.include_router(company_audit_logs_router)
 app.include_router(auth_router)
 
 # ---------- Candidate ----------
-app.include_router(candidates_router)
 app.include_router(candidate_portal_router)
 app.include_router(resume_router)
 app.include_router(interview_router)

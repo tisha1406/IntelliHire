@@ -23,8 +23,8 @@ class InvitationService:
         self.campaign_repo = CampaignRepository()
         self.company_repo = CompanyRepository()
 
-    def _generate_token(self, length=32):
-        alphabet = string.ascii_letters + string.digits
+    def _generate_temporary_password(self, length=12):
+        alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
         return ''.join(secrets.choice(alphabet) for i in range(length))
 
     async def invite_candidate(
@@ -34,16 +34,9 @@ class InvitationService:
         name: str,
         email: str,
         assigned_recruiter_id: str = None
-    ) -> str:
+    ) -> dict:
         """
-        Creates a candidate invitation.
-        Does NOT create the user account yet - they must accept the invite to set a password.
-        (Or depending on flow, we can create the user and candidate now).
-        Per the user's request:
-        "The backend should automatically:
-        Create the User record. Assign the Candidate role. Create the Candidate profile.
-        Associate the candidate with the selected company. Associate the candidate with the selected campaign.
-        Generate a secure invitation token. Send an invitation email..."
+        Creates a candidate account and generates temporary credentials.
         """
 
         # Verify campaign
@@ -60,13 +53,16 @@ class InvitationService:
         if existing_user:
             raise HTTPException(status_code=400, detail="User with this email already exists")
 
+        temp_password = self._generate_temporary_password()
+        hashed_password = hash_password(temp_password)
+
         user_data = {
             "email": email,
-            "password_hash": "", # Will be set on acceptance
+            "password_hash": hashed_password,
             "role": "candidate",
             "company_id": ObjectId(company_id),
             "is_active": True,
-            "must_change_password": True, # Force them to set one via the token
+            "must_change_password": False,
             "created_at": datetime.now(UTC),
             "updated_at": datetime.now(UTC),
         }
@@ -80,7 +76,7 @@ class InvitationService:
             "name": name,
             "email": email,
             "target_role": campaign.get("job_position", ""),
-            "status": "invited",
+            "status": "active",
             "created_at": datetime.now(UTC),
             "updated_at": datetime.now(UTC),
         }
@@ -98,7 +94,7 @@ class InvitationService:
             "user_id": ObjectId(user_id),
             "company_id": ObjectId(company_id),
             "campaign_id": ObjectId(campaign_id),
-            "stage": "INVITATION_PENDING",
+            "stage": "ACCOUNT_ACTIVATED",
             "next_action": "UPLOAD_RESUME", # default after login
             "resume_uploaded": False,
             "practice_completed": False,
@@ -108,25 +104,22 @@ class InvitationService:
         }
         await self.workflow_repo.create(workflow_data)
 
-        # 4. Generate Invitation
-        token = self._generate_token()
-        invitation_data = {
-            "token": token,
-            "candidate_id": ObjectId(candidate_id),
-            "user_id": ObjectId(user_id),
-            "company_id": ObjectId(company_id),
-            "campaign_id": ObjectId(campaign_id),
-            "email": email,
-            "name": name,
-            "expires_at": datetime.now(UTC) + timedelta(days=7),
-            "used": False,
-            "created_at": datetime.now(UTC),
+        return {
+            "candidate": {
+                "id": str(candidate_id),
+                "name": name,
+                "email": email,
+                "username": email,
+                "company_id": str(company_id),
+                "campaign_id": str(campaign_id),
+                "assigned_recruiter_id": str(assigned_recruiter_id) if assigned_recruiter_id else None,
+                "status": "active"
+            },
+            "credentials": {
+                "username": email,
+                "temporary_password": temp_password
+            }
         }
-        await self.invitation_repo.create(invitation_data)
-
-        # 5. TODO: Send Email
-
-        return token
 
     async def accept_invitation(self, token: str, password: str):
         """

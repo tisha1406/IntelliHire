@@ -84,6 +84,20 @@ class AuthService:
             candidate_id = str(user["candidate_id"]) if user.get("candidate_id") else None
             company_id = str(user.get("company_id")) if user.get("company_id") else None
             recruiter_id = str(user.get("recruiter_id")) if role == "recruiter" else None
+
+            if company_id:
+                company = await self.company_repo.get_by_id(company_id)
+                if not company:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Company account not found.",
+                    )
+                company_status = company.get("subscription", {}).get("status") or company.get("status")
+                if company_status != "active" or company.get("deleted_at"):
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Company account is inactive or deleted.",
+                    )
         
         campaign_id = None
 

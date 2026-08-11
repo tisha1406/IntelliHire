@@ -30,8 +30,8 @@ class AuditLogRepository(BaseRepository):
             metadata = {}
             
         entry = AuditLog(
-            company_id=ObjectId(company_id),
-            actor_id=ObjectId(actor_id),
+            company_id=str(company_id),
+            actor_id=str(actor_id),
             actor_name=actor_name,
             actor_role=actor_role,
             action=action,

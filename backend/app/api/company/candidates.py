@@ -60,10 +60,10 @@ async def invite_candidate(
     try:
         
         assigned_recruiter_id = req.assigned_recruiter_id
-        if not assigned_recruiter_id and current_user.role.upper() == UserRole.RECRUITER.value.upper():
+        if current_user.role.upper() == UserRole.RECRUITER.value.upper():
             assigned_recruiter_id = current_user.recruiter_id
 
-        invitation_token = await service.invite_candidate(
+        result = await service.invite_candidate(
             company_id=company_id,
             campaign_id=req.campaign_id,
             name=req.name,
@@ -80,7 +80,7 @@ async def invite_candidate(
         await audit_repo.log_action(
             company_id=company_id,
             actor_id=current_user.sub,
-            actor_name=current_user.name,
+            actor_name="Recruiter/Company Admin",
             actor_role=current_user.role,
             action="CREATED_CANDIDATE",
             target_entity="Candidate",
@@ -93,21 +93,17 @@ async def invite_candidate(
         raise
 
     except Exception as e:
-
         raise HTTPException(
             status_code=500,
             detail=str(e),
         )
 
     return success_response(
-
         data=InviteCandidateResponse(
-            candidate_id="temp",
-            user_id="temp",
-            invitation_token=invitation_token,
-            message="Invitation sent successfully.",
-        )
-
+            candidate=result["candidate"],
+            credentials=result["credentials"]
+        ),
+        message="Candidate created successfully."
     )
 
 @router.get("/")
@@ -188,9 +184,9 @@ async def bulk_assign_candidates(
             await audit_repo.log_action(
                 company_id=current_user.sub,
                 actor_id=current_user.sub,
-                actor_name=current_user.name,
+                actor_name="Recruiter/Company Admin",
                 actor_role=current_user.role,
-                action="ASSIGNED_CANDIDATE",
+                action="REASSIGNED_CANDIDATES",
                 target_entity="Candidate",
                 target_id=cid,
                 target_name=cand.get("name"),
@@ -762,3 +758,103 @@ async def reassign_candidate(
     })
 
     return success_response(message="Candidate reassigned successfully")
+
+# ---------------------------------------------------------
+# SUSPEND CANDIDATE
+# ---------------------------------------------------------
+@router.patch("/{candidate_id}/suspend")
+async def suspend_candidate(
+    candidate_id: str,
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
+):
+    repo = CandidateRepository()
+    cand = await repo.get(candidate_id)
+    company_id = current_user.company_id if current_user.role.upper() == "RECRUITER" else current_user.sub
+    
+    if not cand or str(cand.get("company_id")) != str(company_id):
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    if current_user.role.upper() == "RECRUITER" and str(cand.get("assigned_recruiter_id")) != str(current_user.recruiter_id):
+        raise HTTPException(status_code=404, detail="Candidate not found (not assigned)")
+
+    await repo.update(candidate_id, {"status": "suspended", "updated_at": datetime.now(UTC)})
+    
+    from app.repositories.user_repository import UserRepository
+    user_repo = UserRepository()
+    if cand.get("user_id"):
+        await user_repo.update(str(cand["user_id"]), {"is_active": False, "updated_at": datetime.now(UTC)})
+
+    return success_response(message="Candidate suspended successfully")
+
+# ---------------------------------------------------------
+# ACTIVATE CANDIDATE
+# ---------------------------------------------------------
+@router.patch("/{candidate_id}/activate")
+async def activate_candidate(
+    candidate_id: str,
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
+):
+    repo = CandidateRepository()
+    cand = await repo.get(candidate_id)
+    company_id = current_user.company_id if current_user.role.upper() == "RECRUITER" else current_user.sub
+    
+    if not cand or str(cand.get("company_id")) != str(company_id):
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    if current_user.role.upper() == "RECRUITER" and str(cand.get("assigned_recruiter_id")) != str(current_user.recruiter_id):
+        raise HTTPException(status_code=404, detail="Candidate not found (not assigned)")
+
+    await repo.update(candidate_id, {"status": "active", "updated_at": datetime.now(UTC)})
+    
+    from app.repositories.user_repository import UserRepository
+    user_repo = UserRepository()
+    if cand.get("user_id"):
+        await user_repo.update(str(cand["user_id"]), {"is_active": True, "updated_at": datetime.now(UTC)})
+
+    return success_response(message="Candidate activated successfully")
+
+# ---------------------------------------------------------
+# RESET CREDENTIALS
+# ---------------------------------------------------------
+@router.post("/{candidate_id}/reset-credentials")
+async def reset_credentials(
+    candidate_id: str,
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
+):
+    repo = CandidateRepository()
+    cand = await repo.get(candidate_id)
+    company_id = current_user.company_id if current_user.role.upper() == "RECRUITER" else current_user.sub
+    
+    if not cand or str(cand.get("company_id")) != str(company_id):
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    if current_user.role.upper() == "RECRUITER" and str(cand.get("assigned_recruiter_id")) != str(current_user.recruiter_id):
+        raise HTTPException(status_code=404, detail="Candidate not found (not assigned)")
+
+    service = InvitationService()
+    new_password = service._generate_temporary_password()
+    from app.auth.jwt_handler import hash_password
+    hashed_password = hash_password(new_password)
+
+    from app.repositories.user_repository import UserRepository
+    user_repo = UserRepository()
+    if cand.get("user_id"):
+        await user_repo.update(str(cand["user_id"]), {
+            "password_hash": hashed_password,
+            "must_change_password": False,
+            "updated_at": datetime.now(UTC)
+        })
+
+    return success_response(data={
+        "candidate": {
+            "id": str(cand.get("_id")),
+            "name": cand.get("name"),
+            "email": cand.get("email"),
+            "username": cand.get("email"),
+            "company_id": str(cand.get("company_id")),
+            "campaign_id": str(cand.get("campaign_id")),
+            "assigned_recruiter_id": str(cand.get("assigned_recruiter_id")) if cand.get("assigned_recruiter_id") else None,
+            "status": cand.get("status")
+        },
+        "credentials": {
+            "username": cand.get("email"),
+            "temporary_password": new_password
+        }
+    }, message="Candidate credentials reset successfully")
