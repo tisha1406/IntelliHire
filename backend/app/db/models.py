@@ -1,8 +1,22 @@
 from datetime import UTC, datetime
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict, Any
 
+# pyrefly: ignore [missing-import]
 from bson import ObjectId
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.ai_interview.core.enums import (
+    InterviewState, DifficultyLevel, QuestionType,
+    InterviewDecision, MatchLabel, TopicState, InterviewModeStatus
+)
+from app.ai_interview.schemas.interview_mode import InterviewModeSettings
+from app.ai_interview.schemas.blueprint import InterviewBlueprint
+from app.ai_interview.schemas.session import TopicProgress
+from app.ai_interview.schemas.evaluation import AnswerEvaluation
+from app.ai_interview.schemas.readiness import ReadinessResult
+from app.ai_interview.schemas.turn import TurnTimestamps
+from app.ai_interview.schemas.report import TopicResult, ExplainabilitySummary
+from app.ai_interview.schemas.validation import ValidationResult
 
 
 # ==========================================================
@@ -17,6 +31,9 @@ class PyObjectId(ObjectId):
         return core_schema.no_info_after_validator_function(
             cls.validate,
             core_schema.str_schema(),
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                lambda x: str(x)
+            ),
         )
 
     @classmethod
@@ -36,7 +53,6 @@ class MongoBaseModel(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
-        json_encoders={ObjectId: str},
     )
 
 
@@ -261,37 +277,16 @@ class InterviewCampaign(MongoBaseModel):
 # Interview Mode Definition
 # ==========================================================
 
-class DifficultyPolicy(BaseModel):
-    start: str
-    progression: str
-
-
 class InterviewModeDefinition(MongoBaseModel):
-    display_name: str
-
-    internal_strategy: str
-
-    max_follow_ups_per_topic: int
-
-    topic_saturation_threshold: float
-
-    completion_confidence_threshold: float
-
-    difficulty_policy: DifficultyPolicy
-
-    behavioral_templates_enabled: bool
-
-    is_default: bool
-
-    enabled: bool
-
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC)
-    )
-
-    updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC)
-    )
+    mode_id: str
+    name: str
+    description: str
+    version: int
+    status: InterviewModeStatus
+    settings: InterviewModeSettings = Field(default_factory=InterviewModeSettings)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_by: Optional[str] = None
+    published_at: Optional[datetime] = None
 
 # ==========================================================
 # Candidate Resume Profile Models
@@ -378,293 +373,75 @@ class Candidate(MongoBaseModel):
 # Interview Session Models
 # ==========================================================
 
-class ComplexityScores(BaseModel):
-    experience: float
-    skills: float
-    projects: float
+class InterviewSession(MongoBaseModel):
+    session_id: str
+    candidate_id: PyObjectId
+    company_id: PyObjectId
+    campaign_id: PyObjectId
 
+    mode_id: str
+    mode_version: int
 
-class QuestionBudget(BaseModel):
-    min_questions: int
-    max_questions: int
-    complexity_scores: ComplexityScores
-
-
-class InterviewBlueprintItem(BaseModel):
-    topic_name: str
-    section: str
-    importance: Literal[
-        "mandatory",
-        "high",
-        "medium",
-        "low",
-    ]
-    priority_rank: int
-    target_difficulty: Literal[
-        "easy",
-        "medium",
-        "hard",
-    ]
-    estimated_coverage: Literal[
-        "low",
-        "medium",
-        "high",
-    ]
-
-
-class TopicCoverage(BaseModel):
-    status: str
-    questions_asked: int
-    follow_ups_asked: int
-    topic_confidence_score: float
-    last_score: float
-
-
-class InterviewState(BaseModel):
-
-    current_question: str
-
-    current_topic: str
-
-    last_three_questions: List[str] = Field(default_factory=list)
-
-    last_three_answers: List[str] = Field(default_factory=list)
-
-    difficulty: str
-
-    weak_areas: List[str] = Field(default_factory=list)
-
-    strong_areas: List[str] = Field(default_factory=list)
-
-    score_history: List[float] = Field(default_factory=list)
-
-    topics_remaining: List[str] = Field(default_factory=list)
-
-    topics_covered: List[str] = Field(default_factory=list)
-
-    interview_blueprint: List[InterviewBlueprintItem] = Field(
-        default_factory=list
-    )
-
-    topic_coverage_map: dict[str, TopicCoverage] = Field(
-        default_factory=dict
-    )
-
-    current_topic_follow_up_count: int = 0
-
-    overall_coverage_percentage: float = 0.0
-
-    overall_interview_confidence: float = 0.0
+    state: InterviewState = InterviewState.CREATED
+    blueprint: InterviewBlueprint
 
     questions_asked_total: int = 0
 
-    mandatory_topics_completed: bool = False
+    current_topic_id: Optional[str] = None
+    current_difficulty: Optional[DifficultyLevel] = None
 
-    interview_phase: str
+    topic_progress: List[TopicProgress] = Field(default_factory=list)
 
-    exploitation_attempt_count: int = 0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    failure_reason: Optional[str] = None
 
-
-class Evaluation(BaseModel):
-
-    technical_score: float
-
-    communication_score: float
-
-    completeness_score: float
-
-    logical_flow_score: float
-
-    resume_consistency_score: float
-
-    project_explanation_score: float
-
-    professionalism_score: float
-
-    response_quality_score: float
-
-    topic: str
-
-    readiness_score: float
-
-    suggests_follow_up: bool
-
-    follow_up_reason: Optional[str] = None
-
-
-class Turn(BaseModel):
-
+class InterviewTurn(MongoBaseModel):
+    session_id: str
     turn_number: int
 
+    topic_id: str
+    difficulty: DifficultyLevel
+    question_type: QuestionType
+
     question: str
+    answer: Optional[str] = None
 
-    answer_transcript: str
-
-    response_time_seconds: float
-
-    evaluation: Evaluation
-
-    was_follow_up: bool = False
-
-    was_blocked_by_guardrail: bool = False
-
-    calibrate_hold_triggered: bool = False
-
-    cheating_risk_detected: bool = False
-
-
-class InterviewSession(MongoBaseModel):
-
-    strategy_id: Optional[str] = None
-
-    llm_model: Optional[str] = None
-
-    voice_model: Optional[str] = None
-
-    company_id: PyObjectId
-
-    campaign_id: PyObjectId
-
-    candidate_id: PyObjectId
-
-    created_by: Optional[PyObjectId] = None
-    updated_by: Optional[PyObjectId] = None
-    created_by_role: Optional[str] = None
-    updated_by_role: Optional[str] = None
-
-    language: str
-
-    interview_mode: str
-
-    status: Literal[
-        "in_progress",
-        "completed",
-    ]
-
-    question_budget: QuestionBudget
-
-    interview_state: InterviewState
-
-    turns: List[Turn] = Field(default_factory=list)
-
-    last_disconnected_at: Optional[datetime] = None
-
-    incomplete_coverage: bool = False
-
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC)
-    )
-
-    completed_at: Optional[datetime] = None
-
-    updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC)
-    )
+    evaluation: Optional[AnswerEvaluation] = None
+    readiness: Optional[ReadinessResult] = None
+    decision: Optional[InterviewDecision] = None
+    timestamps: TurnTimestamps
 
 # ==========================================================
 # Interview Report Models
 # ==========================================================
 
-class ResumeMatchAnalysis(BaseModel):
-    matched_skills: List[str] = Field(default_factory=list)
-    gap_skills: List[str] = Field(default_factory=list)
-    consistency_notes: str
-
-
-class InterviewRiskAssessment(BaseModel):
-    risks: List[str] = Field(default_factory=list)
-    severity: Literal[
-        "low",
-        "medium",
-        "high",
-    ]
-
-
-class TopicSelectionExplanation(BaseModel):
-    topic: str
-    reason: str
-
-
-class DifficultyChangeExplanation(BaseModel):
-    turn: int
-    change: str
-    reason: str
-
-
-class FollowUpExplanation(BaseModel):
-    turn: int
-    reason: str
-
-
-class CompletionExplanation(BaseModel):
-    reason: str
-
-
-class ReadinessScoreExplanation(BaseModel):
-    formula_summary: str
-    score: float
-
-
-class Explainability(BaseModel):
-
-    topic_selection_explanations: List[
-        TopicSelectionExplanation
-    ] = Field(default_factory=list)
-
-    difficulty_change_explanations: List[
-        DifficultyChangeExplanation
-    ] = Field(default_factory=list)
-
-    follow_up_explanations: List[
-        FollowUpExplanation
-    ] = Field(default_factory=list)
-
-    completion_explanation: CompletionExplanation
-
-    readiness_score_explanation: ReadinessScoreExplanation
-
-
 class InterviewReport(MongoBaseModel):
+    session_id: str
+    overall_score: float
+    match_label: MatchLabel
+    
+    strengths: List[str] = Field(default_factory=list)
+    improvement_areas: List[str] = Field(default_factory=list)
+    topic_results: List[TopicResult] = Field(default_factory=list)
+    
+    interview_summary: str
+    explainability_summary: ExplainabilitySummary
 
-    session_id: PyObjectId
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-    company_id: PyObjectId
+# ==========================================================
+# Validator Logs
+# ==========================================================
 
-    campaign_id: PyObjectId
-
-    overall_score: int
-
-    interview_readiness_score: float
-
-    resume_match_analysis: ResumeMatchAnalysis
-
-    topic_wise_scores: dict[str, int] = Field(default_factory=dict)
-
-    technical_skills_assessment: str
-
-    communication_assessment: str
-
-    interview_risk_assessment: InterviewRiskAssessment
-
-    strengths: str
-
-    weaknesses: str
-
-    improvement_plan: str
-
-    learning_resources: List[str] = Field(default_factory=list)
-
-    recruiter_summary: str
-
-    explainability: Explainability
-
-    generated_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC)
-    )
-
-    updated_at: datetime = Field(
-    default_factory=lambda: datetime.now(UTC)
-    )
+class ValidatorLog(MongoBaseModel):
+    session_id: str
+    turn_number: int
+    validation_result: ValidationResult
+    fallback_used: Optional[str] = None
+    candidate_question_text: Optional[str] = None
+    logged_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 # ==========================================================

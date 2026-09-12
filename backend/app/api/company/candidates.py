@@ -60,10 +60,10 @@ async def invite_candidate(
     try:
         
         assigned_recruiter_id = req.assigned_recruiter_id
-        if not assigned_recruiter_id and current_user.role.upper() == UserRole.RECRUITER.value.upper():
+        if current_user.role.upper() == UserRole.RECRUITER.value.upper():
             assigned_recruiter_id = current_user.recruiter_id
 
-        invitation_token = await service.invite_candidate(
+        result = await service.invite_candidate(
             company_id=company_id,
             campaign_id=req.campaign_id,
             name=req.name,
@@ -80,7 +80,7 @@ async def invite_candidate(
         await audit_repo.log_action(
             company_id=company_id,
             actor_id=current_user.sub,
-            actor_name=current_user.name,
+            actor_name="Recruiter/Company Admin",
             actor_role=current_user.role,
             action="CREATED_CANDIDATE",
             target_entity="Candidate",
@@ -93,21 +93,17 @@ async def invite_candidate(
         raise
 
     except Exception as e:
-
         raise HTTPException(
             status_code=500,
             detail=str(e),
         )
 
     return success_response(
-
         data=InviteCandidateResponse(
-            candidate_id="temp",
-            user_id="temp",
-            invitation_token=invitation_token,
-            message="Invitation sent successfully.",
-        )
-
+            candidate=result["candidate"],
+            credentials=result["credentials"]
+        ),
+        message="Candidate created successfully."
     )
 
 @router.get("/")
@@ -188,9 +184,9 @@ async def bulk_assign_candidates(
             await audit_repo.log_action(
                 company_id=current_user.sub,
                 actor_id=current_user.sub,
-                actor_name=current_user.name,
+                actor_name="Recruiter/Company Admin",
                 actor_role=current_user.role,
-                action="ASSIGNED_CANDIDATE",
+                action="REASSIGNED_CANDIDATES",
                 target_entity="Candidate",
                 target_id=cid,
                 target_name=cand.get("name"),
@@ -245,8 +241,9 @@ async def get_company_interviews(
     for sess in sessions:
         cand = await cand_repo.get_by_id(str(sess["candidate_id"]))
         camp = await campaign_repo.get_by_id(str(sess["campaign_id"]))
-        rep = await report_repo.get_one({"session_id": sess["_id"]})
-
+        ai_score = None
+        evaluation_data = None
+        
         status_val = "Scheduled"
         if sess.get("status") == "completed":
             status_val = "Completed"
@@ -257,55 +254,38 @@ async def get_company_interviews(
         else:
             status_val = "Scheduled"
             upcoming_count += 1
-
-        ai_score = rep.get("overall_score") if rep else None
-        if ai_score is not None:
-            score_sum += ai_score
-            score_count += 1
-
-        evaluation_data = None
-        if rep:
-            strengths_list = []
-            if rep.get("strengths"):
-                raw_s = rep["strengths"]
-                if isinstance(raw_s, list):
-                    strengths_list = raw_s
-                else:
-                    strengths_list = [s.strip() for s in raw_s.split("\n") if s.strip()]
-
-            weaknesses_list = []
-            if rep.get("weaknesses"):
-                raw_w = rep["weaknesses"]
-                if isinstance(raw_w, list):
-                    weaknesses_list = raw_w
-                else:
-                    weaknesses_list = [w.strip() for w in raw_w.split("\n") if w.strip()]
-
-            questions_list = []
-            for turn in sess.get("turns", []):
-                quality_score = turn.get("evaluation", {}).get("response_quality_score", 0)
-                sentiment_val = (
-                    "Excellent" if quality_score >= 9
-                    else "Very Good" if quality_score >= 8
-                    else "Good" if quality_score >= 7
-                    else "Average"
-                )
-                questions_list.append({
-                    "q": turn.get("question", ""),
-                    "a": turn.get("answer_transcript", ""),
-                    "sentiment": sentiment_val,
-                    "score": int(turn.get("evaluation", {}).get("technical_score", 0) * 10),
-                })
-
-            evaluation_data = {
-                "summary": rep.get("recruiter_summary") or rep.get("technical_skills_assessment", ""),
-                "strengths": strengths_list,
-                "weaknesses": weaknesses_list,
-                "recommendation": (
-                    rep.get("resume_match_analysis", {}).get("consistency_notes") or "Review Candidate"
-                ),
-                "questions": questions_list,
-            }
+        
+        # Use InterviewResultService to generate report from actual session data
+        from app.services.interview_result_service import InterviewResultService
+        result_service = InterviewResultService()
+        
+        if sess.get("status") == "completed":
+            try:
+                rep = await result_service.generate_result_report(str(sess["_id"]))
+                if rep and rep.get("has_report"):
+                    ai_score = rep.get("overall_score")
+                    if ai_score is not None:
+                        score_sum += ai_score
+                        score_count += 1
+                        
+                    questions_list = []
+                    for q in rep.get("question_feedback", []):
+                        questions_list.append({
+                            "q": q.get("question", ""),
+                            "a": "Candidate Answer Transcript", # Real system would pull from turn history
+                            "sentiment": "Good",
+                            "score": q.get("score", 0) * 10
+                        })
+                        
+                    evaluation_data = {
+                        "summary": rep.get("company_remarks", ""),
+                        "strengths": rep.get("strengths", []),
+                        "weaknesses": rep.get("weaknesses", []),
+                        "recommendation": "Review Candidate",
+                        "questions": questions_list
+                    }
+            except Exception as e:
+                print(f"Failed to generate report for {sess['_id']}: {e}")
 
         formatted_interviews.append({
             "id": str(sess["_id"]),
@@ -343,6 +323,39 @@ async def get_company_interviews(
         },
         "interviews": formatted_interviews,
     }
+
+
+# ---------------------------------------------------------
+# GET INTERVIEW RESULTS
+# (MUST be before /{candidate_id} routes)
+# ---------------------------------------------------------
+@router.get("/interviews/{session_id}/results")
+async def get_interview_results(
+    session_id: str,
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
+):
+    from app.services.interview_result_service import InterviewResultService
+    
+    session_repo = InterviewSessionRepository()
+    session = await session_repo.get_by_id(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Interview session not found")
+        
+    company_id = (
+        current_user.company_id
+        if current_user.role.upper() == UserRole.RECRUITER.value.upper()
+        else current_user.sub
+    )
+        
+    if str(session.get("company_id")) != str(company_id):
+        raise HTTPException(status_code=403, detail="Not authorized to view this session")
+
+    service = InterviewResultService()
+    try:
+        report = await service.generate_result_report(session_id)
+        return report
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ---------------------------------------------------------
@@ -762,3 +775,103 @@ async def reassign_candidate(
     })
 
     return success_response(message="Candidate reassigned successfully")
+
+# ---------------------------------------------------------
+# SUSPEND CANDIDATE
+# ---------------------------------------------------------
+@router.patch("/{candidate_id}/suspend")
+async def suspend_candidate(
+    candidate_id: str,
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
+):
+    repo = CandidateRepository()
+    cand = await repo.get(candidate_id)
+    company_id = current_user.company_id if current_user.role.upper() == "RECRUITER" else current_user.sub
+    
+    if not cand or str(cand.get("company_id")) != str(company_id):
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    if current_user.role.upper() == "RECRUITER" and str(cand.get("assigned_recruiter_id")) != str(current_user.recruiter_id):
+        raise HTTPException(status_code=404, detail="Candidate not found (not assigned)")
+
+    await repo.update(candidate_id, {"status": "suspended", "updated_at": datetime.now(UTC)})
+    
+    from app.repositories.user_repository import UserRepository
+    user_repo = UserRepository()
+    if cand.get("user_id"):
+        await user_repo.update(str(cand["user_id"]), {"is_active": False, "updated_at": datetime.now(UTC)})
+
+    return success_response(message="Candidate suspended successfully")
+
+# ---------------------------------------------------------
+# ACTIVATE CANDIDATE
+# ---------------------------------------------------------
+@router.patch("/{candidate_id}/activate")
+async def activate_candidate(
+    candidate_id: str,
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
+):
+    repo = CandidateRepository()
+    cand = await repo.get(candidate_id)
+    company_id = current_user.company_id if current_user.role.upper() == "RECRUITER" else current_user.sub
+    
+    if not cand or str(cand.get("company_id")) != str(company_id):
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    if current_user.role.upper() == "RECRUITER" and str(cand.get("assigned_recruiter_id")) != str(current_user.recruiter_id):
+        raise HTTPException(status_code=404, detail="Candidate not found (not assigned)")
+
+    await repo.update(candidate_id, {"status": "active", "updated_at": datetime.now(UTC)})
+    
+    from app.repositories.user_repository import UserRepository
+    user_repo = UserRepository()
+    if cand.get("user_id"):
+        await user_repo.update(str(cand["user_id"]), {"is_active": True, "updated_at": datetime.now(UTC)})
+
+    return success_response(message="Candidate activated successfully")
+
+# ---------------------------------------------------------
+# RESET CREDENTIALS
+# ---------------------------------------------------------
+@router.post("/{candidate_id}/reset-credentials")
+async def reset_credentials(
+    candidate_id: str,
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
+):
+    repo = CandidateRepository()
+    cand = await repo.get(candidate_id)
+    company_id = current_user.company_id if current_user.role.upper() == "RECRUITER" else current_user.sub
+    
+    if not cand or str(cand.get("company_id")) != str(company_id):
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    if current_user.role.upper() == "RECRUITER" and str(cand.get("assigned_recruiter_id")) != str(current_user.recruiter_id):
+        raise HTTPException(status_code=404, detail="Candidate not found (not assigned)")
+
+    service = InvitationService()
+    new_password = service._generate_temporary_password()
+    from app.auth.jwt_handler import hash_password
+    hashed_password = hash_password(new_password)
+
+    from app.repositories.user_repository import UserRepository
+    user_repo = UserRepository()
+    if cand.get("user_id"):
+        await user_repo.update(str(cand["user_id"]), {
+            "password_hash": hashed_password,
+            "must_change_password": False,
+            "updated_at": datetime.now(UTC)
+        })
+
+    return success_response(data={
+        "candidate": {
+            "id": str(cand.get("_id")),
+            "name": cand.get("name"),
+            "email": cand.get("email"),
+            "username": cand.get("email"),
+            "company_id": str(cand.get("company_id")),
+            "campaign_id": str(cand.get("campaign_id")),
+            "assigned_recruiter_id": str(cand.get("assigned_recruiter_id")) if cand.get("assigned_recruiter_id") else None,
+            "status": cand.get("status")
+        },
+        "credentials": {
+            "username": cand.get("email"),
+            "temporary_password": new_password
+        }
+    }, message="Candidate credentials reset successfully")

@@ -10,17 +10,29 @@ from datetime import datetime
 class InviteCandidateRequest(BaseModel):
     name: str
     email: EmailStr
+    phone: Optional[str] = None
     campaign_id: str
-    target_role: str
-    experience_level: str = "mid"
+    interview_type: Optional[str] = "ai"
     assigned_recruiter_id: Optional[str] = None
 
 
+class CandidateInfo(BaseModel):
+    id: str
+    name: str
+    email: str
+    username: str
+    company_id: str
+    campaign_id: str
+    assigned_recruiter_id: Optional[str] = None
+    status: str
+
+class CredentialsInfo(BaseModel):
+    username: str
+    temporary_password: str
+
 class InviteCandidateResponse(BaseModel):
-    candidate_id: str
-    user_id: str
-    invitation_token: str
-    message: str
+    candidate: CandidateInfo
+    credentials: CredentialsInfo
 
 
 class AcceptInvitationRequest(BaseModel):
@@ -48,11 +60,14 @@ class WorkflowStepOut(BaseModel):
 
 class DashboardResponse(BaseModel):
     # Candidate info
+    candidate_id: str
     candidate_name: str
     candidate_email: str
 
     # Campaign info
+    company_id: str
     company_name: str
+    campaign_id: str
     campaign_name: str
     job_position: str
     deadline: Optional[str] = None

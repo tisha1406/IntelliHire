@@ -99,7 +99,7 @@ async def get_campaigns(
         campaign["_id"] = str(campaign["_id"])
         campaign["company_id"] = str(campaign["company_id"])
         if "assigned_recruiter_ids" in campaign:
-            campaign["assigned_recruiter_ids"] = [str(r) for r in campaign["assigned_recruiter_ids"]]
+            campaign["assigned_recruiter_ids"] = [str(r) for r in (campaign.get("assigned_recruiter_ids") or [])]
 
     return campaigns
 
@@ -140,7 +140,7 @@ async def bulk_assign_campaign(
         "updated_by": ObjectId(current_user.sub),
         "updated_by_role": current_user.role
     })
-    
+   
     # Log action
     from app.repositories.audit_log_repository import AuditLogRepository
     audit_repo = AuditLogRepository()

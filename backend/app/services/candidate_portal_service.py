@@ -99,9 +99,12 @@ class CandidatePortalService:
             ]
 
         return DashboardResponse(
+            candidate_id=candidate_id,
             candidate_name=candidate.get("name", ""),
             candidate_email=candidate.get("email", ""),
+            company_id=company_id if company_id else "",
             company_name=company.get("general", {}).get("name", "") if company else "",
+            campaign_id=campaign_id if campaign_id else "",
             campaign_name=campaign.get("general", {}).get("name", "") if campaign else "",
             job_position=campaign.get("general", {}).get("job_position", "") if campaign else "",
             deadline=campaign.get("settings", {}).get("deadline", "") if campaign else "",

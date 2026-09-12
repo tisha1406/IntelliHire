@@ -184,7 +184,7 @@ export function useStartInterview() {
     const queryClient = useQueryClient();
     
     return useMutation({
-        mutationFn: () => api.startInterview(token),
+        mutationFn: (campaignId) => api.startInterview(token, campaignId),
         onSuccess: () => {
             queryClient.invalidateQueries(["candidate_dashboard"]);
         },

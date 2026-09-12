@@ -107,6 +107,16 @@ class ResumeProcessingService:
                 "completeness": 95,
                 "technical_skills": ["Python", "React", "Node.js", "MongoDB"],
                 "soft_skills": ["Communication", "Leadership", "Problem Solving"],
+                "experience": [
+                    {"title": "Software Engineer", "company": "Tech Corp", "duration": "2021-Present", "description": "Developed scalable backend microservices using Python and MongoDB."},
+                    {"title": "Junior Developer", "company": "StartUp Inc", "duration": "2019-2021", "description": "Built reactive frontend applications and REST APIs using React and Node.js."}
+                ],
+                "education": [
+                    {"degree": "B.S. Computer Science", "institution": "State University", "year": "2019"}
+                ],
+                "projects": [
+                    {"name": "E-Commerce Platform", "description": "Designed and deployed a full-stack e-commerce platform handling 10k daily users."}
+                ],
                 "missing_skills": ["Docker", "Kubernetes", "AWS"],
                 "certifications": ["AWS Certified Developer"],
                 "languages_known": ["English", "Hindi"],
@@ -136,6 +146,15 @@ class ResumeProcessingService:
             "completeness": int (0-100),
             "technical_skills": [list of strings],
             "soft_skills": [list of strings],
+            "experience": [
+                {"title": "string", "company": "string", "duration": "string", "description": "string"}
+            ],
+            "education": [
+                {"degree": "string", "institution": "string", "year": "string"}
+            ],
+            "projects": [
+                {"name": "string", "description": "string"}
+            ],
             "missing_skills": [list of strings],
             "certifications": [list of strings],
             "languages_known": [list of strings],

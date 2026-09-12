@@ -32,6 +32,21 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str
     GEMINI_API_KEY: str
     SARVAM_API_KEY: str
+    
+    # ==========================================================
+    # Speech Infrastructure (Phase 11.5)
+    # ==========================================================
+    SPEECH_STT_PROVIDER: str = "sarvam"
+    SPEECH_TTS_PROVIDER: str = "sarvam"
+    
+    SARVAM_STT_MODEL: str = "saaras:v1"
+    SARVAM_TTS_MODEL: str = "bulbul:v1"
+    
+    STT_MAX_ATTEMPTS: int = 3
+    STT_MAX_OPERATION_TIME_SECONDS: int = 60
+    
+    TTS_MAX_ATTEMPTS: int = 3
+    TTS_MAX_OPERATION_TIME_SECONDS: int = 60
 
     # ==========================================================
     # FastAPI
@@ -40,6 +55,25 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
 
     DEBUG: bool = True
+
+    # ==========================================================
+    # Phase 9 — Interview Transport
+    # ==========================================================
+    # Max worker threads for running synchronous engine operations
+    # (LLM calls may take up to 30s; keep bounded to avoid thread exhaustion)
+    INTERVIEW_EXECUTOR_MAX_WORKERS: int = 10
+
+    # Maximum answer text length in characters (transport-level guard)
+    MAX_ANSWER_TEXT_CHARS: int = 8000
+
+    # Maximum raw WebSocket message size in bytes
+    MAX_WS_MESSAGE_BYTES: int = 32_768  # 32 KB
+
+    # Evaluation lease duration in seconds (re-claimable after expiry)
+    EVALUATION_LEASE_SECONDS: int = 90
+
+    # Question generation lease duration in seconds
+    GENERATION_LEASE_SECONDS: int = 60
 
     # ==========================================================
     # Environment

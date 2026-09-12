@@ -42,6 +42,22 @@ const candidateService = {
 
     bulkAssignCandidates(candidateIds, recruiterId) {
         return api.post(`${BASE}/bulk-assign`, { candidate_ids: candidateIds, recruiter_id: recruiterId });
+    },
+
+    inviteCandidate(data) {
+        return api.post(`${BASE}/invite`, data);
+    },
+
+    suspendCandidate(id) {
+        return api.patch(`${BASE}/${id}/suspend`);
+    },
+
+    activateCandidate(id) {
+        return api.patch(`${BASE}/${id}/activate`);
+    },
+
+    resetCredentials(id) {
+        return api.post(`${BASE}/${id}/reset-credentials`);
     }
 };
 

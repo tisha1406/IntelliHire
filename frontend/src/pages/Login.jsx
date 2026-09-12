@@ -100,46 +100,7 @@ export default function Login() {
 
     };
 
-    // ============================
-    // Demo Candidate Login
-    // ============================
-    const handleDemoLogin = async () => {
 
-        setLoading(true);
-        setError("");
-
-        try {
-
-            const response = await apiRequest("/api/auth/login", {
-                method: "POST",
-                body: JSON.stringify({
-                    email: "candidate@intellihire.dev",
-                    password: "TestCandidate123!",
-                }),
-            });
-
-            const payload = response?.data ?? response;
-            const accessToken = payload?.access_token || payload?.accessToken;
-            const companyName = payload?.company_name || payload?.companyName || null;
-
-            if (!accessToken) {
-                throw new Error("No authentication token received from the server.");
-            }
-
-            login(accessToken, payload?.refresh_token || payload?.refreshToken || null, companyName);
-            navigate("/candidate");
-
-        } catch (err) {
-
-            setError(err.message || "Invalid demo credentials.");
-
-        } finally {
-
-            setLoading(false);
-
-        }
-
-    };
 
     return (
 
@@ -318,16 +279,6 @@ export default function Login() {
                             )}
                         </button>
 
-                        {/* Demo Candidate Login */}
-                        <button
-                            type="button"
-                            className="login-button secondary"
-                            onClick={handleDemoLogin}
-                            disabled={loading}
-                        >
-                            <span>Demo Candidate Login</span>
-                            <FaArrowRight />
-                        </button>
                     </div>
 
                 </form>

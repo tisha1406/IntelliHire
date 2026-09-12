@@ -45,6 +45,10 @@ export default function Candidates() {
     const [selectedCand, setSelectedCand] = useState(null);
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
+    // Credentials Modal
+    const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+    const [credentialsData, setCredentialsData] = useState(null);
+
     // Toast feedback
     const [toast, setToast] = useState(null);
 
@@ -127,21 +131,36 @@ export default function Candidates() {
     
 
     const handleSchedule = async (candidate) => {
-
         try {
-
             await candidateService.scheduleInterview(candidate.id);
-
          showToast(`Interview scheduled for ${candidate.name}`, "success");
-
         }
+        catch { showToast("Failed"); }
+    };
 
-        catch {
+    const handleSuspend = async (id) => {
+        try {
+            await candidateService.suspendCandidate(id);
+            fetchCandidates();
+            showToast("Candidate suspended", "success");
+        } catch { showToast("Failed to suspend", "error"); }
+    };
 
-            showToast("Failed");
+    const handleActivate = async (id) => {
+        try {
+            await candidateService.activateCandidate(id);
+            fetchCandidates();
+            showToast("Candidate activated", "success");
+        } catch { showToast("Failed to activate", "error"); }
+    };
 
-        }
-
+    const handleResetCredentials = async (id) => {
+        try {
+            const res = await candidateService.resetCredentials(id);
+            setCredentialsData(res.data?.data || res.data);
+            setShowCredentialsModal(true);
+            showToast("Credentials reset successfully", "success");
+        } catch { showToast("Failed to reset credentials", "error"); }
     };
 
     // Filter Logic
@@ -205,19 +224,21 @@ export default function Candidates() {
             key: "actions",
             label: "Actions",
             render: (_, row) => (
-                <div className="table-actions-cell">
+                <div className="table-actions-cell" style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                     <Button variant="ghost" size="sm" onClick={() => handleViewDetails(row)}>
                         View
                     </Button>
-                    {row.status !== "Shortlisted" && (
-                        <button className="icon-btn-action  shortlist-btn" aria-label="Schedule Interview" onClick={() => handleShortlist(row.id)} title="Shortlist">
-                            <FaCheck />
-                        </button>
-                    )}
-                    {row.status !== "Rejected" && (
-                        <button className="icon-btn-action reject-btn" aria-label="Schedule Interview" onClick={() => handleReject(row.id)} title="Reject">
-                            <FaTimes />
-                        </button>
+                    <Button variant="ghost" size="sm" onClick={() => handleResetCredentials(row.id)}>
+                        Reset
+                    </Button>
+                    {row.status === "suspended" ? (
+                        <Button variant="ghost" size="sm" onClick={() => handleActivate(row.id)}>
+                            Activate
+                        </Button>
+                    ) : (
+                        <Button variant="ghost" size="sm" onClick={() => handleSuspend(row.id)}>
+                            Suspend
+                        </Button>
                     )}
                 </div>
             )
@@ -244,13 +265,16 @@ export default function Candidates() {
         e.preventDefault();
         setAddLoading(true);
         try {
-            await candidateService.createCandidate(addForm);
+            const res = await candidateService.inviteCandidate(addForm);
             setShowAddModal(false);
             setAddForm({ name: "", email: "", phone: "", campaign_id: "", interview_type: "ai" });
+            setCredentialsData(res.data?.data || res.data);
+            setShowCredentialsModal(true);
             showToast("Candidate added successfully", "success");
             fetchCandidates();
         } catch (err) {
-            showToast(err.response?.data?.detail || "Failed to add candidate", "error");
+            const errorMsg = err.response?.data?.message || err.response?.data?.detail || "Failed to add candidate";
+            showToast(errorMsg, "error");
         } finally {
             setAddLoading(false);
         }
@@ -352,6 +376,56 @@ export default function Candidates() {
                                 </Button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Credentials Modal */}
+            {showCredentialsModal && credentialsData && (
+                <div style={{
+                    position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                    background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center",
+                    justifyContent: "center", zIndex: 1000
+                }}>
+                    <div style={{
+                        background: "var(--card)", padding: 32, borderRadius: "var(--radius-lg)",
+                        width: "100%", maxWidth: 500, border: "1px solid var(--border)",
+                        boxShadow: "0 20px 40px rgba(0,0,0,0.25)"
+                    }}>
+                        <h2 style={{ marginBottom: 16, fontSize: 20, fontWeight: 700, color: "var(--text)" }}>Candidate Created Successfully</h2>
+                        
+                        <div style={{ marginBottom: 20, padding: 16, background: "var(--bg)", borderRadius: "var(--radius-md)", color: "var(--text)" }}>
+                            <p style={{ marginBottom: 8 }}><strong>Candidate:</strong> {credentialsData.candidate?.name || credentialsData.name}</p>
+                            <p style={{ marginBottom: 8 }}><strong>Email:</strong> {credentialsData.candidate?.email || credentialsData.email}</p>
+                            <p style={{ marginBottom: 8 }}><strong>Username:</strong> {credentialsData.credentials?.username || credentialsData.username}</p>
+                            <p style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <strong>Temporary Password:</strong>
+                                <span style={{ fontFamily: 'monospace', fontSize: 16 }}>
+                                    {credentialsData.credentials?.temporary_password || credentialsData.temporary_password}
+                                </span>
+                            </p>
+                        </div>
+                        
+                        <div style={{ color: "var(--warning)", marginBottom: 24, fontWeight: "600", padding: "12px", background: "rgba(255, 165, 0, 0.1)", borderRadius: "var(--radius-md)", display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <span>⚠</span> Save these credentials now. The temporary password will only be shown once.
+                        </div>
+                        
+                        <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                            <Button type="button" variant="outline" onClick={() => {
+                                navigator.clipboard.writeText(credentialsData.credentials?.username || credentialsData.username);
+                                showToast("Copied username", "success");
+                            }}>Copy Username</Button>
+                            
+                            <Button type="button" variant="outline" onClick={() => {
+                                navigator.clipboard.writeText(credentialsData.credentials?.temporary_password || credentialsData.temporary_password);
+                                showToast("Copied password", "success");
+                            }}>Copy Password</Button>
+
+                            <Button type="button" variant="primary" onClick={() => {
+                                setShowCredentialsModal(false);
+                                setCredentialsData(null);
+                            }}>Done</Button>
+                        </div>
                     </div>
                 </div>
             )}

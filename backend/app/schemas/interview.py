@@ -2,25 +2,18 @@ from pydantic import BaseModel
 from typing import Optional
 
 
-class InterviewStartRequest(BaseModel):
-    language: Optional[str] = None
-    domain: Optional[str] = None
+class CreateSessionRequest(BaseModel):
+    """
+    Empty body for now. Campaign ID is in the path, token in the header.
+    Any explicit overrides to the campaign settings could go here.
+    """
+    pass
 
 
-class InterviewStartResponse(BaseModel):
+class CreateSessionResponse(BaseModel):
     session_id: str
-
-
-class InterviewQuestionResponse(BaseModel):
-    question: str
-    audio_reference: str
-
-
-class InterviewAnswerResponse(BaseModel):
-    evaluation_summary: str
-    next_question: str | None = None
-    completed: bool
-
-
-class InterviewReportResponse(BaseModel):
-    report: dict
+    state: str
+    mode_id: str
+    topics_count: int
+    total_question_budget: int
+    min_questions: int

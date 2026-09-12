@@ -56,7 +56,6 @@ from app.api.auth import router as auth_router
 # ===========================
 # Candidate APIs
 # ===========================
-from app.api.candidates import router as candidates_router
 from app.api.candidate_portal import router as candidate_portal_router
 from app.api.resume import router as resume_router
 from app.api.interview import router as interview_router
@@ -78,6 +77,9 @@ from app.api.ws import router as ws_router
 
 from app.db.bootstrap import bootstrap_platform
 
+import concurrent.futures
+from app.ai_interview.transport import set_interview_executor
+
 # ==========================================================
 # Startup / Shutdown
 # ==========================================================
@@ -91,8 +93,16 @@ async def lifespan(app: FastAPI):
     # Run Platform Bootstrap
     await bootstrap_platform()
 
+    # Phase 9: Bounded executor for synchronous LLM engine operations
+    executor = concurrent.futures.ThreadPoolExecutor(
+        max_workers=settings.INTERVIEW_EXECUTOR_MAX_WORKERS,
+        thread_name_prefix="intellihire-interview"
+    )
+    set_interview_executor(executor)
+
     yield
 
+    executor.shutdown(wait=False)
     await close_db()
 
     print("[STOP] IntelliHire Backend Shutting Down...")
@@ -170,7 +180,6 @@ app.include_router(company_audit_logs_router)
 app.include_router(auth_router)
 
 # ---------- Candidate ----------
-app.include_router(candidates_router)
 app.include_router(candidate_portal_router)
 app.include_router(resume_router)
 app.include_router(interview_router)
