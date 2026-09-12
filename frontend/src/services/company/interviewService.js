@@ -13,6 +13,10 @@ const interviewService = {
 
     scheduleInterview(data) {
         return api.post(`${BASE}/schedule`, data);
+    },
+
+    getInterviewResults(sessionId) {
+        return api.get(`${BASE}/${sessionId}/results`);
     }
 };
 

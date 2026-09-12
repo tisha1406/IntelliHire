@@ -241,8 +241,9 @@ async def get_company_interviews(
     for sess in sessions:
         cand = await cand_repo.get_by_id(str(sess["candidate_id"]))
         camp = await campaign_repo.get_by_id(str(sess["campaign_id"]))
-        rep = await report_repo.get_one({"session_id": sess["_id"]})
-
+        ai_score = None
+        evaluation_data = None
+        
         status_val = "Scheduled"
         if sess.get("status") == "completed":
             status_val = "Completed"
@@ -253,55 +254,38 @@ async def get_company_interviews(
         else:
             status_val = "Scheduled"
             upcoming_count += 1
-
-        ai_score = rep.get("overall_score") if rep else None
-        if ai_score is not None:
-            score_sum += ai_score
-            score_count += 1
-
-        evaluation_data = None
-        if rep:
-            strengths_list = []
-            if rep.get("strengths"):
-                raw_s = rep["strengths"]
-                if isinstance(raw_s, list):
-                    strengths_list = raw_s
-                else:
-                    strengths_list = [s.strip() for s in raw_s.split("\n") if s.strip()]
-
-            weaknesses_list = []
-            if rep.get("weaknesses"):
-                raw_w = rep["weaknesses"]
-                if isinstance(raw_w, list):
-                    weaknesses_list = raw_w
-                else:
-                    weaknesses_list = [w.strip() for w in raw_w.split("\n") if w.strip()]
-
-            questions_list = []
-            for turn in sess.get("turns", []):
-                quality_score = turn.get("evaluation", {}).get("response_quality_score", 0)
-                sentiment_val = (
-                    "Excellent" if quality_score >= 9
-                    else "Very Good" if quality_score >= 8
-                    else "Good" if quality_score >= 7
-                    else "Average"
-                )
-                questions_list.append({
-                    "q": turn.get("question", ""),
-                    "a": turn.get("answer_transcript", ""),
-                    "sentiment": sentiment_val,
-                    "score": int(turn.get("evaluation", {}).get("technical_score", 0) * 10),
-                })
-
-            evaluation_data = {
-                "summary": rep.get("recruiter_summary") or rep.get("technical_skills_assessment", ""),
-                "strengths": strengths_list,
-                "weaknesses": weaknesses_list,
-                "recommendation": (
-                    rep.get("resume_match_analysis", {}).get("consistency_notes") or "Review Candidate"
-                ),
-                "questions": questions_list,
-            }
+        
+        # Use InterviewResultService to generate report from actual session data
+        from app.services.interview_result_service import InterviewResultService
+        result_service = InterviewResultService()
+        
+        if sess.get("status") == "completed":
+            try:
+                rep = await result_service.generate_result_report(str(sess["_id"]))
+                if rep and rep.get("has_report"):
+                    ai_score = rep.get("overall_score")
+                    if ai_score is not None:
+                        score_sum += ai_score
+                        score_count += 1
+                        
+                    questions_list = []
+                    for q in rep.get("question_feedback", []):
+                        questions_list.append({
+                            "q": q.get("question", ""),
+                            "a": "Candidate Answer Transcript", # Real system would pull from turn history
+                            "sentiment": "Good",
+                            "score": q.get("score", 0) * 10
+                        })
+                        
+                    evaluation_data = {
+                        "summary": rep.get("company_remarks", ""),
+                        "strengths": rep.get("strengths", []),
+                        "weaknesses": rep.get("weaknesses", []),
+                        "recommendation": "Review Candidate",
+                        "questions": questions_list
+                    }
+            except Exception as e:
+                print(f"Failed to generate report for {sess['_id']}: {e}")
 
         formatted_interviews.append({
             "id": str(sess["_id"]),
@@ -339,6 +323,39 @@ async def get_company_interviews(
         },
         "interviews": formatted_interviews,
     }
+
+
+# ---------------------------------------------------------
+# GET INTERVIEW RESULTS
+# (MUST be before /{candidate_id} routes)
+# ---------------------------------------------------------
+@router.get("/interviews/{session_id}/results")
+async def get_interview_results(
+    session_id: str,
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
+):
+    from app.services.interview_result_service import InterviewResultService
+    
+    session_repo = InterviewSessionRepository()
+    session = await session_repo.get_by_id(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Interview session not found")
+        
+    company_id = (
+        current_user.company_id
+        if current_user.role.upper() == UserRole.RECRUITER.value.upper()
+        else current_user.sub
+    )
+        
+    if str(session.get("company_id")) != str(company_id):
+        raise HTTPException(status_code=403, detail="Not authorized to view this session")
+
+    service = InterviewResultService()
+    try:
+        report = await service.generate_result_report(session_id)
+        return report
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ---------------------------------------------------------

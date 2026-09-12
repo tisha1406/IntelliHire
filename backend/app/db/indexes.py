@@ -95,8 +95,25 @@ async def create_indexes():
     )
 
     # ==========================================================
+    # Interview Mode Definitions
+    # ==========================================================
+    await _safe_create_index(
+        db.interview_mode_definitions,
+        [("mode_id", 1), ("version", 1)],
+        unique=True,
+        name="idx_mode_version_unique",
+    )
+
+    # ==========================================================
     # Interview Sessions
     # ==========================================================
+    await _safe_create_index(
+        db.interview_sessions,
+        "session_id",
+        unique=True,
+        name="idx_session_id_unique",
+    )
+
     await _safe_create_index(
         db.interview_sessions,
         "candidate_id",
@@ -119,6 +136,16 @@ async def create_indexes():
         db.interview_sessions,
         "status",
         name="idx_session_status",
+    )
+
+    # ==========================================================
+    # Interview Turns
+    # ==========================================================
+    await _safe_create_index(
+        db.interview_turns,
+        [("session_id", 1), ("turn_number", 1)],
+        unique=True,
+        name="idx_turn_session_unique",
     )
 
     # ==========================================================
@@ -177,6 +204,38 @@ async def create_indexes():
         db.company_notifications,
         "is_read",
         name="idx_notification_read",
+    )
+
+    # ==========================================================
+    # Phase 9 — Interview Transport (additional indexes)
+    # ==========================================================
+
+    # Fast lookup of sessions by candidate (used in ownership checks)
+    await _safe_create_index(
+        db.interview_sessions,
+        [("session_id", 1), ("candidate_id", 1)],
+        name="idx_session_candidate_ownership",
+    )
+
+    # Generation claim expiry queries (used by reconnect recovery)
+    await _safe_create_index(
+        db.interview_sessions,
+        [("session_id", 1), ("generation_claim.expires_at", 1)],
+        name="idx_session_gen_claim_expiry",
+    )
+
+    # Per-question record lookup for evaluation claim recovery
+    await _safe_create_index(
+        db.interview_sessions,
+        [("session_id", 1), ("question_history.record_id", 1)],
+        name="idx_session_question_record",
+    )
+
+    # Interview mode lookup by mode_id string (used by session creation)
+    await _safe_create_index(
+        db.interview_mode_definitions,
+        [("mode_id", 1), ("status", 1)],
+        name="idx_mode_id_status",
     )
 
     print("MongoDB indexes created.")

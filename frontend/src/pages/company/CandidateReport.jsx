@@ -2,8 +2,10 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useParams, Link } from "react-router-dom";
 import { FaArrowLeft, FaDownload, FaPrint, FaStar, FaCheckCircle, FaTimesCircle, FaSpinner } from "react-icons/fa";
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from "recharts";
 
 import candidateService from "../../services/company/candidateService";
+import interviewService from "../../services/company/interviewService";
 import Button from "../../components/common/Button";
 import StatusBadge from "../../components/common/StatusBadge";
 
@@ -23,6 +25,7 @@ const ScoreBar = ({ value, color }) => (
 export default function CandidateReport() {
     const { id } = useParams();
     const [candidate, setCandidate] = useState(null);
+    const [report, setReport] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -31,6 +34,17 @@ export default function CandidateReport() {
                 setLoading(true);
                 const res = await candidateService.getCandidate(id);
                 setCandidate(res.data);
+
+                try {
+                    const interviewsRes = await interviewService.getInterviews();
+                    const session = interviewsRes.interviews?.find(i => String(i.candidate_id) === String(id) && i.status === "Completed");
+                    if (session) {
+                        const reportRes = await interviewService.getInterviewResults(session.id);
+                        setReport(reportRes);
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch detailed AI report:", e);
+                }
             } catch (err) {
                 console.error("Failed to fetch candidate report:", err);
             } finally {
@@ -211,6 +225,84 @@ export default function CandidateReport() {
                     {candidate.notes}
                 </p>
             </motion.div>
+            {/* Extended AI Evaluation from Phase 12 Result Service */}
+            {report && (
+                <>
+                    {/* Radar Chart & Topic Scores */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.35 }}
+                        style={{
+                            background: "var(--card)", border: "1px solid var(--border)",
+                            borderRadius: "var(--radius-md)", padding: "22px", boxShadow: "var(--shadow)"
+                        }}
+                    >
+                        <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 12 }}>Detailed Topic Evaluation</h4>
+                        <div style={{ display: "flex", gap: 32, flexWrap: "wrap", alignItems: "center", justifyContent: "center" }}>
+                            {report.radar_data && (
+                                <div style={{ width: 400, height: 350 }}>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <RadarChart cx="50%" cy="50%" outerRadius="70%" data={report.radar_data}>
+                                            <PolarGrid stroke="var(--border)" />
+                                            <PolarAngleAxis dataKey="subject" tick={{ fill: "var(--text-secondary)", fontSize: 12 }} />
+                                            <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: "var(--text-muted)", fontSize: 10 }} />
+                                            <Radar name="Candidate" dataKey="A" stroke="var(--primary)" fill="var(--primary)" fillOpacity={0.3} />
+                                        </RadarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            )}
+                            
+                            <div style={{ flex: 1, minWidth: 280, display: "flex", flexDirection: "column", gap: 16 }}>
+                                <div>
+                                    <h5 style={{ fontSize: 13, color: "#10B981", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                                        <FaCheckCircle /> Identified Strengths
+                                    </h5>
+                                    <ul style={{ margin: 0, paddingLeft: 18, color: "var(--text)", fontSize: 13, lineHeight: 1.6 }}>
+                                        {report.strengths?.map((str, i) => <li key={i}>{str}</li>)}
+                                    </ul>
+                                </div>
+                                <div>
+                                    <h5 style={{ fontSize: 13, color: "#EF4444", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                                        <FaTimesCircle /> Areas for Improvement
+                                    </h5>
+                                    <ul style={{ margin: 0, paddingLeft: 18, color: "var(--text)", fontSize: 13, lineHeight: 1.6 }}>
+                                        {report.weaknesses?.map((wk, i) => <li key={i}>{wk}</li>)}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+                    
+                    {/* Question Feedback Breakdown */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4 }}
+                        style={{
+                            background: "var(--card)", border: "1px solid var(--border)",
+                            borderRadius: "var(--radius-md)", padding: "22px", boxShadow: "var(--shadow)",
+                            marginBottom: 40
+                        }}
+                    >
+                        <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 16 }}>Question-by-Question Feedback</h4>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                            {report.question_feedback?.map((q, idx) => (
+                                <div key={idx} style={{ padding: 16, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", borderRadius: 8 }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                                        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--primary)" }}>{q.topic}</span>
+                                        <span style={{ fontSize: 12, fontWeight: 800, color: SCORE_COLOR(q.score * 10) }}>Score: {q.score}/10</span>
+                                    </div>
+                                    <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>Q: {q.question}</p>
+                                    <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                                        <strong>Feedback: </strong> {q.feedback}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    </motion.div>
+                </>
+            )}
         </div>
     );
 }

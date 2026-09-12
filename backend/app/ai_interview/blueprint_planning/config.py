@@ -1,0 +1,5 @@
+class BlueprintPlanningConfig:
+    MAX_TOPICS = 10
+    DEFAULT_QUESTIONS_PER_TOPIC = 2
+    MIN_QUESTIONS_PER_TOPIC = 1
+    MAX_QUESTIONS_PER_TOPIC = 5

@@ -60,11 +60,14 @@ class WorkflowStepOut(BaseModel):
 
 class DashboardResponse(BaseModel):
     # Candidate info
+    candidate_id: str
     candidate_name: str
     candidate_email: str
 
     # Campaign info
+    company_id: str
     company_name: str
+    campaign_id: str
     campaign_name: str
     job_position: str
     deadline: Optional[str] = None

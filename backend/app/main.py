@@ -77,6 +77,9 @@ from app.api.ws import router as ws_router
 
 from app.db.bootstrap import bootstrap_platform
 
+import concurrent.futures
+from app.ai_interview.transport import set_interview_executor
+
 # ==========================================================
 # Startup / Shutdown
 # ==========================================================
@@ -90,8 +93,16 @@ async def lifespan(app: FastAPI):
     # Run Platform Bootstrap
     await bootstrap_platform()
 
+    # Phase 9: Bounded executor for synchronous LLM engine operations
+    executor = concurrent.futures.ThreadPoolExecutor(
+        max_workers=settings.INTERVIEW_EXECUTOR_MAX_WORKERS,
+        thread_name_prefix="intellihire-interview"
+    )
+    set_interview_executor(executor)
+
     yield
 
+    executor.shutdown(wait=False)
     await close_db()
 
     print("[STOP] IntelliHire Backend Shutting Down...")

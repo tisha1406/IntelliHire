@@ -89,6 +89,7 @@ export const completePractice = async (token) => {
     return apiRequest("/api/candidate/practice/complete", { method: "POST" }, token);
 };
 
-export const startInterview = async (token) => {
-    return apiRequest("/api/candidate/interview/start", { method: "POST" }, token);
+export const startInterview = async (token, campaignId) => {
+    // Hits the deterministic AI Interview Engine session creation endpoint
+    return apiRequest(`/api/interview/campaigns/${campaignId}/sessions`, { method: "POST", body: JSON.stringify({}) }, token);
 };
