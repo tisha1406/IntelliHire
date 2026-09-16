@@ -39,26 +39,17 @@ const candidateService = {
     sendInvite(id) {
         return api.post(`${BASE}/${id}/send-invite`);
     },
-
-    bulkAssignCandidates(candidateIds, recruiterId) {
-        return api.post(`${BASE}/bulk-assign`, { candidate_ids: candidateIds, recruiter_id: recruiterId });
+    downloadResume(id) {
+        return api.get(`${BASE}/${id}/resume`, {
+            responseType: "blob",
+        });
     },
 
-    inviteCandidate(data) {
-        return api.post(`${BASE}/invite`, data);
+    downloadReport(id) {
+        return api.get(`${BASE}/${id}/report`, {
+            responseType: "blob",
+        });
     },
-
-    suspendCandidate(id) {
-        return api.patch(`${BASE}/${id}/suspend`);
-    },
-
-    activateCandidate(id) {
-        return api.patch(`${BASE}/${id}/activate`);
-    },
-
-    resetCredentials(id) {
-        return api.post(`${BASE}/${id}/reset-credentials`);
-    }
 };
 
 export default candidateService;

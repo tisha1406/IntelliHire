@@ -1,4 +1,4 @@
-import { Building2, Users, Briefcase, TrendingUp } from "lucide-react";
+import { Building2, Users, Briefcase, TrendingUp, IndianRupee } from "lucide-react";
 import { AnalyticsAPI } from "../../api/analytics";
 import { useAdminDashboard } from "../../hooks/useAdminDashboard";
 
@@ -9,6 +9,8 @@ import RecentActivity from "../../components/admin/dashboard/RecentActivity";
 import SystemStatus from "../../components/admin/dashboard/SystemStatus";
 import OverviewChart from "../../components/admin/dashboard/OverviewChart";
 import MonthlyHiringChart from "../../components/admin/dashboard/MonthlyHiringChart";
+import RecentPayments from "../../components/admin/dashboard/RecentPayments";
+import RecentSubscriptionHistory from "../../components/admin/dashboard/RecentSubscriptionHistory";
 
 import DashboardGrid from "../../layouts/DashboardGrid";
 import StatGrid from "../../components/layout/StatGrid";
@@ -71,11 +73,11 @@ export default function Dashboard() {
                     loading={isLoading}
                 />
                 <KpiCard
-                    title="Platform Alerts"
-                    value={isLoading ? null : (summaryCards.companies?.near_limits || 0).toLocaleString()}
-                    change="Companies near usage limits"
-                    icon={<TrendingUp size={24}/>}
-                    linkTo="/admin/companies"
+                    title="Total Revenue"
+                    value={isLoading ? null : `₹${(statistics.totalRevenue || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
+                    change="Lifetime subscription earnings"
+                    icon={<IndianRupee size={24}/>}
+                    linkTo="/admin/dashboard"
                     loading={isLoading}
                 />
             </StatGrid>
@@ -90,6 +92,11 @@ export default function Dashboard() {
             <ContentGrid
                 left={<MonthlyHiringChart data={charts?.interviews_over_time} loading={isLoading} />}
                 right={<RecentActivity data={recentActivity} loading={isLoading} />}
+            />
+
+            <ContentGrid
+                left={<RecentPayments data={dashboard?.recent_payments} loading={isLoading} />}
+                right={<RecentSubscriptionHistory data={dashboard?.recent_subscription_history} loading={isLoading} />}
             />
         </DashboardGrid>
     );

@@ -69,7 +69,11 @@ export default function Login() {
                     break;
 
                 case "company":
-                    navigate("/company");
+                    if (payload.required_redirect) {
+                        navigate(payload.required_redirect);
+                    } else {
+                        navigate("/company");
+                    }
                     break;
 
                 case "candidate":

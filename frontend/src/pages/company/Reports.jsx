@@ -11,7 +11,6 @@ import PageHeader from "../../components/common/PageHeader";
 import Button from "../../components/common/Button";
 import StatusBadge from "../../components/common/StatusBadge";
 import Toast from "../../components/common/Toast";
-import FeatureGuard from "../../components/common/FeatureGuard";
 import reportService from "../../services/company/reportService";
 
 import "../../styles/company/Reports.css";
@@ -88,7 +87,13 @@ export default function Reports() {
             setLoading(true);
             const typeFilter = selectedType || "";
             const res = await reportService.getReports(typeFilter, searchTerm);
-            setReports(res.data || []);
+
+            const reportsData =
+                res?.data?.data ||
+                res?.data ||
+                [];
+
+            setReports(reportsData);
         } catch (err) {
             console.error("Error loading reports:", err);
             showToast("Failed to load reports from backend", "error");
@@ -105,8 +110,13 @@ export default function Reports() {
         try {
             setGenerating(true);
             await reportService.generateReport(genForm);
-            showToast("Report generated successfully!", "success");
-            fetchReports();
+
+            await fetchReports();
+
+            showToast(
+                "Report generated successfully!",
+                "success"
+            );
         } catch (err) {
             console.error("Report generation failed:", err);
             showToast("Failed to generate report", "error");
@@ -129,7 +139,7 @@ export default function Reports() {
             link.remove();
             window.URL.revokeObjectURL(url);
             showToast(`Downloaded ${report.name}`, "success");
-            fetchReports();
+            await fetchReports();
         } catch (err) {
             console.error("Download failed:", err);
             showToast("Failed to download report file", "error");
@@ -139,8 +149,13 @@ export default function Reports() {
     const handleDelete = async (reportId) => {
         try {
             await reportService.deleteReport(reportId);
-            showToast("Report deleted successfully", "success");
-            fetchReports();
+
+            await fetchReports();
+
+            showToast(
+                "Report deleted successfully",
+                "success"
+            );
         } catch (err) {
             console.error("Delete failed:", err);
             showToast("Failed to delete report", "error");
@@ -148,9 +163,8 @@ export default function Reports() {
     };
 
     return (
-        <FeatureGuard featureName="reports">
-            <div className="reports-page">
-                {toast && (
+        <div className="reports-page">
+            {toast && (
                 <Toast
                     message={toast.message}
                     type={toast.type}
@@ -388,6 +402,5 @@ export default function Reports() {
                 </div>
             </div>
         </div>
-        </FeatureGuard>
     );
 }

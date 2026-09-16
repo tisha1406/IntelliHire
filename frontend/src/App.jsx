@@ -33,6 +33,13 @@ import EditCampaign from "./pages/company/EditCampaign";
 import Recruiters from "./pages/company/Recruiters";
 import ChangePassword from "./pages/company/ChangePassword";
 
+// Subscription Pages
+import VerifySubscription from "./pages/company/subscription/VerifySubscription";
+import Payment from "./pages/company/subscription/Payment";
+import RenewSubscription from "./pages/company/subscription/RenewSubscription";
+import ChangeSubscription from "./pages/company/subscription/ChangeSubscription";
+import SubscriptionManagement from "./pages/company/subscription/SubscriptionManagement";
+
 function App() {
     return (
         <Routes>
@@ -190,6 +197,13 @@ function App() {
                     path="change-password"
                     element={<ChangePassword />}
                 />
+
+                {/* Subscription Management */}
+                <Route path="subscription" element={<SubscriptionManagement />} />
+                <Route path="subscription/verify" element={<VerifySubscription />} />
+                <Route path="subscription/payment" element={<Payment />} />
+                <Route path="subscription/renew" element={<RenewSubscription />} />
+                <Route path="subscription/change" element={<ChangeSubscription />} />
 
             </Route>
 

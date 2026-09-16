@@ -127,7 +127,7 @@ export default function CompanyWizard({ companyId }) {
             toast.promise(promise, {
                 loading: isEditMode ? 'Updating Enterprise Configuration...' : 'Provisioning Enterprise...',
                 success: 'Success!',
-                error: 'Failed to process request.'
+                error: (err) => err.message || 'Failed to process request.'
             });
 
             const response = await promise;

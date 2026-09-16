@@ -12,3 +12,8 @@ class LoginResponse(BaseModel):
     token_type: str = "bearer"
     role: str
     company_id: str | None = None
+    company_name: str | None = None
+    subscription_status: str | None = None
+    required_redirect: str | None = None
+    must_change_password: bool | None = None
+    candidate_context: dict | None = None

@@ -36,11 +36,24 @@ class DashboardService:
         completed_interviews = await self.interview_repo.count({"status": "completed"})
         success_rate = round(completed_interviews / total_interviews * 100, 1) if total_interviews > 0 else 0.0
         
+        # Calculate total revenue from real db.payments
+        from app.db.mongo import get_database
+        db = get_database()
+        
+        pipeline = [
+            {"$match": {"status": "success"}},
+            {"$group": {"_id": None, "total_revenue": {"$sum": "$amount"}}}
+        ]
+        revenue_cursor = db.payments.aggregate(pipeline)
+        revenue_docs = await revenue_cursor.to_list(length=1)
+        total_revenue = revenue_docs[0]["total_revenue"] if revenue_docs else 0.0
+        
         statistics = {
             "totalCompanies": total_companies,
             "totalCandidates": total_candidates,
             "totalInterviews": total_interviews,
-            "aiAccuracy": f"{round(success_rate, 1)}%"
+            "aiAccuracy": f"{round(success_rate, 1)}%",
+            "totalRevenue": total_revenue
         }
 
         # 3. Summary Cards
@@ -183,6 +196,21 @@ class DashboardService:
             "interviews_over_time": interviews_chart
         }
 
+        # 9. Admin Billing (Recent Payments and Subscriptions)
+        recent_payments_cursor = db.payments.find().sort("created_at", -1).limit(5)
+        recent_payments_docs = await recent_payments_cursor.to_list(length=5)
+        for p in recent_payments_docs:
+            p["id"] = str(p["_id"])
+            p["company_id"] = str(p["company_id"])
+            if "_id" in p: del p["_id"]
+
+        recent_history_cursor = db.subscription_history.find().sort("created_at", -1).limit(5)
+        recent_history_docs = await recent_history_cursor.to_list(length=5)
+        for h in recent_history_docs:
+            h["id"] = str(h["_id"])
+            h["company_id"] = str(h["company_id"])
+            if "_id" in h: del h["_id"]
+
         return {
             "welcome": welcome,
             "statistics": statistics,
@@ -191,5 +219,7 @@ class DashboardService:
             "system_health": system_health,
             "recruitment_pipeline": recruitment_pipeline,
             "platform_usage": platform_usage,
-            "charts": charts
+            "charts": charts,
+            "recent_payments": recent_payments_docs,
+            "recent_subscription_history": recent_history_docs
         }

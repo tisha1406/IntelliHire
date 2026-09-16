@@ -47,6 +47,7 @@ from app.api.company.notifications import router as company_notifications_router
 from app.api.company.platform_config import router as company_platform_config_router
 from app.api.company.recruiters import router as company_recruiters_router
 from app.api.company.audit_logs import router as company_audit_logs_router
+from app.api.company.company_subscription import router as company_subscription_router
 
 # ===========================
 # Authentication
@@ -80,6 +81,21 @@ from app.db.bootstrap import bootstrap_platform
 import concurrent.futures
 from app.ai_interview.transport import set_interview_executor
 
+import asyncio
+from app.services.subscription_expiry_service import SubscriptionExpiryService
+
+async def expiry_scheduler():
+    while True:
+        try:
+            print("[Scheduler] Checking for expiring subscriptions...")
+            service = SubscriptionExpiryService()
+            await service.check_expiring_subscriptions()
+        except Exception as e:
+            print(f"[Scheduler] Error checking expiring subscriptions: {e}")
+        
+        # Run every 12 hours
+        await asyncio.sleep(43200)
+
 # ==========================================================
 # Startup / Shutdown
 # ==========================================================
@@ -100,7 +116,12 @@ async def lifespan(app: FastAPI):
     )
     set_interview_executor(executor)
 
+    # Start Expiry Scheduler
+    expiry_task = asyncio.create_task(expiry_scheduler())
+
     yield
+
+    expiry_task.cancel()
 
     executor.shutdown(wait=False)
     await close_db()
@@ -175,6 +196,7 @@ app.include_router(company_notifications_router)
 app.include_router(company_platform_config_router)
 app.include_router(company_recruiters_router)
 app.include_router(company_audit_logs_router)
+app.include_router(company_subscription_router)
 
 # ---------- Authentication ----------
 app.include_router(auth_router)

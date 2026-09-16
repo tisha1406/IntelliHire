@@ -53,10 +53,11 @@ class AuthService:
             
             # Check if active
             company_status = user.get("subscription", {}).get("status") or user.get("status")
-            if company_status != "active":
+            allowed_statuses = ["active", "pending_verification", "pending_payment", "expired", "trial"]
+            if company_status not in allowed_statuses:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Company account is inactive.\nPlease contact IntelliHire administrator.",
+                    detail=f"Company account is {company_status or 'inactive'}.\nPlease contact IntelliHire administrator.",
                 )
             if user.get("deleted_at"):
                 raise HTTPException(
@@ -167,6 +168,16 @@ class AuthService:
                     or company.get("general", {}).get("name", "")
                     or company.get("name", "")
                 )
+                
+                # Subscription logic
+                sub_status = company.get("subscription", {}).get("status", "active")
+                base_response["subscription_status"] = sub_status
+                if sub_status == "pending_verification":
+                    base_response["required_redirect"] = "/company/subscription/verify"
+                elif sub_status == "pending_payment":
+                    base_response["required_redirect"] = "/company/subscription/payment"
+                elif sub_status == "expired":
+                    base_response["required_redirect"] = "/company/subscription/renew"
 
         if candidate_context:
             base_response["candidate_context"] = candidate_context

@@ -21,8 +21,9 @@ class CompanyGeneralSchema(BaseModel):
 
 class CompanySubscriptionSchema(BaseModel):
     plan: str = "Enterprise"
-    status: str = "active"
+    status: str = "pending_verification"
     billing_cycle: str = "annual"
+    start_date: Optional[str] = None
     expiry_date: Optional[str] = None
     seat_count: int = 5
 
@@ -90,10 +91,10 @@ class CompanyResponse(BaseModel):
     id: str
     company_name: str = ""
     general: CompanyGeneralSchema
-    subscription: CompanySubscriptionSchema
-    limits: CompanyLimitsSchema
-    security: CompanySecuritySchema
-    features: Dict[str, bool]
+    subscription: CompanySubscriptionSchema = Field(default_factory=CompanySubscriptionSchema)
+    limits: CompanyLimitsSchema = Field(default_factory=CompanyLimitsSchema)
+    security: CompanySecuritySchema = Field(default_factory=CompanySecuritySchema)
+    features: Dict[str, bool] = Field(default_factory=dict)
     
     allowed_languages: List[str] = Field(default_factory=list)
     allowed_voices: List[str] = Field(default_factory=list)
@@ -101,8 +102,8 @@ class CompanyResponse(BaseModel):
     allowed_interview_modes: List[str] = Field(default_factory=list)
     allowed_llm_tiers: List[str] = Field(default_factory=list)
     
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
     deleted_at: Optional[datetime] = None
 
 class StrategyCreateRequest(BaseModel):

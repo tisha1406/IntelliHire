@@ -717,7 +717,8 @@ export default function PaymentGateway({ isOpen, onClose, onSuccess, amount, ord
                     )}
                 </motion.div>
             </div>
-        </>
+        </>,
+        document.body
     );
 }
 

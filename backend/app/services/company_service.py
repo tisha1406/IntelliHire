@@ -30,16 +30,35 @@ class CompanyService:
         return f"{base}_{suffix}"
 
     async def create_company(self, data: dict, created_by: str) -> tuple[str, str, str]:
+        from app.services.subscription_pricing_service import SubscriptionPricingService
         username = self.generate_username(data["general"]["name"])
         temp_password = self.generate_random_password()
         hashed_password = pwd_context.hash(temp_password)
         
         now = datetime.now(timezone.utc).isoformat()
         
+        # Calculate pricing
+        features = data.get("features", {})
+        limits = data.get("limits", {})
+        subscription = data.get("subscription", {})
+        
+        # duration logic can be inferred. if billing_cycle is annual -> 12 else 1
+        billing_cycle = subscription.get("billing_cycle", "annual")
+        duration_months = 12 if billing_cycle == "annual" else 1
+
+        pricing = SubscriptionPricingService.calculate_price(features, limits, duration_months)
+        
+        if "subscription" not in data:
+            data["subscription"] = {}
+            
+        data["subscription"]["pricing"] = pricing
+        # Force initial status to pending_verification
+        data["subscription"]["status"] = "pending_verification"
+        
         company_doc = data.copy()
         company_doc.update({
             "company_name": data["general"]["name"],
-            "status": "active",
+            "status": "pending_verification", # Can also be active, but let's sync with sub status
             "created_at": now,
             "updated_at": now,
             "created_by": created_by,
@@ -59,7 +78,7 @@ class CompanyService:
             action="create_company",
             entity_type="company",
             entity_id=company_id,
-            details={"company_name": data["general"]["name"]}
+            details={"company_name": data["general"]["name"], "pricing": pricing}
         ))
         
         return company_id, username, temp_password

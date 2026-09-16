@@ -14,7 +14,8 @@ import {
     FaUserFriends,
     FaBell,
     FaBuilding,
-    FaUserTie
+    FaUserTie,
+    FaCreditCard
 } from "react-icons/fa";
 import useAuth from "../../hooks/useAuth";
 import { usePermissions } from "../../context/PermissionsContext";
@@ -54,6 +55,7 @@ const companyMenuGroups = [
             { title: "Team Members",     path: "/company/team",           icon: <FaUserFriends /> },
             { title: "Notifications",    path: "/company/notifications",  icon: <FaBell /> },
             { title: "Company Profile",  path: "/company/profile",        icon: <FaBuilding /> },
+            { title: "Subscription",     path: "/company/subscription",   icon: <FaCreditCard /> },
             { title: "Settings",         path: "/company/settings",       icon: <FaCog /> },
         ]
     }
