@@ -56,6 +56,9 @@ class Settings(BaseSettings):
 
     DEBUG: bool = True
 
+    # Maximum file upload size for resumes (MB)
+    MAX_UPLOAD_SIZE_MB: int = 5
+
     # ==========================================================
     # Phase 9 — Interview Transport
     # ==========================================================
