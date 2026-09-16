@@ -20,4 +20,32 @@ api.interceptors.request.use((config) => {
     return config;
 });
 
+// Global error handler for subscription issues
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response) {
+            const { status } = error.response;
+            
+            // Payment Required (Subscription Pending)
+            if (status === 402) {
+                if (!window.location.pathname.includes('/subscription/verify') && !window.location.pathname.includes('/subscription/renew')) {
+                    window.location.href = '/subscription/verify';
+                }
+            }
+            
+            // Forbidden (Subscription Expired or Unauthorized)
+            if (status === 403) {
+                const detail = error.response.data?.detail;
+                if (typeof detail === 'string' && detail.toLowerCase().includes('subscription')) {
+                    if (!window.location.pathname.includes('/subscription/renew')) {
+                        window.location.href = '/subscription/renew';
+                    }
+                }
+            }
+        }
+        return Promise.reject(error);
+    }
+);
+
 export default api;

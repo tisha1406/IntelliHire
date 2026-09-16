@@ -30,12 +30,21 @@ export async function apiRequest(
     );
 
     if (response.status === 401) {
-
         localStorage.removeItem("accessToken");
+        
+        // Don't redirect if we are already on the login page to avoid infinite loops
+        if (window.location.pathname !== "/login" && window.location.pathname !== "/") {
+            window.location.href = "/login";
+        }
 
-        window.location.href = "/login";
-
-        return;
+        // We must throw an error so callers (like the login form) can catch and display it
+        // Check if there's a JSON body with a specific message first
+        try {
+            const errData = await response.json();
+            throw new Error(errData.detail || errData.message || "Unauthorized");
+        } catch (e) {
+            throw new Error(e.message === "Unexpected end of JSON input" ? "Unauthorized" : e.message);
+        }
     }
 
     if (response.status === 403) {

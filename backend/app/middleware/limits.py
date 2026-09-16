@@ -25,6 +25,13 @@ def check_limit(limit_field: str, usage_field: str) -> Callable:
                 detail="Company not found."
             )
             
+        sub_status = company.get("subscription", {}).get("status")
+        if sub_status != "active":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your subscription is not active. Please renew or verify your subscription."
+            )
+            
         limits = company.get("limits", {})
         usage = company.get("usage", {})
         

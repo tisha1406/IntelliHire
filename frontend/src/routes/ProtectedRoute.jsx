@@ -8,13 +8,10 @@ export default function ProtectedRoute({
 }) {
 
     const {
-
         isAuthenticated,
-
         user,
-
         loading,
-
+        companyProfile,
     } = useAuth();
 
     // ======================================
@@ -59,6 +56,24 @@ export default function ProtectedRoute({
 
         return <Navigate to="/unauthorized" replace />;
 
+    }
+
+    // ======================================
+    // Intercept Company Subscription Status
+    // ======================================
+    if (user?.role === "company" && companyProfile) {
+        const subStatus = companyProfile?.subscription?.status || "active";
+        const currentPath = window.location.pathname;
+        
+        if (subStatus === "pending_verification" && !currentPath.includes("/subscription/verify")) {
+            return <Navigate to="/company/subscription/verify" replace />;
+        }
+        if (subStatus === "pending_payment" && !currentPath.includes("/subscription/payment")) {
+            return <Navigate to="/company/subscription/payment" replace />;
+        }
+        if (subStatus === "expired" && !currentPath.includes("/subscription/renew") && !currentPath.includes("/subscription/payment") && currentPath !== "/company/subscription") {
+            return <Navigate to="/company/subscription/renew" replace />;
+        }
     }
 
     // ======================================

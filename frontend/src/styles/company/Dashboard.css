@@ -92,7 +92,8 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    height: 280px;
+    min-height: 330px;
+    height: auto;
 }
 
 .widget-header {

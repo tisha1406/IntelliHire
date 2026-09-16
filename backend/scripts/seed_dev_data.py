@@ -172,7 +172,7 @@ async def seed_admin():
     )
 
     if existing:
-        print("✓ Admin already exists")
+        print("[OK] Admin already exists")
         return
 
     await user_repo.create(
@@ -188,7 +188,7 @@ async def seed_admin():
         }
     )
 
-    print("✓ Admin created")
+    print("[OK] Admin created")
 
 
 async def seed_companies():
@@ -211,7 +211,7 @@ async def seed_companies():
                     },
                 )
             print(
-                f"✓ {company['general']['name']} already exists"
+                f"[OK] {company['general']['name']} already exists"
             )
             continue
 
@@ -252,7 +252,7 @@ async def seed_companies():
         )
 
         print(
-            f"✓ Created {company['general']['name']}"
+            f"[OK] Created {company['general']['name']}"
         )
 
 
@@ -274,7 +274,7 @@ async def seed_company_users():
 
         if existing:
             print(
-                f"✓ User already exists for {company['general']['name']}"
+                f"[OK] User already exists for {company['general']['name']}"
             )
             continue
 
@@ -292,7 +292,7 @@ async def seed_company_users():
         )
 
         print(
-             f"✓ Company user created for {company['general']['name']}"
+             f"[OK] Company user created for {company['general']['name']}"
         )
 
 
@@ -306,7 +306,7 @@ async def seed_company_interviews():
     # Get Acme Technologies
     company_doc = await company_repo.get_by_email("hr@acme.dev")
     if not company_doc:
-        print("✗ Company hr@acme.dev not found for interview seeding")
+        print("[FAIL] Company hr@acme.dev not found for interview seeding")
         return
 
     company_id = company_doc["_id"]
@@ -337,7 +337,7 @@ async def seed_company_interviews():
     }
     campaign_id_str = await campaign_repo.create(campaign_data)
     campaign_id = ObjectId(campaign_id_str)
-    print(f"✓ Created Campaign: {campaign_data['name']}")
+    print(f"[OK] Created Campaign: {campaign_data['name']}")
 
     # 2. Seed Candidates & Sessions & Reports
     candidates_to_seed = [
@@ -522,7 +522,7 @@ async def seed_company_interviews():
         }
         cand_id_str = await candidate_repo.create(cand_doc)
         cand_id = ObjectId(cand_id_str)
-        print(f"  ✓ Created Candidate: {cand['name']}")
+        print(f"  [OK] Created Candidate: {cand['name']}")
 
         # Create Session if session_status is set
         if cand["session_status"]:
@@ -626,7 +626,7 @@ async def main():
     finally:
         await close_db()
 
-    print("\n✓ Seed completed successfully")
+    print("\n[OK] Seed completed successfully")
 
 
 if __name__ == "__main__":

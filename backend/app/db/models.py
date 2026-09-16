@@ -126,12 +126,23 @@ class CompanyGeneral(BaseModel):
     notes: Optional[str] = None
     logo_url: Optional[str] = None
 
+class SubscriptionPricing(BaseModel):
+    base_price: float = 0.0
+    feature_cost: float = 0.0
+    limit_cost: float = 0.0
+    discount: float = 0.0
+    tax: float = 0.0
+    total: float = 0.0
+    currency: str = "INR"
+
 class CompanySubscription(BaseModel):
     plan: str = "Enterprise"
-    status: Literal["active", "suspended", "trial", "cancelled"] = "active"
-    billing_cycle: Literal["monthly", "annual"] = "annual"
-    expiry_date: Optional[str] = None
+    status: Literal["pending_verification", "pending_payment", "active", "suspended", "trial", "expired", "cancelled"] = "pending_verification"
+    billing_cycle: Literal["monthly", "annual", "1_year", "2_years", "3_years"] = "annual"
+    start_date: Optional[datetime] = None
+    expiry_date: Optional[datetime] = None
     seat_count: int = 5
+    pricing: SubscriptionPricing = Field(default_factory=SubscriptionPricing)
 
 class CompanyLimits(BaseModel):
     max_recruiters: int = 5
@@ -191,6 +202,9 @@ class Company(MongoBaseModel):
     features: CompanyFeatures = Field(
     default_factory=CompanyFeatures
     )
+
+    # Optional configuration stored for application upon the next renewal
+    pending_subscription: Optional[dict] = None
 
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC)
@@ -469,6 +483,35 @@ class ValidatorLog(MongoBaseModel):
     updated_at: datetime = Field(
     default_factory=lambda: datetime.now(UTC)
     )
+
+# ==========================================================
+# Payments and Subscriptions History Collection
+# ==========================================================
+
+class Payment(MongoBaseModel):
+    company_id: PyObjectId
+    subscription_id: Optional[str] = None
+    payment_type: Literal["initial", "upgrade", "renewal", "adjustment"]
+    provider: str = "mock"
+    order_id: Optional[str] = None
+    payment_id: Optional[str] = None
+    amount: float
+    currency: str = "INR"
+    status: Literal["pending", "success", "failed"] = "pending"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    verified_at: Optional[datetime] = None
+
+class SubscriptionHistory(MongoBaseModel):
+    company_id: PyObjectId
+    change_type: Literal["initial", "upgrade", "downgrade", "renewal", "admin_update"]
+    old_configuration: dict = Field(default_factory=dict)
+    new_configuration: dict = Field(default_factory=dict)
+    old_price: float = 0.0
+    new_price: float = 0.0
+    payment_required: float = 0.0
+    status: str = "completed"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
 
 
 # ==========================================================
