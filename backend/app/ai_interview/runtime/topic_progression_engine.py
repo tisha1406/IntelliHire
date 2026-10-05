@@ -16,22 +16,30 @@ class TopicProgressionEngine:
     def get_next_active_topic(session: InterviewSessionSchema) -> Optional[TopicProgress]:
         blueprint_map = {t.topic_id: t for t in session.blueprint.topics}
         
-        # Filter unresolved topics
+        # Filter unresolved topics that haven't exhausted their budget
         unresolved = []
+        
         for p in session.topic_progress:
             if p.state not in [TopicState.COVERED, TopicState.FAILED_ABANDONED]:
-                unresolved.append(p)
+                bp_topic = blueprint_map.get(p.topic_id)
+                budget = bp_topic.question_budget if bp_topic else float('inf')
+                if p.questions_asked < budget:
+                    unresolved.append(p)
                 
         if not unresolved:
             return None
             
-        # Helper to get sorting keys (mandatory True first, then priority desc, then blueprint index ascending)
-        blueprint_order = {t.topic_id: i for i, t in enumerate(session.blueprint.topics)}
+        # Cutover: Shadow priority becomes authoritative
+        from app.ai_interview.runtime.shadow_priority_calculator import ShadowPriorityCalculator
+        best_result = ShadowPriorityCalculator.get_best_topic(session, unresolved)
         
-        def sort_key(progress: TopicProgress):
-            bp_topic = blueprint_map[progress.topic_id]
-            # mandatory -> boolean (True > False), we negate boolean for ascending sort
-            return (not bp_topic.mandatory, -bp_topic.priority, blueprint_order[progress.topic_id])
-            
-        unresolved.sort(key=sort_key)
-        return unresolved[0]
+        if best_result:
+            # We return the actual TopicProgress object
+            for p in session.topic_progress:
+                if p.topic_id == best_result.topic_id:
+                    # Attach the calculated priority to the returned progress temporarily
+                    # so RuntimeController can log it
+                    setattr(p, "_selected_priority", best_result.priority)
+                    return p
+                    
+        return None

@@ -188,12 +188,24 @@ export default function CampaignDetail() {
 
                         <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 12 }}>Requirements</h4>
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                            {(campaign.requirements || []).map((req, i) => (
-                                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "var(--text-secondary)" }}>
-                                    <FaCheckCircle style={{ color: "#10B981", flexShrink: 0, fontSize: 12 }} />
-                                    {req}
-                                </div>
-                            ))}
+                            {(campaign.requirements || []).map((req, i) => {
+                                const isObj = typeof req === 'object' && req !== null;
+                                const skill = isObj ? req.skill : req;
+                                const crit = isObj && req.criticality ? req.criticality : null;
+                                return (
+                                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "var(--text-secondary)" }}>
+                                        <FaCheckCircle style={{ color: "#10B981", flexShrink: 0, fontSize: 12 }} />
+                                        <span>{skill} {crit && <span style={{ 
+                                            fontSize: 10, 
+                                            textTransform: 'uppercase', 
+                                            background: 'rgba(255,255,255,0.1)', 
+                                            padding: '2px 6px', 
+                                            borderRadius: '4px',
+                                            marginLeft: '6px'
+                                        }}>{crit}</span>}</span>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </motion.div>
 
@@ -320,19 +332,57 @@ export default function CampaignDetail() {
                         }}
                     >
                         <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 16 }}>Interview Settings</h4>
-                        {[
-                            { label: "Type", value: campaign.interviewSettings?.type || "—" },
-                            { label: "Duration", value: campaign.interviewSettings?.duration ? `${campaign.interviewSettings.duration} min` : "—" },
-                            { label: "Strictness", value: campaign.interviewSettings?.strictness || "—" },
-                        ].map(s => (
-                            <div key={s.label} style={{
-                                display: "flex", justifyContent: "space-between",
-                                padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.04)"
-                            }}>
-                                <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{s.label}</span>
-                                <strong style={{ fontSize: 13, color: "var(--text)" }}>{s.value}</strong>
-                            </div>
-                        ))}
+                        {(() => {
+                            const getInterviewTypeLabel = (val) => {
+                                const types = {
+                                    "technical": "Technical",
+                                    "resume_experience": "Resume / Experience",
+                                    "hr_behavioral": "HR / Behavioral",
+                                    "situational_case": "Situational / Case",
+                                    "mixed": "Mixed"
+                                };
+                                return types[val] || val || "—";
+                            };
+
+                            const items = [];
+                            
+                            if (campaign.strategy_snapshot) {
+                                items.push({ label: "Strategy", value: `${campaign.strategy_snapshot.definition?.name || campaign.strategy_id} (v${campaign.strategy_snapshot.definition?.version || '1.0'})` });
+                            } else if (campaign.strategy_id) {
+                                items.push({ label: "Strategy", value: campaign.strategy_id });
+                            }
+                        
+                            const iType = campaign.interview_type || campaign.interviewSettings?.type;
+                            items.push({ label: "Type", value: getInterviewTypeLabel(iType) });
+                        
+                            if (campaign.interviewSettings?.duration) items.push({ label: "Legacy Duration", value: `${campaign.interviewSettings.duration} min` });
+                            
+                            const diff = campaign.interviewSettings?.strictness;
+                            if (diff) items.push({ label: "Legacy Strictness", value: diff });
+                        
+                            if (campaign.budget_override?.target_questions) items.push({ label: "Question Budget", value: campaign.budget_override.target_questions });
+                            
+                            if (campaign.language) items.push({ label: "Language", value: campaign.language });
+                            if (campaign.voice_id) items.push({ label: "Voice", value: campaign.voice_id });
+                        
+                            if ((campaign.interview_type === "mixed" || (iType && iType.toLowerCase() === "mixed")) && campaign.mixed_composition) {
+                                const comp = campaign.mixed_composition;
+                                if (comp.technical > 0) items.push({ label: "Technical Wt.", value: `${comp.technical * 100}%` });
+                                if (comp.resume_experience > 0) items.push({ label: "Resume/Exp Wt.", value: `${comp.resume_experience * 100}%` });
+                                if (comp.hr_behavioral > 0) items.push({ label: "HR/Behav Wt.", value: `${comp.hr_behavioral * 100}%` });
+                                if (comp.situational_case > 0) items.push({ label: "Sit/Case Wt.", value: `${comp.situational_case * 100}%` });
+                            }
+
+                            return items.map(s => (
+                                <div key={s.label} style={{
+                                    display: "flex", justifyContent: "space-between",
+                                    padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.04)"
+                                }}>
+                                    <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{s.label}</span>
+                                    <strong style={{ fontSize: 13, color: "var(--text)", textAlign: "right" }}>{s.value}</strong>
+                                </div>
+                            ));
+                        })()}
                     </motion.div>
 
                     {/* Recruiter card */}

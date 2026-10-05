@@ -1,8 +1,14 @@
 from typing import Any, List, Optional, TYPE_CHECKING
 from pydantic import BaseModel, Field, model_validator
 from datetime import datetime, timezone
-from app.ai_interview.core.enums import InterviewState, TopicState, DifficultyLevel
+from app.ai_interview.core.enums import (
+    InterviewState, TopicState, DifficultyLevel, InterviewType,
+    TopicDimension, RequirementCriticality, ResumeEvidence,
+    InterviewEvidence, TopicSource, TopicTerminalReason,
+    CompletionReason, BehavioralSpecificity
+)
 from app.ai_interview.schemas.blueprint import InterviewBlueprint
+from app.ai_interview.schemas.strategy import StrategyDefinition, MixedComposition
 if TYPE_CHECKING:
     from app.ai_interview.question_engine.schemas import QuestionRecord
     from app.ai_interview.answer_engine.schemas import EvaluationRecord
@@ -24,7 +30,13 @@ class TopicEvaluationAggregate(BaseModel):
 
 class TopicProgress(BaseModel):
     topic_id: str
+    dimension: Optional[TopicDimension] = None
+    source: Optional[TopicSource] = None
+    criticality: Optional[RequirementCriticality] = None
+    
     state: TopicState = TopicState.NOT_STARTED
+    terminal_reason: Optional[TopicTerminalReason] = None
+    
     structurally_attempted: bool = False
     qualitatively_covered: bool = False
     coverage_score: float = 0.0
@@ -34,6 +46,14 @@ class TopicProgress(BaseModel):
         default=0,
         description="Count of questions officially dispatched for this topic. Incremented only by QuestionDispatcher after successful dispatch."
     )
+    current_difficulty: Optional[DifficultyLevel] = None
+    current_specificity: Optional[BehavioralSpecificity] = None
+    
+    resume_evidence: Optional[ResumeEvidence] = None
+    campaign_requirement: Optional[str] = None
+    candidate_claim: Optional[str] = None
+    interview_evidence: Optional[InterviewEvidence] = None
+    
     evaluation_aggregate: TopicEvaluationAggregate = Field(default_factory=TopicEvaluationAggregate)
 
     @model_validator(mode="after")
@@ -55,8 +75,15 @@ class InterviewSessionSchema(BaseModel):
 
     mode_id: str
     mode_version: int
+    
+    strategy_snapshot: Optional[StrategyDefinition] = None
+    interview_type: Optional[InterviewType] = None
+    mixed_composition: Optional[MixedComposition] = None
 
     state: InterviewState = InterviewState.CREATED
+    completion_reason: Optional[CompletionReason] = None
+    
+    voice_id: Optional[str] = Field(default=None, description="Snapshot of the campaign voice selected for this session")
 
     blueprint: InterviewBlueprint
 

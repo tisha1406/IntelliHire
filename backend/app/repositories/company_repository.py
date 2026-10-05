@@ -134,18 +134,32 @@ class CompanyRepository(BaseRepository):
     # Authentication Support
     # ==========================================================
 
+    async def get_by_refresh_token(self, refresh_token_hash: str):
+        """
+        Fetch a company using its stored refresh token hash (mirrors
+        UserRepository.get_by_refresh_token -- companies store their own
+        refresh token on the company document, not in `users`).
+        """
+        return await self.get_one(
+            {"refresh_token_hash": refresh_token_hash}
+        )
+
     async def store_refresh_token(
         self,
         company_id: str,
         refresh_token_hash: str,
+        refresh_token_expires_at=None,
     ) -> bool:
         from datetime import UTC, datetime
+        update_data = {
+            "refresh_token_hash": refresh_token_hash,
+            "updated_at": datetime.now(UTC),
+        }
+        if refresh_token_expires_at is not None:
+            update_data["refresh_token_expires_at"] = refresh_token_expires_at
         return await self.update(
             company_id,
-            {
-                "refresh_token_hash": refresh_token_hash,
-                "updated_at": datetime.now(UTC),
-            },
+            update_data,
         )
 
     async def clear_refresh_token(
@@ -157,6 +171,7 @@ class CompanyRepository(BaseRepository):
             company_id,
             {
                 "refresh_token_hash": None,
+                "refresh_token_expires_at": None,
                 "updated_at": datetime.now(UTC),
             },
         )

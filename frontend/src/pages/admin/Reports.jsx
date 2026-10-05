@@ -149,7 +149,7 @@ export default function Reports() {
                     )) : [
                         { label: "Interview Count", value: stats ? stats.interview_count : 0 },
                         { label: "Completed", value: stats ? stats.completed : 0 },
-                        { label: "Cancelled", value: stats ? stats.cancelled : 0 },
+                        { label: "Avg Score", value: stats ? `${stats.average_score}%` : "0%" },
                         { label: "Avg Duration", value: stats ? `${stats.average_duration}m` : "0m" },
                     ].map(({ label, value }) => (
                         <Card key={label} className="ih-card">

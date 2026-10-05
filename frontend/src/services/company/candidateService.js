@@ -36,18 +36,32 @@ const candidateService = {
         return api.patch(`${BASE}/${id}/schedule`);
     },
 
-    sendInvite(id) {
-        return api.post(`${BASE}/${id}/send-invite`);
-    },
-    downloadResume(id) {
-        return api.get(`${BASE}/${id}/resume`, {
-            responseType: "blob",
-        });
+    // Creates a new candidate + invites them to a campaign.
+    // data: { name, email, phone?, campaign_id, interview_type?, assigned_recruiter_id? }
+    // (backend: InviteCandidateRequest, POST /company/candidates/invite)
+    inviteCandidate(data) {
+        return api.post(`${BASE}/invite`, data);
     },
 
-    downloadReport(id) {
-        return api.get(`${BASE}/${id}/report`, {
-            responseType: "blob",
+    suspendCandidate(id) {
+        return api.patch(`${BASE}/${id}/suspend`);
+    },
+
+    activateCandidate(id) {
+        return api.patch(`${BASE}/${id}/activate`);
+    },
+
+    resetCredentials(id) {
+        return api.post(`${BASE}/${id}/reset-credentials`);
+    },
+
+    // candidateIds: string[], recruiterId: string
+    // (backend: BulkAssignCandidatesRequest { candidate_ids, recruiter_id },
+    // POST /company/candidates/bulk-assign)
+    bulkAssignCandidates(candidateIds, recruiterId) {
+        return api.post(`${BASE}/bulk-assign`, {
+            candidate_ids: candidateIds,
+            recruiter_id: recruiterId,
         });
     },
 };

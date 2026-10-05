@@ -1,4 +1,4 @@
-const BASE_URL =
+export const BASE_URL =
     import.meta.env.VITE_API_BASE_URL ||
     "http://127.0.0.1:8000";
 
@@ -78,4 +78,25 @@ export async function apiRequest(
     }
 
     return data;
+}
+
+/**
+ * G-04: best-effort server-side logout, shared by every role's logout
+ * button (mirrors the call UserMenu.jsx already made for admin -- see
+ * G-02 for the real revocation behavior this now reaches consistently).
+ *
+ * Deliberately never throws: callers must clear local auth state and let
+ * the user leave the authenticated UI even if this request fails (network
+ * error, already-expired token, etc.) -- a failed backend call must not
+ * trap the user in a logged-in-looking screen. Failures are logged, not
+ * silently discarded, per the G-04 requirement to fix that exact pattern.
+ */
+export async function logoutFromServer(token) {
+    if (!token) return;
+
+    try {
+        await apiRequest("/api/auth/logout", { method: "POST" }, token);
+    } catch (error) {
+        console.error("Server-side logout failed (local session will still be cleared):", error);
+    }
 }

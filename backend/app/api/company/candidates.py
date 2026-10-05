@@ -217,19 +217,30 @@ async def get_company_interviews(
         else current_user.sub
     )
 
+    # interview_sessions (the real AI interview engine collection) stores
+    # candidate_id/company_id/campaign_id as plain strings
+    # (InterviewSessionSchema's field type), not ObjectId like most other
+    # collections -- querying with ObjectId(...) here never matched any real
+    # session. mode_id="practice" sessions are excluded so a candidate's
+    # 3-question practice round is never shown as a completed official
+    # interview.
     if current_user.role.upper() == UserRole.RECRUITER.value.upper():
         # Get candidates assigned to this recruiter
         my_candidates = await cand_repo.get_many({"assigned_recruiter_id": ObjectId(current_user.recruiter_id)})
-        my_candidate_ids = [c["_id"] for c in my_candidates]
+        my_candidate_ids = [str(c["_id"]) for c in my_candidates]
         if not my_candidate_ids:
             sessions = []
         else:
             sessions = await session_repo.get_many({
-                "company_id": ObjectId(company_id),
-                "candidate_id": {"$in": my_candidate_ids}
+                "company_id": str(company_id),
+                "candidate_id": {"$in": my_candidate_ids},
+                "mode_id": {"$ne": "practice"},
             })
     else:
-        sessions = await session_repo.get_many({"company_id": ObjectId(company_id)})
+        sessions = await session_repo.get_many({
+            "company_id": str(company_id),
+            "mode_id": {"$ne": "practice"},
+        })
 
     formatted_interviews = []
     upcoming_count = 0
@@ -244,30 +255,37 @@ async def get_company_interviews(
         ai_score = None
         evaluation_data = None
         
+        # The real engine's InterviewSessionSchema field is "state"
+        # (InterviewState: created|in_progress|completed|failed|...), not
+        # "status" -- this previously always fell through to "Scheduled"
+        # even for genuinely completed interviews.
         status_val = "Scheduled"
-        if sess.get("status") == "completed":
+        if sess.get("state") == "completed":
             status_val = "Completed"
             completed_count += 1
-        elif sess.get("status") == "cancelled" or (cand and cand.get("status") == "Cancelled"):
+        elif sess.get("state") == "failed" or (cand and cand.get("status") == "Cancelled"):
             status_val = "Cancelled"
             cancelled_count += 1
         else:
             status_val = "Scheduled"
             upcoming_count += 1
-        
+
         # Use InterviewResultService to generate report from actual session data
         from app.services.interview_result_service import InterviewResultService
         result_service = InterviewResultService()
-        
-        if sess.get("status") == "completed":
+
+        if sess.get("state") == "completed":
             try:
-                rep = await result_service.generate_result_report(str(sess["_id"]))
+                # generate_result_report() looks sessions up by the engine's
+                # own session_id field (see InterviewResultService._load_session),
+                # not Mongo's _id.
+                rep = await result_service.generate_result_report(sess["session_id"])
                 if rep and rep.get("has_report"):
                     ai_score = rep.get("overall_score")
                     if ai_score is not None:
                         score_sum += ai_score
                         score_count += 1
-                        
+
                     questions_list = []
                     for q in rep.get("question_feedback", []):
                         questions_list.append({
@@ -276,7 +294,7 @@ async def get_company_interviews(
                             "sentiment": "Good",
                             "score": q.get("score", 0) * 10
                         })
-                        
+
                     evaluation_data = {
                         "summary": rep.get("company_remarks", ""),
                         "strengths": rep.get("strengths", []),
@@ -285,10 +303,24 @@ async def get_company_interviews(
                         "questions": questions_list
                     }
             except Exception as e:
-                print(f"Failed to generate report for {sess['_id']}: {e}")
+                print(f"Failed to generate report for {sess['session_id']}: {e}")
+
+        # created_at is persisted as an ISO string (InterviewSessionSchema is
+        # dumped with model_dump(mode="json") before insert), not a BSON
+        # Date -- .strftime() on it raised AttributeError for every real
+        # session.
+        created_at_raw = sess.get("created_at")
+        created_at_dt = None
+        if isinstance(created_at_raw, str):
+            try:
+                created_at_dt = datetime.fromisoformat(created_at_raw)
+            except ValueError:
+                created_at_dt = None
+        elif isinstance(created_at_raw, datetime):
+            created_at_dt = created_at_raw
 
         formatted_interviews.append({
-            "id": str(sess["_id"]),
+            "id": sess["session_id"],
             "candidate": cand.get("name") if cand else "Unknown",
             "candidate_id": str(sess["candidate_id"]),
             "position": camp.get("role_target") if camp else "Software Engineer",
@@ -297,16 +329,8 @@ async def get_company_interviews(
                 if (camp and camp.get("voice_config"))
                 else "AI Agent"
             ),
-            "date": (
-                sess["created_at"].strftime("%Y-%m-%d")
-                if sess.get("created_at")
-                else "2026-07-29"
-            ),
-            "time": (
-                sess["created_at"].strftime("%H:%M")
-                if sess.get("created_at")
-                else "12:00"
-            ),
+            "date": created_at_dt.strftime("%Y-%m-%d") if created_at_dt else "2026-07-29",
+            "time": created_at_dt.strftime("%H:%M") if created_at_dt else "12:00",
             "status": status_val,
             "aiScore": ai_score,
             "evaluation": evaluation_data,
@@ -337,16 +361,19 @@ async def get_interview_results(
     from app.services.interview_result_service import InterviewResultService
     
     session_repo = InterviewSessionRepository()
-    session = await session_repo.get_by_id(session_id)
+    # session_id here is the AI interview engine's own session_id field (see
+    # get_company_interviews() below, which lists interviews by this same
+    # id) -- not Mongo's _id, so lookup must be by that field.
+    session = await session_repo.get_by_session_id(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Interview session not found")
-        
+
     company_id = (
         current_user.company_id
         if current_user.role.upper() == UserRole.RECRUITER.value.upper()
         else current_user.sub
     )
-        
+
     if str(session.get("company_id")) != str(company_id):
         raise HTTPException(status_code=403, detail="Not authorized to view this session")
 
@@ -356,6 +383,52 @@ async def get_interview_results(
         return report
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------
+# GET INTERVIEW RESULTS AS PDF (D-05)
+# (MUST be before /{candidate_id} routes)
+# ---------------------------------------------------------
+@router.get("/interviews/{session_id}/results/pdf")
+async def get_interview_results_pdf(
+    session_id: str,
+    current_user: TokenPayload = Depends(require_company_or_recruiter),
+):
+    """
+    D-05: real PDF rendering of the exact same report get_interview_results()
+    returns above -- same ownership check, same InterviewResultService call,
+    no duplicate report-calculation logic.
+    """
+    from fastapi import Response
+    from app.services.interview_result_service import InterviewResultService
+    from app.reports.report_generator import generate_report_pdf
+
+    session_repo = InterviewSessionRepository()
+    # Same session_id-field lookup as get_interview_results() above.
+    session = await session_repo.get_by_session_id(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Interview session not found")
+
+    company_id = (
+        current_user.company_id
+        if current_user.role.upper() == UserRole.RECRUITER.value.upper()
+        else current_user.sub
+    )
+
+    if str(session.get("company_id")) != str(company_id):
+        raise HTTPException(status_code=403, detail="Not authorized to view this session")
+
+    service = InterviewResultService()
+    try:
+        pdf_bytes = await generate_report_pdf(session_id, service)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=interview_report_{session_id}.pdf"},
+    )
 
 
 # ---------------------------------------------------------
@@ -370,11 +443,40 @@ async def cancel_company_interview(
     session_repo = InterviewSessionRepository()
     cand_repo = CandidateRepository()
 
-    session = await session_repo.get_by_id(session_id)
+    # session_id is the AI interview engine's own session_id field (the same
+    # identifier used throughout get_company_interviews()/get_interview_results()
+    # -- see Checkpoint 6), not Mongo's _id.
+    session = await session_repo.get_by_session_id(session_id)
     if not session or str(session.get("company_id")) != str(current_user.company_id):
         raise HTTPException(status_code=404, detail="Interview session not found")
 
-    await session_repo.update(session_id, {"status": "cancelled"})
+    # This endpoint is only for cancelling an upcoming/not-yet-completed
+    # OFFICIAL interview:
+    #   - a practice session (mode_id="practice") is out of scope for this
+    #     company-facing action and must never be reachable through it.
+    #   - a session already in a terminal state (completed or already
+    #     failed/cancelled) must not be overwritten -- InterviewResultService
+    #     keys report availability off state == COMPLETED, so cancelling a
+    #     completed session would silently destroy its report.
+    if session.get("mode_id") == "practice":
+        raise HTTPException(status_code=404, detail="Interview session not found")
+    if session.get("state") in ("completed", "failed"):
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot cancel an interview that has already completed or been cancelled.",
+        )
+
+    # InterviewSessionSchema has no dedicated CANCELLED value; "failed" is
+    # the engine's existing terminal "will not continue" state (already used
+    # for the same purpose when SessionCreationService detects a stuck
+    # session -- see RuntimeController.execute_transition(..., RuntimeAction.FAIL)),
+    # and find_active_session() already excludes it, so cancelling here
+    # correctly un-blocks a future session for this candidate/campaign.
+    # Written directly (not via RuntimeController) to match this endpoint's
+    # existing simple-update style and avoid touching the AI interview engine.
+    await session_repo.collection.update_one(
+        {"session_id": session_id}, {"$set": {"state": "failed"}}
+    )
 
     candidate_id = str(session["candidate_id"])
     await cand_repo.update(candidate_id, {"status": "Cancelled", "currentStage": "Rejected"})

@@ -180,3 +180,41 @@
     --input-border-focus: var(--primary);
     --overlay: rgba(0,0,0,.60);
 }
+
+/* ==========================================================
+   ACCESSIBILITY PREFERENCES (Candidate Settings)
+   Applied via a root-level data attribute, same mechanism as
+   [data-theme] above -- set by useApplyCandidatePreferences()
+   from the candidate's saved high_contrast/reduced_motion settings.
+   ========================================================== */
+
+[data-high-contrast="true"] {
+    --text:             #000000;
+    --text-secondary:   #000000;
+    --text-muted:       #1A1A1A;
+    --border:           #000000;
+    --border-subtle:    #000000;
+    --border-strong:    #000000;
+    --primary:          #0B4FCC;
+    --primary-hover:    #072E99;
+}
+
+[data-theme="dark"][data-high-contrast="true"] {
+    --text:             #FFFFFF;
+    --text-secondary:   #FFFFFF;
+    --text-muted:       #E5E7EB;
+    --border:           #FFFFFF;
+    --border-subtle:    #FFFFFF;
+    --border-strong:    #FFFFFF;
+    --primary:          #5B9BFF;
+    --primary-hover:    #8AB8FF;
+}
+
+[data-reduced-motion="true"] *,
+[data-reduced-motion="true"] *::before,
+[data-reduced-motion="true"] *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+}

@@ -5,6 +5,7 @@ import {
     UserCog,
     CalendarDays,
     ClipboardCheck,
+    ListTree,
     Sparkles,
     FileSearch,
     BrainCircuit,
@@ -27,6 +28,7 @@ import SidebarItem from "./SidebarItem";
 import useSidebar from "../../hooks/useSidebar";
 import { useAuthContext } from "../../context/AuthContext";
 import { MonitoringAPI } from "../../api/monitoring";
+import { logoutFromServer } from "../../api/client";
 
 import "../../styles/admin/sidebar.css";
 
@@ -38,6 +40,15 @@ export default function Sidebar() {
     } = useSidebar();
     
     const [storageData, setStorageData] = useState(null);
+
+    const handleLogout = async () => {
+        try {
+            await logoutFromServer(localStorage.getItem("accessToken"));
+        } catch {
+            // best-effort only -- local logout still proceeds below
+        }
+        logout();
+    };
 
     useEffect(() => {
         const fetchStorage = async () => {
@@ -70,7 +81,8 @@ export default function Sidebar() {
                 { to: "/admin/recruiters", icon: UserCog, label: "Recruiters" },
                 { to: "/admin/candidates", icon: Users, label: "Candidates" },
                 { to: "/admin/interviews", icon: ClipboardCheck, label: "Interviews" },
-                { to: "/admin/interview-calendar", icon: CalendarDays, label: "Interview Calendar" }
+                { to: "/admin/interview-calendar", icon: CalendarDays, label: "Interview Calendar" },
+                { to: "/admin/strategies", icon: ListTree, label: "Strategies" }
             ]
         },
         {
@@ -200,7 +212,7 @@ export default function Sidebar() {
                         </div>
                     )}
                 </div>
-                <button className="logout-btn" onClick={logout}>
+                <button className="logout-btn" onClick={handleLogout}>
                     <LogOut size={18}/>
                     {!collapsed && <span>Logout</span>}
                 </button>

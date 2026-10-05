@@ -1,4 +1,4 @@
-import { apiRequest } from "./client";
+import { apiRequest, BASE_URL } from "./client";
 
 // ==========================================
 // Dashboard & Workflow
@@ -92,4 +92,26 @@ export const completePractice = async (token) => {
 export const startInterview = async (token, campaignId) => {
     // Hits the deterministic AI Interview Engine session creation endpoint
     return apiRequest(`/api/interview/campaigns/${campaignId}/sessions`, { method: "POST", body: JSON.stringify({}) }, token);
+};
+
+export const completeInterview = async (token) => {
+    return apiRequest("/api/candidate/interview/complete", { method: "POST" }, token);
+};
+
+export const getInterviewReport = async (token, sessionId) => {
+    return apiRequest(`/api/interview/sessions/${sessionId}/report`, { method: "GET" }, token);
+};
+
+// D-05: real PDF download. apiRequest always parses the response as JSON, so
+// this binary endpoint uses a plain fetch (same auth/base-URL convention as
+// apiRequest) and returns a Blob for the caller to save.
+export const downloadInterviewReportPdf = async (token, sessionId) => {
+    const response = await fetch(
+        `${BASE_URL}/api/interview/sessions/${sessionId}/report/pdf`,
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+    );
+    if (!response.ok) {
+        throw new Error("Failed to download report PDF");
+    }
+    return response.blob();
 };

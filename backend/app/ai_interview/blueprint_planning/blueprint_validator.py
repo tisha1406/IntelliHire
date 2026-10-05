@@ -19,3 +19,4 @@ class BlueprintValidator:
             if name_lower in topic_names:
                 raise BlueprintValidationError(f"Duplicate topic found: {topic.topic_name}")
             topic_names.add(name_lower)
+

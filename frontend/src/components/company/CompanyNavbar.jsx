@@ -17,6 +17,7 @@ import {
 
 import { useTheme } from "../../context/ThemeContext";
 import { useAuthContext } from "../../context/AuthContext";
+import { logoutFromServer } from "../../api/client";
 
 import "../../styles/company/CompanyNavbar.css";
 
@@ -77,7 +78,12 @@ function CompanyNavbar({ sidebarOpen, setSidebarOpen }) {
         setNotifications(notifications.map(item => ({ ...item, read: true })));
     };
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        try {
+            await logoutFromServer(localStorage.getItem("accessToken"));
+        } catch {
+            // best-effort only -- local logout still proceeds below
+        }
         logout();
         navigate("/login");
     };

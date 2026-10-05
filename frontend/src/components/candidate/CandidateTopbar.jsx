@@ -6,6 +6,7 @@ import useTheme from "../../hooks/useTheme";
 import useSidebar from "../../hooks/useSidebar";
 import { useAuthContext } from "../../context/AuthContext";
 import { useCandidateDashboard, useCandidateNotifications, useMarkNotificationsRead } from "../../hooks/candidate/useCandidate";
+import { logoutFromServer } from "../../api/client";
 
 import "../../styles/candidate/topbar.css";
 
@@ -19,6 +20,15 @@ export default function CandidateTopbar() {
     const { data: dashboard, isLoading: dashboardLoading } = useCandidateDashboard();
     const { data: notificationsData } = useCandidateNotifications();
     const { mutate: markRead } = useMarkNotificationsRead();
+
+    const handleLogout = async () => {
+        try {
+            await logoutFromServer(localStorage.getItem("accessToken"));
+        } catch {
+            // best-effort only -- local logout still proceeds below
+        }
+        logout();
+    };
 
     const notifications = notificationsData?.notifications || [];
     const unreadCount = notificationsData?.unread_count || 0;
@@ -136,7 +146,7 @@ export default function CandidateTopbar() {
                                 <Settings size={15} /> Settings
                             </Link>
                             <div className="c-dropdown-divider" />
-                            <button className="c-dropdown-item c-text-danger" onClick={logout}>
+                            <button className="c-dropdown-item c-text-danger" onClick={handleLogout}>
                                 <LogOut size={15} /> Log Out
                             </button>
                         </div>

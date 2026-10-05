@@ -36,6 +36,7 @@ class QuestionRequestBuilder:
         candidate_context: CandidateInterviewContext,
         mode: InterviewModeDefinition,
         question_history: list,  # List[QuestionRecord] — kept as list[Any] to avoid circular import
+        evaluation_history: list = None,  # List[EvaluationRecord]
     ) -> QuestionGenerationRequest:
         """
         Construct a QuestionGenerationRequest from the deterministic turn plan.
@@ -45,6 +46,7 @@ class QuestionRequestBuilder:
             candidate_context:  Structured resume context from Phase 2.
             mode:               InterviewModeDefinition from Phase 1.
             question_history:   Session's official QuestionRecord list.
+            evaluation_history: Session's official EvaluationRecord list.
         """
         if not plan.allowed:
             raise ValueError(
@@ -82,10 +84,7 @@ class QuestionRequestBuilder:
         ]
 
         # ── Job requirements ─────────────────────────────────────────────────
-        # Phase 5 defers job-requirement context to a future phase.
-        # JobRequirementContext will be added when the candidate-role matching
-        # pipeline is integrated. For now, always empty.
-        relevant_job_requirements: list[str] = []
+        relevant_job_requirements: list[str] = [plan.campaign_requirement] if plan.campaign_requirement else []
 
         # ── Previous questions (bounded LIFO) ────────────────────────────────
         # Take the last MAX_PREVIOUS_QUESTIONS_CONTEXT dispatched questions,
@@ -102,20 +101,66 @@ class QuestionRequestBuilder:
             selected_type: QuestionType = plan.allowed_question_types[0]
         else:
             selected_type = QuestionType.INITIAL
+            
+        # ── Previous turn context for follow-ups ─────────────────────────────
+        evaluation_history = evaluation_history or []
+        previous_question_for_followup = None
+        previous_answer = None
+        previous_evaluation = None
+        
+        # We only pass follow-up context if this is a follow-up category
+        if plan.category and plan.category.value.startswith("followup"):
+            if question_history and evaluation_history:
+                last_eval = evaluation_history[-1]
+                matched_q = next((q for q in question_history if q.record_id == last_eval.question_record_id), None)
+                if matched_q:
+                    previous_question_for_followup = matched_q.question_text
+                    # The candidate's submitted answer is persisted on the evaluation of that
+                    # question (EvaluationRecord.answer_text, whitespace-normalised, set by
+                    # EvaluationApplicator). Only hand it to the prompt when that evaluation is
+                    # for THIS plan's topic, so a follow-up never sees another topic's answer.
+                    if last_eval.topic_id == plan.topic_id:
+                        previous_answer = last_eval.answer_text or None
+                    
+                    previous_evaluation = {
+                        "score": last_eval.overall_score,
+                        "correctness": last_eval.correctness,
+                        "coverage": last_eval.coverage,
+                        "confidence": last_eval.confidence,
+                        "qualitative_coverage_signal": last_eval.qualitative_coverage_signal.value if hasattr(last_eval.qualitative_coverage_signal, 'value') else last_eval.qualitative_coverage_signal,
+                        "evidence_quality": last_eval.evidence_quality,
+                        "followup_recommended": last_eval.followup_recommended,
+                    }
 
         return QuestionGenerationRequest(
             session_id=plan.session_id,
             turn_number=plan.turn_number,
             topic_id=plan.topic_id,
             topic_name=plan.topic_name,
+            mode_id=mode.mode_id,
+            question_style=plan.question_style or mode.settings.question_style or "technical",
+            interview_type=plan.interview_type,
+            strategy=plan.strategy,
+            strategy_id=plan.strategy_id,
+            dimension=plan.dimension,
+            category=plan.category,
+            resume_evidence=plan.resume_evidence,
+            candidate_claim=plan.candidate_claim,
+            interview_evidence=plan.interview_evidence,
+            campaign_requirement=plan.campaign_requirement,
+            requirement_criticality=plan.requirement_criticality,
+            scenario_context=plan.scenario_context,
+            specificity_required=plan.specificity_required,
             difficulty=plan.difficulty,
             allowed_question_types=plan.allowed_question_types,
             selected_question_type=selected_type,
             relevant_skills=relevant_skills,
             relevant_projects=relevant_projects,
             relevant_experience=relevant_experience,
-            relevant_job_requirements=relevant_job_requirements,
             previous_questions=previous_questions,
+            previous_question_for_followup=previous_question_for_followup,
+            previous_answer=previous_answer,
+            previous_evaluation=previous_evaluation,
             question_number=plan.topic_questions_asked + 1,
             max_questions_for_topic=plan.topic_question_budget,
         )

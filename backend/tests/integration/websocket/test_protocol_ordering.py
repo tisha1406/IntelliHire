@@ -7,7 +7,7 @@ def test_submit_answer_before_start_rejected(client, candidate_token, mock_sessi
     before starting the interview, it should be rejected gracefully by the transport layer 
     (which maps to INVALID_SESSION_STATE).
     """
-    with client.websocket_connect(f"/ws/interview/session_1?token={candidate_token}") as websocket:
+    with client.websocket_connect(f"/api/ws/interview/session_1?token={candidate_token}") as websocket:
         # 1. Connection Ready
         data = websocket.receive_json()
         assert data["event_type"] == "connection_ready"

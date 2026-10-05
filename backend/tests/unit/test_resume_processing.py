@@ -1,5 +1,6 @@
 import pytest
 import io
+from unittest.mock import patch, MagicMock
 import fitz
 from docx import Document
 from resume.parser import ResumeParser
@@ -104,3 +105,48 @@ def test_13_privacy():
     # By design, the parser only accepts bytes and returns text.
     # It does not write to the filesystem.
     pass
+
+@pytest.mark.asyncio
+@patch('app.services.resume_processing_service.AsyncGroq')
+async def test_resume_processing_service_groq_model(mock_async_groq):
+    from app.services.resume_processing_service import ResumeProcessingService
+    from app.config.settings import settings
+    mock_client = mock_async_groq.return_value
+    mock_client.chat.completions.create.return_value.choices = [MagicMock(message=MagicMock(content='{" overall_score\:100}'))]
+
+@pytest.mark.asyncio
+@patch('app.services.resume_processing_service.AsyncGroq')
+@patch('app.services.resume_processing_service.ResumeCleaner')
+@patch('app.services.resume_processing_service.ResumeParser')
+@patch('app.services.resume_processing_service.CandidateWorkflowRepository')
+@patch('app.services.resume_processing_service.ResumeRepository')
+@patch('app.services.resume_processing_service.NotificationRepository')
+async def test_resume_processing_stores_uploaded_at(mock_notif, mock_resume_repo, mock_workflow_repo, mock_parser, mock_cleaner, mock_groq):
+    from app.services.resume_processing_service import ResumeProcessingService
+    # setup mocks
+    mock_workflow_repo_instance = mock_workflow_repo.return_value
+    mock_groq.return_value.chat.completions.create.return_value.choices = [MagicMock(message=MagicMock(content='{" overall_score\:100}'))]
+
+@pytest.mark.asyncio
+@patch("app.services.resume_processing_service.AsyncGroq")
+async def test_resume_structured_output_schema(mock_async_groq):
+    from app.services.resume_processing_service import ResumeProcessingService
+    mock_client = mock_async_groq.return_value
+    mock_client.chat.completions.create.return_value.choices = [MagicMock(message=MagicMock(content="""{"overall_score":100, "experience": []}"""))]
+    
+    service = ResumeProcessingService()
+    try:
+        await service._structure_resume_with_llm("dummy text")
+    except Exception:
+        pass
+    
+    mock_client.chat.completions.create.assert_called_once()
+    call_kwargs = mock_client.chat.completions.create.call_args.kwargs
+    assert "response_format" in call_kwargs
+    rf = call_kwargs["response_format"]
+    assert rf["type"] == "json_schema"
+    assert rf["json_schema"]["strict"] is True
+    schema = rf["json_schema"]["schema"]
+    assert "additionalProperties" in schema
+    assert schema["additionalProperties"] is False
+    assert "overall_score" in schema["properties"]

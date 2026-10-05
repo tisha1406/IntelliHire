@@ -32,16 +32,21 @@ class UserRepository(BaseRepository):
         self,
         user_id: str,
         refresh_token_hash: str,
+        refresh_token_expires_at: datetime | None = None,
     ) -> bool:
         """
-        Save or update the user's refresh token hash.
+        Save or update the user's refresh token hash (and its expiry, used by
+        the G-01 refresh flow; optional so existing callers are unaffected).
         """
+        update_data = {
+            "refresh_token_hash": refresh_token_hash,
+            "updated_at": datetime.now(UTC),
+        }
+        if refresh_token_expires_at is not None:
+            update_data["refresh_token_expires_at"] = refresh_token_expires_at
         return await self.update(
             user_id,
-            {
-                "refresh_token_hash": refresh_token_hash,
-                "updated_at": datetime.now(UTC),
-            },
+            update_data,
         )
 
     async def clear_refresh_token(
@@ -55,6 +60,7 @@ class UserRepository(BaseRepository):
             user_id,
             {
                 "refresh_token_hash": None,
+                "refresh_token_expires_at": None,
                 "updated_at": datetime.now(UTC),
             },
         )

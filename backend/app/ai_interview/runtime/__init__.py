@@ -4,6 +4,7 @@ from .state_machine import StateMachine
 from .topic_state_manager import TopicStateManager
 from .topic_progression_engine import TopicProgressionEngine
 from .completion_engine import CompletionEngine
+from .followup_policy_engine import FollowUpPolicyEngine
 from .validators import Validators
 from .schemas import RuntimeDecision, TransitionResult
 from .enums import RuntimeAction
@@ -16,6 +17,7 @@ __all__ = [
     "TopicStateManager",
     "TopicProgressionEngine",
     "CompletionEngine",
+    "FollowUpPolicyEngine",
     "Validators",
     "RuntimeDecision",
     "TransitionResult",

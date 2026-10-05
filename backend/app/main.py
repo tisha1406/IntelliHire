@@ -45,7 +45,6 @@ from app.api.company.profile import router as company_profile_router
 from app.api.company.dashboard import router as company_dashboard_router
 from app.api.company.notifications import router as company_notifications_router
 from app.api.company.platform_config import router as company_platform_config_router
-from app.api.company.recruiters import router as company_recruiters_router
 from app.api.company.audit_logs import router as company_audit_logs_router
 from app.api.company.company_subscription import router as company_subscription_router
 
@@ -194,7 +193,6 @@ app.include_router(company_profile_router)
 app.include_router(company_dashboard_router)
 app.include_router(company_notifications_router)
 app.include_router(company_platform_config_router)
-app.include_router(company_recruiters_router)
 app.include_router(company_audit_logs_router)
 app.include_router(company_subscription_router)
 

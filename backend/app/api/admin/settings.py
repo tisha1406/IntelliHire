@@ -81,7 +81,7 @@ async def get_master_settings(token: TokenPayload = Depends(require_role(UserRol
     # 4. Fetch Strategies
     from app.repositories.strategy_repository import StrategyRepository
     strategies_repo = StrategyRepository()
-    strategies = await strategies_repo.get_many(limit=1000)
+    strategies = await strategies_repo.get_all_unique_strategies(limit=1000)
     
     # 5. Fetch Interview Modes
     from app.repositories.interview_mode_repository import InterviewModeRepository
@@ -142,7 +142,7 @@ async def get_master_settings(token: TokenPayload = Depends(require_role(UserRol
     for m in modes:
         augmented_modes.append({
             "id": str(m["_id"]),
-            "name": m.get("display_name"),
+            "name": m.get("name"),
             "description": "Standard interview mode flow.",
             "duration": "30 mins",
             "difficulty": "Adaptive",
@@ -156,14 +156,14 @@ async def get_master_settings(token: TokenPayload = Depends(require_role(UserRol
     for s in strategies:
         augmented_strategies.append({
             "id": str(s["_id"]),
-            "name": s.get("display_name"),
+            "name": s.get("name"),
             "description": s.get("description", "A conversational strategy."),
             "ai_prompt": "Hidden (System)",
             "difficulty": "Medium",
             "follow_up_logic": "Contextual",
             "evaluation_logic": "Strict",
-            "enabled": s.get("enabled", True),
-            "is_default": s.get("display_name") == "Adaptive"
+            "enabled": s.get("is_active", True),
+            "is_default": s.get("name") == "Adaptive Depth"
         })
 
     # Expand features to categories

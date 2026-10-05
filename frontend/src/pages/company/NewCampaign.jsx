@@ -16,8 +16,8 @@ import Input from "../../components/common/Input";
 import Select from "../../components/common/Select";
 import Card from "../../components/common/Card";
 import Toast from "../../components/common/Toast";
-
-
+import { VALID_VOICES } from "../../utils/voiceConstants";
+import { DIFFICULTY_LEVELS } from "../../utils/difficultyConstants";
 import "../../styles/company/Campaign.css";
 
 const DEPARTMENTS = [
@@ -37,6 +37,22 @@ const EMPLOYMENT_TYPES = [
     { value: "Remote", label: "Remote" }
 ];
 
+import { SettingsAPI } from "../../api/settings";
+
+const INTERVIEW_TYPES = [
+    { value: "technical", label: "Technical" },
+    { value: "resume_experience", label: "Resume / Experience" },
+    { value: "hr_behavioral", label: "HR / Behavioral" },
+    { value: "situational_case", label: "Situational / Case" },
+    { value: "mixed", label: "Mixed" }
+];
+
+const CRITICALITY_OPTIONS = [
+    { value: "critical", label: "Critical" },
+    { value: "required", label: "Required" },
+    { value: "preferred", label: "Preferred" }
+];
+
 import { usePermissions } from "../../context/PermissionsContext";
 
 export default function NewCampaign() {
@@ -44,6 +60,19 @@ export default function NewCampaign() {
     const { user, loading } = useAuthContext();
     const { platform } = usePermissions();
     const [currentStep, setCurrentStep] = useState(0);
+
+    const [strategies, setStrategies] = useState([]);
+    
+    React.useEffect(() => {
+        SettingsAPI.getStrategies().then(res => {
+            const allStrategies = Array.isArray(res) 
+                ? res 
+                : (Array.isArray(res?.data) ? res.data : []);
+            if (platform?.allowed_strategies) {
+                setStrategies(allStrategies.filter(s => s.is_active && platform.allowed_strategies.includes(s.name)));
+            }
+        }).catch(err => console.error(err));
+    }, [platform]);
 
     // Form inputs state
     const [formData, setFormData] = useState({
@@ -54,14 +83,29 @@ export default function NewCampaign() {
         salary: "",
         description: "",
         employmentType: "",
-        requirements: ["React experience", "TypeScript fluency"],
+        requirements: [
+            { skill: "React experience", criticality: "required" },
+            { skill: "TypeScript fluency", criticality: "preferred" }
+        ],
         interviewDuration: 45,
-        strictness: "High",
-        interviewType: "Technical",
+        strictness: "medium", // Default fallback if needed
+        interviewType: "technical",
+        strategy_id: "",
+        mixed_composition: {
+            technical: 0,
+            resume_experience: 0,
+            hr_behavioral: 0,
+            situational_case: 0
+        },
+        budget_override_target: "",
+        difficulty_band: "",
+        language: "",
+        voice_id: "",
         assigned_recruiter_ids: []
     });
 
     const [reqInput, setReqInput] = useState("");
+    const [reqCriticality, setReqCriticality] = useState("required");
     const [recruiters, setRecruiters] = useState([]);
     const [errors, setErrors] = useState({});
     const [toastMessage, setToastMessage] = useState(null);
@@ -89,10 +133,23 @@ export default function NewCampaign() {
             if (formData.requirements.length === 0) {
                 errs.requirements = "Please add at least one job requirement.";
             }
+        } else if (currentStep === 3) {
+            if (!formData.strategy_id) errs.strategy_id = "Strategy is required.";
+            if (formData.interviewType === "mixed") {
+                const sum = (formData.mixed_composition.technical || 0) +
+                            (formData.mixed_composition.resume_experience || 0) +
+                            (formData.mixed_composition.hr_behavioral || 0) +
+                            (formData.mixed_composition.situational_case || 0);
+                if (Math.abs(sum - 1.0) > 0.01) {
+                    errs.mixed_composition = "Mixed composition must total exactly 1.0 (100%)";
+                }
+            }
         }
         setErrors(errs);
         return Object.keys(errs).length === 0;
     };
+
+    const selectedStrategy = strategies.find(s => s.strategy_id === formData.strategy_id);
 
     const handleNext = () => {
         if (validateStep()) {
@@ -107,10 +164,10 @@ export default function NewCampaign() {
     const handleAddRequirement = () => {
         const value = reqInput.trim();
 
-        if (value && !formData.requirements.includes(value)) {
+        if (value && !formData.requirements.find(r => r.skill === value)) {
             setFormData({
                 ...formData,
-                requirements: [...formData.requirements, value]
+                requirements: [...formData.requirements, { skill: value, criticality: reqCriticality }]
             });
             setReqInput("");
         }
@@ -138,27 +195,46 @@ export default function NewCampaign() {
 
         setSubmitting(true);
 
-        await campaignService.createCampaign({
+        const payload = {
             name: formData.name.trim(),
             department: formData.department.trim(),
             location: formData.location.trim(),
             deadline: formData.deadline,
-
             salary: formData.salary.trim(),
-
             description: formData.description.trim(),
-
             employment_type: formData.employmentType.trim(),
-                assigned_recruiter_ids: formData.assigned_recruiter_ids,
-
+            assigned_recruiter_ids: formData.assigned_recruiter_ids,
             requirements: formData.requirements,
-
+            interview_type: formData.interviewType,
+            strategy_id: formData.strategy_id,
             interview_settings: {
                 duration: formData.interviewDuration,
                 strictness: formData.strictness,
                 type: formData.interviewType
             }
-        });
+        };
+
+        if (formData.interviewType === "mixed") {
+            payload.mixed_composition = formData.mixed_composition;
+        }
+
+        if (formData.budget_override_target !== "") {
+            payload.budget_override = { target_questions: parseInt(formData.budget_override_target) };
+        }
+
+        if (formData.difficulty_band) {
+            payload.difficulty_band = formData.difficulty_band;
+        }
+
+        if (formData.language) {
+            payload.language = formData.language;
+        }
+
+        if (formData.voice_id) {
+            payload.voice_id = formData.voice_id;
+        }
+
+        await campaignService.createCampaign(payload);
 
         setToastMessage("Campaign Created Successfully.");
 
@@ -294,12 +370,21 @@ export default function NewCampaign() {
                                     <p className="step-instruction-text">
                                         List critical qualifications. Our AI agents will match candidates' resumes against these items.
                                     </p>
-                                    <div className="requirement-adder-row">
-                                        <Input
-                                            placeholder="e.g. 5+ years Go development"
-                                            value={reqInput}
-                                            onChange={(e) => setReqInput(e.target.value)}
-                                        />
+                                    <div className="requirement-adder-row" style={{ display: 'flex', gap: '10px' }}>
+                                        <div style={{ flex: 2 }}>
+                                            <Input
+                                                placeholder="e.g. 5+ years Go development"
+                                                value={reqInput}
+                                                onChange={(e) => setReqInput(e.target.value)}
+                                            />
+                                        </div>
+                                        <div style={{ flex: 1 }}>
+                                            <Select
+                                                options={CRITICALITY_OPTIONS}
+                                                value={reqCriticality}
+                                                onChange={(e) => setReqCriticality(e.target.value)}
+                                            />
+                                        </div>
                                         <Button variant="outline" iconLeft={<FaPlus />} onClick={handleAddRequirement}>
                                             Add
                                         </Button>
@@ -309,7 +394,7 @@ export default function NewCampaign() {
                                     <div className="requirements-dynamic-list">
                                         {formData.requirements.map((req, idx) => (
                                             <div key={idx} className="req-pill-item compact-chip">
-                                                <span>{req}</span>
+                                                <span>{req.skill} <small>({req.criticality})</small></span>
                                                 <button className="delete-pill-btn" onClick={() => handleRemoveRequirement(idx)}>
                                                     &times;
                                                 </button>
@@ -323,40 +408,114 @@ export default function NewCampaign() {
                             {currentStep === 3 && (
                                 <div className="step-fields-layout">
                                     <h3>Configure AI Agent Parameters</h3>
+                                    
                                     <div className="form-grid-2x">
                                         <Select
-                                            label="AI Strictness Policy (Difficulty)"
-                                            options={(platform?.difficulty_levels || []).map(d => ({ value: d, label: d }))}
-                                            value={formData.strictness}
-                                            onChange={(e) => setFormData({ ...formData, strictness: e.target.value })}
-                                            placeholder="Select strictness..."
+                                            label="Interview Strategy"
+                                            placeholder="Select strategy..."
+                                            options={[
+                                                ...strategies.filter(s => !formData.interviewType || s.applicable_interview_types.includes(formData.interviewType)).map(s => ({ value: s.strategy_id, label: s.name }))
+                                            ]}
+                                            value={formData.strategy_id}
+                                            onChange={(e) => setFormData({ ...formData, strategy_id: e.target.value })}
+                                            error={errors.strategy_id}
                                         />
                                         <Select
-                                            label="Primary Interview Target"
-                                            options={(platform?.interview_types || []).map(t => ({ value: t, label: t }))}
+                                            label="Interview Type"
+                                            placeholder="Select type..."
+                                            options={[
+                                                ...INTERVIEW_TYPES
+                                            ]}
                                             value={formData.interviewType}
                                             onChange={(e) => setFormData({ ...formData, interviewType: e.target.value })}
-                                            placeholder="Select type..."
                                         />
                                     </div>
-                                    <div className="duration-slider-section">
-                                        <div className="slider-labels">
-                                            <label className="input-label">Interview Duration Limit</label>
-                                            <strong>{formData.interviewDuration} minutes</strong>
+
+                                    {selectedStrategy && selectedStrategy.description && (
+                                        <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '5px', marginBottom: '20px' }}>
+                                            {selectedStrategy.description}
+                                        </p>
+                                    )}
+
+                                    {formData.interviewType === "mixed" && (
+                                        <div className="mixed-composition-section" style={{ marginTop: '20px' }}>
+                                            <h4>Mixed Composition (Target interview emphasis)</h4>
+                                            {errors.mixed_composition && <p className="input-error-msg">{errors.mixed_composition}</p>}
+                                            <div className="form-grid-2x">
+                                                <Input label="Technical" type="number" step="0.1" min="0" max="1"
+                                                    value={formData.mixed_composition.technical}
+                                                    onChange={e => setFormData({ ...formData, mixed_composition: { ...formData.mixed_composition, technical: parseFloat(e.target.value) || 0 } })} />
+                                                <Input label="Resume / Experience" type="number" step="0.1" min="0" max="1"
+                                                    value={formData.mixed_composition.resume_experience}
+                                                    onChange={e => setFormData({ ...formData, mixed_composition: { ...formData.mixed_composition, resume_experience: parseFloat(e.target.value) || 0 } })} />
+                                                <Input label="HR / Behavioral" type="number" step="0.1" min="0" max="1"
+                                                    value={formData.mixed_composition.hr_behavioral}
+                                                    onChange={e => setFormData({ ...formData, mixed_composition: { ...formData.mixed_composition, hr_behavioral: parseFloat(e.target.value) || 0 } })} />
+                                                <Input label="Situational / Case" type="number" step="0.1" min="0" max="1"
+                                                    value={formData.mixed_composition.situational_case}
+                                                    onChange={e => setFormData({ ...formData, mixed_composition: { ...formData.mixed_composition, situational_case: parseFloat(e.target.value) || 0 } })} />
+                                            </div>
                                         </div>
-                                        <input
-                                            type="range"
-                                            min="15"
-                                            max="90"
-                                            step="5"
-                                            value={formData.interviewDuration}
-                                            onChange={(e) => setFormData({ ...formData, interviewDuration: parseInt(e.target.value) })}
-                                            className="custom-range-slider"
+                                    )}
+
+                                    {selectedStrategy && (
+                                        <div className="budget-override-section" style={{ marginTop: '20px', padding: '15px', background: 'var(--bg-card-hover)', borderRadius: '8px' }}>
+                                            <h4>Question Budget</h4>
+                                            {selectedStrategy.budget_mode === "distinct_topics" ? (
+                                                <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                                                    Based on distinct topics
+                                                </p>
+                                            ) : (
+                                                <>
+                                                    <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                                                        Target: {selectedStrategy.target_questions} questions | Adjustable: {selectedStrategy.min_questions + (selectedStrategy.company_override_bounds?.target_questions_min_delta || 0)}–{selectedStrategy.max_questions + (selectedStrategy.company_override_bounds?.target_questions_max_delta || 0)}
+                                                    </p>
+                                                    <div className="form-grid-2x">
+                                                        {selectedStrategy.min_questions !== selectedStrategy.max_questions && (
+                                                            <Input
+                                                                label="Target Questions Override (Optional)"
+                                                                type="number"
+                                                                min={selectedStrategy.min_questions + (selectedStrategy.company_override_bounds?.target_questions_min_delta || 0)}
+                                                                max={selectedStrategy.max_questions + (selectedStrategy.company_override_bounds?.target_questions_max_delta || 0)}
+                                                                placeholder={`Default: ${selectedStrategy.target_questions}`}
+                                                                value={formData.budget_override_target}
+                                                                onChange={(e) => setFormData({ ...formData, budget_override_target: e.target.value })}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                </>
+                                            )}
+                                            {selectedStrategy.difficulty_policy?.band_constrainable !== false && (
+                                                <div className="form-grid-2x" style={{ marginTop: '15px' }}>
+                                                    <Select
+                                                        label="Difficulty"
+                                                        placeholder="Select difficulty..."
+                                                        options={DIFFICULTY_LEVELS}
+                                                        value={formData.difficulty_band}
+                                                        onChange={(e) => setFormData({ ...formData, difficulty_band: e.target.value })}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <div className="form-grid-2x" style={{ marginTop: '20px' }}>
+                                        <Select
+                                            label="Language"
+                                            placeholder="Platform Default"
+                                            options={[
+                                                ...(platform?.allowed_languages || ["English"]).map(l => ({ value: l, label: l }))
+                                            ]}
+                                            value={formData.language}
+                                            onChange={(e) => setFormData({ ...formData, language: e.target.value })}
                                         />
-                                        <div className="slider-endpoints">
-                                            <span>15 mins</span>
-                                            <span>90 mins</span>
-                                        </div>
+                                        <Select
+                                            label="Voice"
+                                            placeholder="Platform Default"
+                                            options={VALID_VOICES}
+                                            value={formData.voice_id}
+                                            onChange={(e) => setFormData({ ...formData, voice_id: e.target.value })}
+                                        />
                                     </div>
                                 </div>
                             )}
@@ -398,8 +557,20 @@ export default function NewCampaign() {
                                             <h4>{formData.interviewType}</h4>
                                         </div>
                                         <div className="review-card">
-                                            <span>AI Strictness</span>
-                                            <h4>{formData.strictness}</h4>
+                                            <span>Interview Strategy</span>
+                                            <h4>{selectedStrategy ? selectedStrategy.name : formData.strategy_id}</h4>
+                                        </div>
+                                        <div className="review-card">
+                                            <span>Language</span>
+                                            <h4>{formData.language || "Platform Default"}</h4>
+                                        </div>
+                                        <div className="review-card">
+                                            <span>Voice</span>
+                                            <h4>{formData.voice_id ? formData.voice_id.charAt(0).toUpperCase() + formData.voice_id.slice(1) : "Platform Default"}</h4>
+                                        </div>
+                                        <div className="review-card">
+                                            <span>Question Target</span>
+                                            <h4>{formData.budget_override_target || (selectedStrategy ? (selectedStrategy.budget_mode === "distinct_topics" ? "Based on distinct topics" : selectedStrategy.target_questions) : "Default")}</h4>
                                         </div>
                                     </div>
 
@@ -408,7 +579,7 @@ export default function NewCampaign() {
                                         <div className="review-reqs-wrap">
                                             {formData.requirements.map((req, idx) => (
                                                 <span key={idx} className="compact-chip read-only">
-                                                    {req}
+                                                    {req.skill} <small>({req.criticality})</small>
                                                 </span>
                                             ))}
                                         </div>

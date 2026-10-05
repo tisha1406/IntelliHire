@@ -1,12 +1,23 @@
-from typing import List, Optional
+from typing import List, Optional, Union, Dict
+from pydantic import BaseModel, Field, field_validator
 
-from pydantic import BaseModel
+from app.ai_interview.core.enums import InterviewType, RequirementCriticality, DifficultyLevel
+from app.ai_interview.schemas.strategy import MixedComposition
 
+ALLOWED_VOICES = {"shubh", "simran", "rohan", "ishita", "sunny"}
 
 class InterviewSettingsRequest(BaseModel):
     duration: int
     strictness: str
     type: str
+
+
+class CampaignRequirement(BaseModel):
+    skill: str
+    criticality: RequirementCriticality = RequirementCriticality.REQUIRED
+
+class CampaignQuestionBudget(BaseModel):
+    target_questions: Optional[int] = None
 
 
 class CampaignCreateRequest(BaseModel):
@@ -20,11 +31,29 @@ class CampaignCreateRequest(BaseModel):
     description: str
     employment_type: str
 
-    requirements: List[str]
+    requirements: List[Union[str, CampaignRequirement]]
 
     interview_settings: InterviewSettingsRequest
     
-    assigned_recruiter_ids: Optional[List[str]] = None
+    assigned_recruiter_ids: List[str] = Field(default_factory=list)
+
+    # Official Strategy Fields
+    strategy_id: Optional[str] = None
+    interview_type: Optional[InterviewType] = None
+    mixed_composition: Optional[MixedComposition] = None
+    budget_override: Optional[CampaignQuestionBudget] = None
+    difficulty_band: Optional[DifficultyLevel] = None
+    
+    # Existing Voice/Language options passed during campaign creation
+    language: Optional[str] = None
+    voice_id: Optional[str] = None
+
+    @field_validator("voice_id")
+    @classmethod
+    def validate_voice_id(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v.lower() not in ALLOWED_VOICES:
+            raise ValueError(f"Voice '{v}' is not allowed. Must be one of: {', '.join(ALLOWED_VOICES)}")
+        return v
 
 
 class CampaignUpdateRequest(BaseModel):
@@ -36,7 +65,7 @@ class CampaignUpdateRequest(BaseModel):
     description: Optional[str] = None
     employment_type: Optional[str] = None
 
-    requirements: Optional[List[str]] = None
+    requirements: Optional[List[Union[str, CampaignRequirement]]] = None
 
     interview_settings: Optional[InterviewSettingsRequest] = None
 
@@ -44,13 +73,32 @@ class CampaignUpdateRequest(BaseModel):
     
     assigned_recruiter_ids: Optional[List[str]] = None
 
-
+    strategy_id: Optional[str] = None
+    interview_type: Optional[InterviewType] = None
+    mixed_composition: Optional[MixedComposition] = None
+    budget_override: Optional[CampaignQuestionBudget] = None
+    difficulty_band: Optional[DifficultyLevel] = None
+    language: Optional[str] = None
+    voice_id: Optional[str] = None
+    
+    @field_validator("voice_id")
+    @classmethod
+    def validate_voice_id(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v.lower() not in ALLOWED_VOICES:
+            raise ValueError(f"Voice '{v}' is not allowed. Must be one of: {', '.join(ALLOWED_VOICES)}")
+        return v
 class CampaignResponse(BaseModel):
     campaign_id: str
+    # Non-blocking configuration warnings (e.g. R-13's
+    # max_questions_per_topic * critical_topic_count > max_questions check).
+    # The campaign is still created/updated when warnings are present — this
+    # is a safety-net notice, never a validation failure.
+    warnings: List[str] = Field(default_factory=list)
 
 
 class CampaignUpdateResponse(BaseModel):
     updated_fields: List[str]
+    warnings: List[str] = Field(default_factory=list)
 
 
 # ── Reports & Exports Schemas ─────────────────────────────────────────────

@@ -12,7 +12,7 @@ def test_duplicate_commands_across_reconnects(client, candidate_token, mock_sess
     and the Transport should map it cleanly without crashing.
     """
     # 1. Connection 1
-    with client.websocket_connect(f"/ws/interview/session_1?token={candidate_token}") as ws_a:
+    with client.websocket_connect(f"/api/ws/interview/session_1?token={candidate_token}") as ws_a:
         ws_a.receive_json() # ready
         ws_a.receive_json() # snapshot
         
@@ -20,7 +20,7 @@ def test_duplicate_commands_across_reconnects(client, candidate_token, mock_sess
         # But let's assume we sent it and it processed.
         
     # 2. Connection 2
-    with client.websocket_connect(f"/ws/interview/session_1?token={candidate_token}") as ws_b:
+    with client.websocket_connect(f"/api/ws/interview/session_1?token={candidate_token}") as ws_b:
         ws_b.receive_json() # ready
         ws_b.receive_json() # snapshot
         

@@ -12,6 +12,11 @@ from app.ai_interview.core.enums import (
 from app.ai_interview.schemas.interview_mode import InterviewModeSettings
 from app.ai_interview.schemas.blueprint import InterviewBlueprint
 from app.ai_interview.schemas.session import TopicProgress
+from app.ai_interview.schemas.strategy import (
+    TopicSelectionPolicy, DifficultyPolicy, FollowUpPolicy,
+    GapPolicy, CompletionPolicy, CompanyOverrideBounds,
+    CampaignStrategySnapshot, MixedComposition
+)
 from app.ai_interview.schemas.evaluation import AnswerEvaluation
 from app.ai_interview.schemas.readiness import ReadinessResult
 from app.ai_interview.schemas.turn import TurnTimestamps
@@ -218,24 +223,37 @@ class Company(MongoBaseModel):
 # ==========================================================
 
 class Strategy(MongoBaseModel):
-
     strategy_id: str
-
-    display_name: str
-
+    name: str
     description: str
+    version: int = 1
+    is_active: bool = True
 
-    prompt_template_ref: str
+    applicable_interview_types: List[str] = Field(default_factory=list)
 
-    enabled: bool = True
+    budget_mode: str = "fixed"
 
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC)
-    )
+    min_questions: int = 0
+    target_questions: int = 0
+    max_questions: int = 0
 
-    updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC)
-    )
+    max_questions_per_topic: int = 0
+    max_followups_per_topic: int = 0
+    critical_topic_max_followups: Optional[int] = None
+
+    strong_threshold: float = 0.8
+    acceptable_threshold: float = 0.6
+    weak_threshold: float = 0.4
+
+    topic_selection_policy: TopicSelectionPolicy = Field(default_factory=TopicSelectionPolicy)
+    difficulty_policy: DifficultyPolicy = Field(default_factory=DifficultyPolicy)
+    followup_policy: FollowUpPolicy = Field(default_factory=FollowUpPolicy)
+    gap_policy: GapPolicy = Field(default_factory=GapPolicy)
+    completion_policy: CompletionPolicy = Field(default_factory=CompletionPolicy)
+    company_override_bounds: CompanyOverrideBounds = Field(default_factory=CompanyOverrideBounds)
+
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 # ==========================================================
 # Interview Campaign
@@ -259,12 +277,22 @@ class InterviewCampaign(MongoBaseModel):
 
     role_target: str
 
-    interview_type: Literal[
+    interview_type: Optional[Literal[
         "technical",
-        "hr",
-        "behavioral",
+        "resume_experience",
+        "hr_behavioral",
+        "situational_case",
         "mixed",
-    ]
+    ]] = None
+
+    # Optional fields for backward compatibility, these are the new official strategy config fields
+    strategy_id: Optional[str] = None
+    strategy_snapshot: Optional[CampaignStrategySnapshot] = None
+    mixed_composition: Optional[MixedComposition] = None
+    difficulty_band: Optional[DifficultyLevel] = None
+    budget_override: Optional[dict] = None
+    requirements: Optional[List[dict]] = None
+    interview_settings: Optional[dict] = None
 
     voice_config: VoiceConfig
 
@@ -382,107 +410,6 @@ class Candidate(MongoBaseModel):
         default_factory=lambda: datetime.now(UTC)
     )
 
-
-# ==========================================================
-# Interview Session Models
-# ==========================================================
-
-class InterviewSession(MongoBaseModel):
-    session_id: str
-    candidate_id: PyObjectId
-    company_id: PyObjectId
-    campaign_id: PyObjectId
-
-    mode_id: str
-    mode_version: int
-
-    state: InterviewState = InterviewState.CREATED
-    blueprint: InterviewBlueprint
-
-    questions_asked_total: int = 0
-
-    current_topic_id: Optional[str] = None
-    current_difficulty: Optional[DifficultyLevel] = None
-
-    topic_progress: List[TopicProgress] = Field(default_factory=list)
-
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    failure_reason: Optional[str] = None
-
-class InterviewTurn(MongoBaseModel):
-    session_id: str
-    turn_number: int
-
-    topic_id: str
-    difficulty: DifficultyLevel
-    question_type: QuestionType
-
-    question: str
-    answer: Optional[str] = None
-
-    evaluation: Optional[AnswerEvaluation] = None
-    readiness: Optional[ReadinessResult] = None
-    decision: Optional[InterviewDecision] = None
-    timestamps: TurnTimestamps
-
-# ==========================================================
-# Interview Report Models
-# ==========================================================
-
-class InterviewReport(MongoBaseModel):
-    session_id: str
-    overall_score: float
-    match_label: MatchLabel
-    
-    strengths: List[str] = Field(default_factory=list)
-    improvement_areas: List[str] = Field(default_factory=list)
-    topic_results: List[TopicResult] = Field(default_factory=list)
-    
-    interview_summary: str
-    explainability_summary: ExplainabilitySummary
-
-    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
-# ==========================================================
-# Validator Logs
-# ==========================================================
-
-class ValidatorLog(MongoBaseModel):
-    session_id: str
-    turn_number: int
-    validation_result: ValidationResult
-    fallback_used: Optional[str] = None
-    candidate_question_text: Optional[str] = None
-    logged_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
-
-# ==========================================================
-# Validator Logs
-# ==========================================================
-
-class ValidatorLog(MongoBaseModel):
-
-    session_id: PyObjectId
-
-    turn_number: int
-
-    attempt: int
-
-    passed: bool
-
-    failed_rules: List[str] = Field(default_factory=list)
-
-    candidate_question_text: str
-
-    logged_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC)
-    )
-
-    updated_at: datetime = Field(
-    default_factory=lambda: datetime.now(UTC)
-    )
 
 # ==========================================================
 # Payments and Subscriptions History Collection

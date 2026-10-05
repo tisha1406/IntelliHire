@@ -33,7 +33,7 @@ def test_reconnect_during_unanswered_question(client, candidate_token, mock_sess
     sync_client.close()
 
     # 2. Connect via WS and verify snapshot
-    with client.websocket_connect(f"/ws/interview/session_1?token={candidate_token}") as ws:
+    with client.websocket_connect(f"/api/ws/interview/session_1?token={candidate_token}") as ws:
         # 1. Connection established
         ready = ws.receive_json()
         assert ready["event_type"] == "connection_ready"
@@ -63,7 +63,7 @@ def test_reconnect_after_terminal_state(client, candidate_token, mock_session):
     sync_client.close()
 
     # 2. Connect via WS
-    with client.websocket_connect(f"/ws/interview/session_1?token={candidate_token}") as ws:
+    with client.websocket_connect(f"/api/ws/interview/session_1?token={candidate_token}") as ws:
         ready = ws.receive_json()
         assert ready["event_type"] == "connection_ready"
         

@@ -42,7 +42,6 @@ export default function InterviewAnalysis() {
         { title: "Candidate", dataIndex: "candidate_name", sortable: true },
         { title: "Campaign", dataIndex: "campaign", sortable: true },
         { title: "Score", dataIndex: "score", sortable: true, align: "right", render: (val) => <strong>{val}%</strong> },
-        { title: "AI Confidence", dataIndex: "ai_confidence", sortable: true, align: "right", render: (val) => <strong>{val}%</strong> },
         { title: "Date", dataIndex: "created_at", sortable: true, align: "right", render: (val) => new Date(val).toLocaleDateString() },
     ];
 
@@ -52,53 +51,54 @@ export default function InterviewAnalysis() {
         { name: "Hard", value: summary.difficulty_distribution.hard || 0, color: "#ef4444" },
     ] : [];
 
+    // Extract top 3 topics for StatGrid
+    const topTopics = summary?.top_topics || [];
+    const statCards = [
+        { label: "Overall Average Score", value: summary ? `${summary.average_score}%` : "0%", color: "var(--primary)" },
+    ];
+    
+    // Add up to 3 topics
+    const colors = ["#8B5CF6", "var(--success)", "var(--warning)"];
+    for (let i = 0; i < Math.min(3, topTopics.length); i++) {
+        statCards.push({
+            label: `Top Topic: ${topTopics[i].topic_name}`,
+            value: `${topTopics[i].average_score}%`,
+            color: colors[i]
+        });
+    }
+    
+    // If we have less than 4 cards, fill the rest with placeholders to maintain grid
+    while (statCards.length < 4) {
+        statCards.push({ label: "—", value: "—", color: "var(--text-muted)" });
+    }
+
     return (
         <DashboardGrid>
             <PageHeader title="Interview Analysis" description="Platform-wide analytics on question coverage, skill assessments, and AI evaluation quality." />
 
             <StatGrid>
-                {[
-                    { label: "Avg Score", value: summary ? `${summary.average_score}%` : "0%", color: "var(--primary)" },
-                    { label: "Avg Communication", value: summary && summary.skill_distribution ? `${summary.skill_distribution.communication}%` : "0%", color: "#8B5CF6" },
-                    { label: "Avg Technical", value: summary && summary.skill_distribution ? `${summary.skill_distribution.technical}%` : "0%", color: "var(--success)" },
-                    { label: "Avg Problem Solving", value: summary && summary.skill_distribution ? `${summary.skill_distribution.problem_solving}%` : "0%", color: "var(--warning)" },
-                ].map(({ label, value, color }) => (
-                    <Card key={label} className="ih-card">
+                {statCards.map(({ label, value, color }, idx) => (
+                    <Card key={idx} className="ih-card">
                         <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '8px' }}>{label}</div>
                         <div style={{ fontSize: '28px', fontWeight: 'bold', color }}>{loading ? "..." : value}</div>
                     </Card>
                 ))}
             </StatGrid>
 
-            <SectionCard>
-                <h3 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text)', padding: '20px 24px 0', marginBottom: '16px' }}>Weekly Skill Score Trends</h3>
-                <div style={{ padding: '0 24px 24px' }}>
-                    {!loading && (!summary?.weeklyData || summary.weeklyData.length === 0) ? (
-                        <div style={{ height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>No trend data available.</div>
-                    ) : (
-                        <AreaChart
-                            data={summary?.weeklyData || []}
-                            xAxisKey="name"
-                            series={[
-                                { key: "technical", color: "#2563EB", label: "Technical" },
-                                { key: "communication", color: "#8B5CF6", label: "Communication" },
-                                { key: "behavior", color: "#22c55e", label: "Behavioral" },
-                            ]}
-                            height={260}
-                        />
-                    )}
-                </div>
-            </SectionCard>
-
             <ContentGrid>
                 <div className="main-content">
                     <SectionCard>
-                        <h3 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text)', padding: '20px 24px 0', marginBottom: '4px' }}>Top Question Coverage Areas</h3>
+                        <h3 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text)', padding: '20px 24px 0', marginBottom: '4px' }}>Top Topics by Performance</h3>
                         <div style={{ padding: '0 24px 24px' }}>
-                            {!loading && (!summary?.coverageData || summary.coverageData.length === 0) ? (
-                                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>No coverage data available.</div>
+                            {!loading && topTopics.length === 0 ? (
+                                <div style={{ height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>No topic data available.</div>
                             ) : (
-                                <HorizontalBarChart data={summary?.coverageData || []} nameKey="name" valueKey="value" height={220} />
+                                <HorizontalBarChart 
+                                    data={topTopics.map(t => ({ name: t.topic_name, value: t.average_score }))} 
+                                    nameKey="name" 
+                                    valueKey="value" 
+                                    height={260} 
+                                />
                             )}
                         </div>
                     </SectionCard>
@@ -107,7 +107,7 @@ export default function InterviewAnalysis() {
                     <SectionCard>
                         <h3 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text)', padding: '20px 24px 0', marginBottom: '4px' }}>Question Difficulty</h3>
                         <div style={{ padding: '0 24px 24px' }}>
-                            {loading ? <div style={{height: 240, display: 'flex', alignItems:'center', justifyContent:'center'}}>Loading...</div> : difficultyData.length === 0 || difficultyData.every(d => d.value === 0) ? <div style={{height: 240, display: 'flex', alignItems:'center', justifyContent:'center', color: 'var(--text-muted)'}}>No difficulty data.</div> : <DonutChart data={difficultyData} height={240} />}
+                            {loading ? <div style={{height: 260, display: 'flex', alignItems:'center', justifyContent:'center'}}>Loading...</div> : difficultyData.length === 0 || difficultyData.every(d => d.value === 0) ? <div style={{height: 260, display: 'flex', alignItems:'center', justifyContent:'center', color: 'var(--text-muted)'}}>No difficulty data.</div> : <DonutChart data={difficultyData} height={260} />}
                         </div>
                     </SectionCard>
                 </div>

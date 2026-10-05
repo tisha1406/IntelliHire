@@ -142,5 +142,39 @@ async def bootstrap_platform():
             {"id": "self_registration", "name": "Candidate Self Registration", "enabled": True, "category": "Core"}
         ]
         await features_col.insert_many(features)
-        
+
+    # 5. Languages
+    languages_col = db.get_collection("languages")
+    language_count = await languages_col.count_documents({})
+
+    if language_count > 0:
+        print("[BOOTSTRAP] Languages verified.")
+    else:
+        print("[BOOTSTRAP] Languages missing.")
+        print("[BOOTSTRAP] Creating master language records...")
+        languages = [
+            {"name": "English",  "code": "en"},
+            {"name": "Hindi",    "code": "hi"},
+            {"name": "Gujarati", "code": "gu"},
+        ]
+        await languages_col.insert_many(languages)
+
+    # 6. Voices
+    voices_col = db.get_collection("voices")
+    voice_count = await voices_col.count_documents({})
+
+    if voice_count > 0:
+        print("[BOOTSTRAP] Voices verified.")
+    else:
+        print("[BOOTSTRAP] Voices missing.")
+        print("[BOOTSTRAP] Creating master voice records...")
+        voices = [
+            {"name": "shubh",   "provider": "Sarvam AI"},
+            {"name": "simran",  "provider": "Sarvam AI"},
+            {"name": "rohan",   "provider": "Sarvam AI"},
+            {"name": "ishita",  "provider": "Sarvam AI"},
+            {"name": "sunny",   "provider": "Sarvam AI"},
+        ]
+        await voices_col.insert_many(voices)
+
     print("[BOOTSTRAP] Platform initialization complete.\n")

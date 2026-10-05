@@ -30,7 +30,7 @@ class TextToSpeechProvider(Protocol):
     Abstract Text-to-Speech provider interface.
     """
     
-    async def synthesize(self, text: str, language: Optional[str] = None) -> SpeechSynthesisResult:
+    async def synthesize(self, text: str, language: Optional[str] = None, speaker: Optional[str] = None) -> SpeechSynthesisResult:
         """
         Synthesize text into speech audio.
         

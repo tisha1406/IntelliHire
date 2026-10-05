@@ -124,6 +124,7 @@ class QuestionEngine:
             candidate_context=candidate_context,
             mode=mode,
             question_history=session.question_history,
+            evaluation_history=session.evaluation_history,
         )
 
         # ── Steps 3–5: Generate → Validate → Duplicate check (with retries) ──
@@ -132,16 +133,36 @@ class QuestionEngine:
         last_failure_detail: str = "No attempts made."
 
         for attempt in range(1, max_attempts + 1):
-            try:
-                # Step 3: Generate (LLM boundary)
-                generated = self._generator.generate(
-                    request=gen_request,
-                    attempt_number=attempt,
+            if session.mode_id == "practice":
+                from app.ai_interview.question_engine.schemas import GeneratedQuestion
+                from app.ai_interview.core.enums import QuestionType, DifficultyLevel
+                
+                # Rigid sequence mapping based on topic_id assigned in SessionCreationService
+                practice_questions = {
+                    "practice_1": "Tell me about yourself.",
+                    "practice_2": "What is the last project you worked on?",
+                    "practice_3": "What role or area are you specifically strongest in?"
+                }
+                q_text = practice_questions.get(plan.topic_id, "Tell me about yourself.")
+                
+                generated = GeneratedQuestion(
+                    question_text=q_text,
+                    question_type=gen_request.selected_question_type,
+                    topic_id=plan.topic_id,
+                    difficulty=gen_request.difficulty,
+                    rationale="Deterministic practice question"
                 )
-            except QuestionGenerationError as exc:
-                last_failure_code = QuestionEngineFailureCode.GENERATION_FAILED
-                last_failure_detail = str(exc)
-                continue  # retry
+            else:
+                try:
+                    # Step 3: Generate (LLM boundary)
+                    generated = self._generator.generate(
+                        request=gen_request,
+                        attempt_number=attempt,
+                    )
+                except QuestionGenerationError as exc:
+                    last_failure_code = QuestionEngineFailureCode.GENERATION_FAILED
+                    last_failure_detail = str(exc)
+                    continue  # retry
 
             try:
                 # Step 4: Structural validation

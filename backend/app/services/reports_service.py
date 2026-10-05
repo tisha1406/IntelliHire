@@ -31,16 +31,15 @@ class ReportsService:
         recruiters = await self.recruiter_repo.count(date_filter)
         candidates = await self.candidate_repo.count(date_filter)
         
-        active_interviews = await self.interview_repo.count({"status": "in_progress", **date_filter})
-        completed_interviews = await self.interview_repo.count({"status": "completed", **date_filter})
+        active_interviews = await self.interview_repo.count({"state": "in_progress", **date_filter})
+        completed_interviews = await self.interview_repo.count({"state": "completed", **date_filter})
         
         return {
             "companies": companies,
             "recruiters": recruiters,
             "candidates": candidates,
             "active_interviews": active_interviews,
-            "completed_interviews": completed_interviews,
-            "monthly_growth": {"companies": 0, "candidates": 0} 
+            "completed_interviews": completed_interviews
         }
 
     async def get_company_report(self, date_range: str, limit: int = 50, offset: int = 0):
@@ -55,7 +54,7 @@ class ReportsService:
         for c in companies:
             company_id = str(c["_id"])
             c_interviews = await self.interview_repo.count({"company_id": company_id, **date_filter})
-            c_completed = await self.interview_repo.count({"company_id": company_id, "status": "completed", **date_filter})
+            c_completed = await self.interview_repo.count({"company_id": company_id, "state": "completed", **date_filter})
             
             completion_rate = f"{round((c_completed / c_interviews) * 100)}%" if c_interviews > 0 else "—"
             
@@ -64,12 +63,9 @@ class ReportsService:
                 "company": c.get("general", {}).get("name", "Unknown"),
                 "candidates": await self.candidate_repo.count({"company_id": company_id, **date_filter}),
                 "recruiters": await self.recruiter_repo.count({"company_id": company_id, **date_filter}),
-                "campaigns": 0, 
                 "interviews": c_interviews,
                 "completions": c_completed,
                 "completion": completion_rate,
-                "avgScore": 0, 
-                "monthlyUsage": "0",
                 "period": "Current"
             })
             
@@ -80,20 +76,43 @@ class ReportsService:
         date_filter = self._get_date_filter(date_range)
         
         total = await self.interview_repo.count(date_filter)
-        completed = await self.interview_repo.count({"status": "completed", **date_filter})
-        cancelled = await self.interview_repo.count({"status": "cancelled", **date_filter})
+        completed = await self.interview_repo.count({"state": "completed", **date_filter})
+        cancelled = await self.interview_repo.count({"state": "failed", **date_filter})
+        
+        # Calculate average duration and average score using MongoDB aggregation
+        pipeline = [
+            {"$match": {"state": "completed", **date_filter}},
+            {"$project": {
+                "duration_ms": {"$subtract": [
+                    {"$dateFromString": {"dateString": "$completed_at"}},
+                    {"$dateFromString": {"dateString": "$started_at"}}
+                ]},
+                "eval_avg": {"$avg": "$evaluation_history.overall_score"}
+            }},
+            {"$group": {
+                "_id": None,
+                "avg_duration_ms": {"$avg": "$duration_ms"},
+                "global_avg_score": {"$avg": "$eval_avg"}
+            }}
+        ]
+        agg_cursor = self.interview_repo.collection.aggregate(pipeline)
+        agg_results = await agg_cursor.to_list(length=1)
+        
+        avg_duration = 0
+        avg_score = 0
+        if agg_results:
+            agg = agg_results[0]
+            if agg.get("avg_duration_ms"):
+                avg_duration = int(round(agg["avg_duration_ms"] / 60000))
+            if agg.get("global_avg_score"):
+                avg_score = int(round(max(0.0, min(1.0, agg["global_avg_score"])) * 100))
         
         return {
             "interview_count": total,
             "completed": completed,
             "cancelled": cancelled,
-            "average_duration": 0,
-            "average_technical_score": 0,
-            "average_behaviour_score": 0,
-            "average_communication_score": 0,
-            "pass_percentage": 0,
-            "fail_percentage": 0,
-            "monthly_trend": []
+            "average_duration": avg_duration,
+            "average_score": avg_score
         }
 
     async def get_candidate_report(self, date_range: str, limit: int = 50, offset: int = 0):
@@ -106,16 +125,26 @@ class ReportsService:
         
         records = []
         for c in candidates:
+            c_id = str(c["_id"])
+            
+            # Fetch real interview score from latest completed session
+            latest_session = await self.interview_repo.collection.find_one(
+                {"candidate_id": c_id, "state": "completed"}, 
+                sort=[("completed_at", -1)]
+            )
+            interview_score = 0
+            if latest_session and latest_session.get("evaluation_history"):
+                evals = latest_session["evaluation_history"]
+                avg_01 = sum(e.get("overall_score", 0) for e in evals) / len(evals)
+                interview_score = int(round(max(0.0, min(1.0, avg_01)) * 100))
+
             records.append({
-                "id": str(c["_id"]),
+                "id": c_id,
                 "candidate": c.get("name", "Unknown"),
                 "resume_score": c.get("resume_score", 0),
-                "interview_score": c.get("interview_score", 0),
+                "interview_score": interview_score,
                 "status": c.get("status", "pending"),
-                "offer_status": c.get("offer_status", "none"),
-                "skill_match": 0,
-                "communication": 0,
-                "technical": 0
+                "offer_status": c.get("offer_status", "none")
             })
             
         return records, total
@@ -131,17 +160,16 @@ class ReportsService:
             day_end = day_start + timedelta(days=1)
             
             f = {"created_at": {"$gte": day_start.isoformat(), "$lt": day_end.isoformat()}}
-            completed = await self.interview_repo.count({"status": "completed", **f})
-            cancelled = await self.interview_repo.count({"status": "cancelled", **f})
-            scheduled = await self.interview_repo.count({"status": "scheduled", **f})
+            completed = await self.interview_repo.count({"state": "completed", **f})
+            cancelled = await self.interview_repo.count({"state": "failed", **f})
+            scheduled = await self.interview_repo.count({"state": "created", **f})
             
             data.append({
                 "name": day_start.strftime("%b %d" if days > 1 else "%H:00"),
                 "completed": completed,
                 "cancelled": cancelled,
                 "scheduled": scheduled,
-                "interviews": completed + cancelled + scheduled, 
-                "candidates": 0
+                "interviews": completed + cancelled + scheduled
             })
             
         return data

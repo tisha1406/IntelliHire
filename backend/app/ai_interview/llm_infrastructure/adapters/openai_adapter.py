@@ -25,7 +25,7 @@ class OpenAICompatibleAdapter(LLMProvider):
     def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None, model: Optional[str] = None):
         self.api_key = api_key or settings.GROQ_API_KEY or os.environ.get("OPENAI_API_KEY", "dummy_key")
         self.base_url = base_url or ("https://api.groq.com/openai/v1" if self.api_key == settings.GROQ_API_KEY else "https://api.openai.com/v1")
-        self.model = model or ("llama-3.1-8b-instant" if self.api_key == settings.GROQ_API_KEY else "gpt-4o-mini")
+        self.model = model or (settings.GROQ_MODEL if self.api_key == settings.GROQ_API_KEY else "gpt-4o-mini")
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
@@ -49,9 +49,15 @@ class OpenAICompatibleAdapter(LLMProvider):
             "temperature": temperature,
         }
         if max_tokens:
-            payload["max_tokens"] = max_tokens
+            # Groq's OpenAI-compatible endpoint (and specifically the
+            # openai/gpt-oss-* reasoning models) expects max_completion_tokens,
+            # not the legacy max_tokens field -- confirmed against Groq's own
+            # API docs/examples for this model. max_completion_tokens is the
+            # combined budget for the model's internal reasoning tokens plus
+            # its final visible output.
+            payload["max_completion_tokens"] = max_tokens
             
-        if is_json and "gpt-4" in self.model or "gpt-3.5" in self.model:
+        if is_json and ("gpt-4" in self.model or "gpt-3.5" in self.model or "gpt-oss" in self.model):
             payload["response_format"] = {"type": "json_object"}
             
         try:
@@ -71,12 +77,21 @@ class OpenAICompatibleAdapter(LLMProvider):
                 
         except httpx.HTTPStatusError as e:
             status = e.response.status_code
+            
+            # Extract and bounded-truncate the response body
+            try:
+                error_body = e.response.text[:500]
+                if len(e.response.text) > 500:
+                    error_body += "..."
+            except Exception:
+                error_body = "<failed to read body>"
+
             if status in (429, 500, 502, 503, 504):
-                logger.warning(f"Transient HTTP {status} from provider {self.base_url}.")
-                raise LLMTransientError(f"Transient provider error: {status}") from e
+                logger.warning(f"Transient HTTP {status} from provider {self.base_url}. Body: {error_body}")
+                raise LLMTransientError(f"Transient provider error: {status} - {error_body}") from e
             else:
-                logger.error(f"Fatal HTTP {status} from provider {self.base_url}.")
-                raise LLMFatalError(f"Fatal provider error: {status}") from e
+                logger.error(f"Fatal HTTP {status} from provider {self.base_url}. Body: {error_body}")
+                raise LLMFatalError(f"Fatal provider error: {status} - {error_body}") from e
         except httpx.TimeoutException as e:
             logger.warning(f"Timeout communicating with provider {self.base_url}.")
             raise LLMTransientError(f"Provider timeout") from e

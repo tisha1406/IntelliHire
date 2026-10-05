@@ -26,6 +26,22 @@ async def test_sarvam_stt_success(adapter):
         assert result.duration_ms >= 0
 
 @pytest.mark.asyncio
+async def test_sarvam_stt_language_code_included():
+    adapter = SarvamSaarasAdapter(api_key="test_key", model="saaras:v1", language_code="hi-IN")
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"transcript": "hello", "language_code": "hi-IN"}
+    
+    with patch("httpx.AsyncClient.post", return_value=mock_response) as mock_post:
+        await adapter.transcribe(b"dummy audio", "audio/webm")
+        
+        # Verify the data payload contains the expected language_code
+        mock_post.assert_called_once()
+        call_kwargs = mock_post.call_args.kwargs
+        assert "data" in call_kwargs
+        assert call_kwargs["data"]["language_code"] == "hi-IN"
+
+@pytest.mark.asyncio
 async def test_sarvam_stt_rate_limit(adapter):
     mock_response = MagicMock()
     mock_response.status_code = 429

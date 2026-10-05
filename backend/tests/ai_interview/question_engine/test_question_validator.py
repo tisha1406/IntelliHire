@@ -27,6 +27,8 @@ def valid_request() -> QuestionGenerationRequest:
         turn_number=1,
         topic_id="python",
         topic_name="Python",
+        mode_id="technical",
+        question_style="technical",
         difficulty=DifficultyLevel.MEDIUM,
         allowed_question_types=[QuestionType.INITIAL, QuestionType.SKILL_SPECIFIC],
         selected_question_type=QuestionType.INITIAL,

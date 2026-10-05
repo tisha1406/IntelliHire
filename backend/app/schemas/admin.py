@@ -106,24 +106,20 @@ class CompanyResponse(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     deleted_at: Optional[datetime] = None
 
-class StrategyCreateRequest(BaseModel):
-    strategy_id: str
-    display_name: str
-    description: str
-    prompt_template_ref: str
-    enabled: bool = True
+from app.ai_interview.schemas.strategy import StrategyDefinition
 
+class StrategyCreateRequest(StrategyDefinition):
+    pass
 
 class StrategyUpdateRequest(BaseModel):
-    enabled: Optional[bool] = None
+    is_active: Optional[bool] = None
 
-
-class StrategyResponse(BaseModel):
-    strategy_id: str
-
+class StrategyResponse(StrategyDefinition):
+    id: str
 
 class StrategyUpdateResponse(BaseModel):
     updated_fields: list[str]
+    new_version: int
 
 class DifficultyPolicyRequest(BaseModel):
     start: str

@@ -49,7 +49,9 @@ export default function UserMenu() {
         try {
             const token = localStorage.getItem("accessToken");
             await apiRequest("/api/auth/logout", { method: "POST" }, token);
-        } catch (e) {} // ignore error on logout
+        } catch (e) {
+            console.error("Server-side logout failed (local session will still be cleared):", e);
+        }
         logout();
         queryClient.clear(); // Clear all react query cache
         navigate("/login");

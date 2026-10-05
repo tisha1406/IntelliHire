@@ -10,7 +10,7 @@ export const MonitoringAPI = {
         if (params.offset) searchParams.append("offset", params.offset);
         
         const qs = searchParams.toString();
-        const url = `/admin/candidates${qs ? `?${qs}` : ""}`;
+        const url = `/admin/candidates/${qs ? `?${qs}` : ""}`;
         return await apiRequest(url, {}, token);
     },
 
@@ -28,7 +28,7 @@ export const MonitoringAPI = {
         if (params.offset) searchParams.append("offset", params.offset);
         
         const qs = searchParams.toString();
-        const url = `/admin/interviews${qs ? `?${qs}` : ""}`;
+        const url = `/admin/interviews/${qs ? `?${qs}` : ""}`;
         return await apiRequest(url, {}, token);
     },
 

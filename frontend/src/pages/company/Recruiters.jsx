@@ -1,18 +1,54 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaUserPlus, FaEdit, FaTrash, FaKey, FaCopy, FaSearch, FaUserTie, FaBan, FaCheck, FaRedo, FaChartBar, FaCircle, FaTimes, FaTasks, FaBullseye } from "react-icons/fa";
+import {
+    FaUserPlus, FaEdit, FaTrash, FaKey, FaCopy, FaSearch, FaUserTie, FaBan, FaCheck, FaRedo,
+    FaChartBar, FaCircle, FaTimes, FaTasks, FaThLarge, FaList, FaEnvelope, FaPhone, FaUsers, FaSpinner
+} from "react-icons/fa";
 import recruiterManagementService from "../../services/company/recruiterManagementService";
 import campaignService from "../../services/company/campaignService";
 import analyticsService from "../../services/company/analyticsService";
+import PageHeader from "../../components/common/PageHeader";
 import Button from "../../components/common/Button";
 import StatusBadge from "../../components/common/StatusBadge";
+import StatsCard from "../../components/common/StatsCard";
 import Toast from "../../components/common/Toast";
+
+import "../../styles/company/Team.css";
+
+// F-01: Recruiters.jsx and Team.jsx consolidated into this single page.
+// Both previously hit the exact same backend resource (/company/team --
+// see backend/app/api/company/team.py's own docstring: "Decision: Team
+// Members == Recruiters. One collection, one concept."). This page keeps
+// the union of both pages' prior functionality:
+//   - from Recruiters.jsx: suspend/activate, force password reset, reset
+//     password, delete, campaign assignment, the activity/candidates/
+//     interviews drawer, and performance-metric merge.
+//   - from Team.jsx: the stats row, the grid/list view toggle, the
+//     server-side search + role filter, and the invite form's role picker.
+// `recruiterManagementService` (not `teamService`, now retired) is the
+// single canonical client, since it already had the full endpoint surface
+// and is also depended on by CandidateDetails.jsx/NewCampaign.jsx/
+// EditCampaign.jsx for an unrelated recruiter dropdown -- untouched here.
+
+const ROLE_COLORS = {
+    Admin: { bg: "rgba(59,130,246,0.15)", color: "#3B82F6" },
+    Recruiter: { bg: "rgba(16,185,129,0.15)", color: "#10B981" },
+    "Hiring Manager": { bg: "rgba(139,92,246,0.15)", color: "#8B5CF6" },
+    Viewer: { bg: "rgba(100,116,139,0.15)", color: "#64748B" },
+};
+
+const cardVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: (i) => ({ opacity: 1, y: 0, transition: { delay: i * 0.07, duration: 0.35 } })
+};
 
 export default function Recruiters() {
     const [recruiters, setRecruiters] = useState([]);
     const [performance, setPerformance] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    const [roleFilter, setRoleFilter] = useState("All");
+    const [view, setView] = useState("list");
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [credentialsModal, setCredentialsModal] = useState(null);
     const [toast, setToast] = useState(null);
@@ -20,15 +56,15 @@ export default function Recruiters() {
     const [campaigns, setCampaigns] = useState([]);
     const [selectedCampaigns, setSelectedCampaigns] = useState([]);
     const [formData, setFormData] = useState({
-        name: "", email: "", phone: "", department: "", designation: "", role: "recruiter"
+        name: "", email: "", phone: "", department: "", designation: "", role: "Recruiter"
     });
-    
+
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [selectedRecruiter, setSelectedRecruiter] = useState(null);
     const [recruiterActivity, setRecruiterActivity] = useState([]);
     const [recruiterCandidates, setRecruiterCandidates] = useState([]);
     const [recruiterInterviews, setRecruiterInterviews] = useState([]);
-    
+
     const openDrawer = async (recruiter) => {
         setSelectedRecruiter(recruiter);
         setDrawerOpen(true);
@@ -49,20 +85,25 @@ export default function Recruiters() {
     const loadRecruiters = async () => {
         try {
             setLoading(true);
+            const params = {};
+            if (searchTerm) params.search = searchTerm;
+            if (roleFilter !== "All") params.role = roleFilter;
+
             const [teamRes, perfRes] = await Promise.all([
-                recruiterManagementService.getRecruiters(),
+                recruiterManagementService.getRecruiters(params),
                 analyticsService.getRecruiterPerformance()
             ]);
-            
+
             const team = teamRes.data?.data || teamRes.data || [];
             const perf = perfRes.data?.data || perfRes.data || [];
-            
+            setPerformance(perf);
+
             // Merge performance data into team data
             const merged = team.map(member => {
                 const pData = perf.find(p => p.id === member.id) || {};
                 return { ...member, performance: pData };
             });
-            
+
             setRecruiters(merged);
         } catch (err) {
             console.error(err);
@@ -74,6 +115,10 @@ export default function Recruiters() {
 
     useEffect(() => {
         loadRecruiters();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchTerm, roleFilter]);
+
+    useEffect(() => {
         loadCampaigns();
     }, []);
 
@@ -91,6 +136,13 @@ export default function Recruiters() {
         setTimeout(() => setToast(null), 3000);
     };
 
+    // Stats reflect the currently loaded (search/role-filtered) set, exactly
+    // as Team.jsx's stats row did.
+    const totalActive = recruiters.filter(r => r.status === "active").length;
+    const totalRecruiters = recruiters.filter(r => r.role === "Recruiter").length;
+    const totalManagers = recruiters.filter(r => r.role === "Hiring Manager").length;
+    const totalAdmins = recruiters.filter(r => r.role === "Admin").length;
+
     const handleCreate = async (e) => {
         e.preventDefault();
         try {
@@ -104,7 +156,7 @@ export default function Recruiters() {
             });
             loadRecruiters();
             showToast("Recruiter created successfully", "success");
-            setFormData({ name: "", email: "", phone: "", department: "", designation: "", role: "recruiter" });
+            setFormData({ name: "", email: "", phone: "", department: "", designation: "", role: "Recruiter" });
         } catch (err) {
             console.error(err);
             const errorMsg = err.response?.data?.message || err.response?.data?.detail || "Failed to create recruiter";
@@ -113,14 +165,14 @@ export default function Recruiters() {
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm("Are you sure you want to delete this recruiter?")) return;
+        if (!window.confirm("Are you sure you want to remove this recruiter?")) return;
         try {
             await recruiterManagementService.deleteRecruiter(id);
-            showToast("Recruiter deleted", "success");
+            showToast("Recruiter removed", "success");
             loadRecruiters();
         } catch (err) {
             console.error(err);
-            showToast("Failed to delete recruiter", "error");
+            showToast("Failed to remove recruiter", "error");
         }
     };
 
@@ -145,7 +197,6 @@ export default function Recruiters() {
         showToast("Credentials copied to clipboard", "success");
     };
 
-    
     const handleOpenAssign = async (recruiter) => {
         try {
             const res = await recruiterManagementService.getRecruiterCampaigns(recruiter.id);
@@ -198,42 +249,90 @@ export default function Recruiters() {
         }
     };
 
-    const filtered = recruiters.filter(r => {
-        const fullName = r.name || `${r.first_name || ""} ${r.last_name || ""}`.trim();
-        return fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-               (r.email && r.email.toLowerCase().includes(searchTerm.toLowerCase()));
-    });
+    // The backend already applies `search`/`role` server-side (see
+    // loadRecruiters); `recruiters` is the result set as returned.
+    const filtered = recruiters;
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 24, animation: "fadeInPage 0.4s ease-out" }}>
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                    <h1 style={{ fontSize: 28, fontWeight: 700, color: "var(--text)", marginBottom: 8 }}>Recruiters</h1>
-                    <p style={{ color: "var(--text-secondary)", fontSize: 15 }}>Manage your recruitment team</p>
-                </div>
-                <Button variant="primary" icon={<FaUserPlus />} onClick={() => setIsModalOpen(true)}>Add Recruiter</Button>
+            <PageHeader
+                title="Recruiters"
+                subtitle="Manage your recruitment team"
+                actions={
+                    <Button variant="primary" icon={<FaUserPlus />} onClick={() => setIsModalOpen(true)}>Add Recruiter</Button>
+                }
+            />
+
+            {/* Stats */}
+            <div className="team-stats-row">
+                {[
+                    { title: "Total Members", value: recruiters.length, icon: <FaUsers />, color: "#3B82F6" },
+                    { title: "Active", value: totalActive, icon: <FaCheck />, color: "#10B981" },
+                    { title: "Recruiters", value: totalRecruiters, icon: <FaUsers />, color: "#8B5CF6" },
+                    { title: "Hiring Managers", value: totalManagers, icon: <FaUsers />, color: "#F59E0B" },
+                    { title: "Admins", value: totalAdmins, icon: <FaUsers />, color: "#EC4899" },
+                ].map((s, i) => (
+                    <motion.div key={s.title} custom={i} variants={cardVariants} initial="hidden" animate="visible">
+                        <StatsCard {...s} />
+                    </motion.div>
+                ))}
             </div>
 
-            <div style={{ 
-                background: "var(--card)", padding: 20, borderRadius: "var(--radius-lg)", 
-                border: "1px solid var(--border)", boxShadow: "var(--shadow)" 
+            <div style={{
+                background: "var(--card)", padding: 20, borderRadius: "var(--radius-lg)",
+                border: "1px solid var(--border)", boxShadow: "var(--shadow)"
             }}>
-                <div style={{ marginBottom: 20, display: "flex", gap: 16 }}>
-                    <div style={{ position: "relative", flex: 1, maxWidth: 300 }}>
-                        <FaSearch style={{ position: "absolute", left: 14, top: 14, color: "var(--text-muted)" }} />
-                        <input
-                            type="text"
-                            placeholder="Search recruiters..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                <div style={{ marginBottom: 20, display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                        <div style={{ position: "relative", flex: 1, minWidth: 220, maxWidth: 300 }}>
+                            <FaSearch style={{ position: "absolute", left: 14, top: 14, color: "var(--text-muted)" }} />
+                            <input
+                                type="text"
+                                placeholder="Search recruiters..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                style={{
+                                    width: "100%", padding: "10px 16px 10px 40px",
+                                    background: "var(--bg)", border: "1px solid var(--border)",
+                                    borderRadius: "var(--radius-md)", color: "var(--text)", outline: "none"
+                                }}
+                            />
+                        </div>
+                        <select
+                            value={roleFilter}
+                            onChange={(e) => setRoleFilter(e.target.value)}
                             style={{
-                                width: "100%", padding: "10px 16px 10px 40px",
-                                background: "var(--bg)", border: "1px solid var(--border)",
-                                borderRadius: "var(--radius-md)", color: "var(--text)", outline: "none"
+                                padding: "10px 14px", borderRadius: "var(--radius-md)",
+                                border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text)"
                             }}
-                        />
+                        >
+                            <option value="All">All Roles</option>
+                            <option value="Admin">Admin</option>
+                            <option value="Recruiter">Recruiter</option>
+                            <option value="Hiring Manager">Hiring Manager</option>
+                            <option value="Viewer">Viewer</option>
+                        </select>
+                    </div>
+
+                    <div className="team-view-toggle">
+                        <button
+                            className={`view-toggle-btn ${view === "list" ? "active" : ""}`}
+                            onClick={() => setView("list")}
+                            title="List view"
+                            type="button"
+                        >
+                            <FaList />
+                        </button>
+                        <button
+                            className={`view-toggle-btn ${view === "grid" ? "active" : ""}`}
+                            onClick={() => setView("grid")}
+                            title="Grid view"
+                            type="button"
+                        >
+                            <FaThLarge />
+                        </button>
                     </div>
                 </div>
 
@@ -244,7 +343,7 @@ export default function Recruiters() {
                         <FaUserTie size={40} style={{ marginBottom: 16, opacity: 0.5 }} />
                         <p>No recruiters found.</p>
                     </div>
-                ) : (
+                ) : view === "list" ? (
                     <div style={{ overflowX: "auto" }}>
                         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
                             <thead>
@@ -279,7 +378,7 @@ export default function Recruiters() {
                                             </div>
                                         </td>
                                         <td style={{ padding: "16px" }}>
-                                            <div style={{ color: "var(--text-secondary)", fontSize: 14, fontWeight: 500 }}>{r.designation || "Recruiter"}</div>
+                                            <div style={{ color: "var(--text-secondary)", fontSize: 14, fontWeight: 500 }}>{r.designation || r.role || "Recruiter"}</div>
                                             <div style={{ color: "var(--text-muted)", fontSize: 12 }}>{r.department || "HR"}</div>
                                         </td>
                                         <td style={{ padding: "16px", minWidth: 200 }}>
@@ -305,7 +404,7 @@ export default function Recruiters() {
                                         <td style={{ padding: "16px" }}>
                                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                                 {r.is_online ? <FaCircle size={8} color="var(--success)" /> : <FaCircle size={8} color="var(--text-muted)" />}
-                                                <StatusBadge status={r.account_status || r.status || "Active"} />
+                                                <StatusBadge status={r.status || "active"} />
                                             </div>
                                         </td>
                                         <td style={{ padding: "16px", color: "var(--text-secondary)", fontSize: 13 }}>
@@ -316,18 +415,73 @@ export default function Recruiters() {
                                                 <button onClick={() => handleOpenAssign(r)} style={{ background: "none", border: "none", color: "var(--primary)", cursor: "pointer", padding: 6 }} title="Assign Campaigns"><FaUserPlus /></button>
                                                 <button onClick={() => handleResetPassword(r.id)} style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: 6 }} title="Reset Password"><FaKey /></button>
                                                 <button onClick={() => handleForceReset(r.id)} style={{ background: "none", border: "none", color: "var(--warning, #f59e0b)", cursor: "pointer", padding: 6 }} title="Force Password Reset on Next Login"><FaRedo /></button>
-                                                {(r.account_status === "Suspended" || r.status === "suspended") ? (
+                                                {r.status === "suspended" ? (
                                                     <button onClick={() => handleActivate(r.id)} style={{ background: "none", border: "none", color: "var(--success, #22c55e)", cursor: "pointer", padding: 6 }} title="Activate"><FaCheck /></button>
                                                 ) : (
                                                     <button onClick={() => handleSuspend(r.id)} style={{ background: "none", border: "none", color: "var(--warning, #f59e0b)", cursor: "pointer", padding: 6 }} title="Suspend"><FaBan /></button>
                                                 )}
-                                                <button onClick={() => handleDelete(r.id)} style={{ background: "none", border: "none", color: "var(--danger)", cursor: "pointer", padding: 6 }} title="Delete"><FaTrash /></button>
+                                                <button onClick={() => handleDelete(r.id)} style={{ background: "none", border: "none", color: "var(--danger)", cursor: "pointer", padding: 6 }} title="Remove"><FaTrash /></button>
                                             </div>
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                ) : (
+                    <div className="team-grid">
+                        {filtered.map((member, i) => {
+                            const roleStyle = ROLE_COLORS[member.role] || ROLE_COLORS.Viewer;
+                            return (
+                                <motion.div
+                                    key={member.id}
+                                    className="team-member-card"
+                                    custom={i}
+                                    variants={cardVariants}
+                                    initial="hidden"
+                                    animate="visible"
+                                >
+                                    <div className="team-member-avatar">
+                                        {(member.name || member.email || "?")[0].toUpperCase()}
+                                        <div className={`team-member-status-dot ${member.status === "active" ? "active" : "inactive"}`} />
+                                    </div>
+
+                                    <div className="team-member-info">
+                                        <h4>{member.name}</h4>
+                                        <p>{member.designation}</p>
+                                    </div>
+
+                                    <span className="team-member-dept">{member.department}</span>
+
+                                    <span
+                                        className="team-member-role-badge"
+                                        style={{ background: roleStyle.bg, color: roleStyle.color }}
+                                    >
+                                        {member.role}
+                                    </span>
+
+                                    <div className="team-member-contact">
+                                        <div className="contact-row">
+                                            <FaEnvelope size={10} />
+                                            <span style={{ fontSize: "11px" }}>{member.email}</span>
+                                        </div>
+                                        <div className="contact-row">
+                                            <FaPhone size={10} />
+                                            <span style={{ fontSize: "11px" }}>{member.phone}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="team-card-actions">
+                                        {/* Pre-existing from Team.jsx: this button has never had a handler
+                                            (no edit flow exists on either prior page). Carried over as-is --
+                                            wiring a real edit flow is a new feature, outside this
+                                            consolidation's scope. */}
+                                        <Button variant="outline" size="sm" icon={<FaEdit />}>Edit</Button>
+                                        <Button variant="ghost" size="sm" icon={<FaTrash />} onClick={() => handleDelete(member.id)}>Remove</Button>
+                                    </div>
+                                </motion.div>
+                            );
+                        })}
                     </div>
                 )}
             </div>
@@ -386,6 +540,16 @@ export default function Recruiters() {
                                         style={{ padding: "10px 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text)" }}
                                     />
                                 </div>
+                                <select
+                                    value={formData.role}
+                                    onChange={e => setFormData({...formData, role: e.target.value})}
+                                    style={{ padding: "10px 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text)" }}
+                                >
+                                    <option value="Recruiter">Recruiter</option>
+                                    <option value="Hiring Manager">Hiring Manager</option>
+                                    <option value="Viewer">Viewer</option>
+                                    <option value="Admin">Admin</option>
+                                </select>
                                 <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 16 }}>
                                     <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
                                     <Button type="submit" variant="primary">Create Recruiter</Button>
@@ -408,10 +572,10 @@ export default function Recruiters() {
                                 width: "100%", maxWidth: 450, border: "1px solid var(--primary)", boxShadow: "0 20px 40px rgba(0,0,0,0.3)"
                             }}
                         >
-                            <div style={{ 
-                                width: 64, height: 64, borderRadius: "50%", background: "rgba(16, 185, 129, 0.1)", 
-                                color: "#10B981", display: "flex", alignItems: "center", justifyContent: "center", 
-                                fontSize: 32, margin: "0 auto 20px" 
+                            <div style={{
+                                width: 64, height: 64, borderRadius: "50%", background: "rgba(16, 185, 129, 0.1)",
+                                color: "#10B981", display: "flex", alignItems: "center", justifyContent: "center",
+                                fontSize: 32, margin: "0 auto 20px"
                             }}>
                                 <FaKey />
                             </div>
@@ -419,9 +583,9 @@ export default function Recruiters() {
                             <p style={{ color: "var(--text-secondary)", marginBottom: 24, fontSize: 14 }}>
                                 Please copy these credentials now. For security reasons, the password will not be shown again. The recruiter will be required to change this password on their first login.
                             </p>
-                            
-                            <div style={{ 
-                                background: "var(--bg)", padding: 20, borderRadius: "var(--radius-md)", 
+
+                            <div style={{
+                                background: "var(--bg)", padding: 20, borderRadius: "var(--radius-md)",
                                 border: "1px solid var(--border)", marginBottom: 24, textAlign: "left"
                             }}>
                                 <div style={{ marginBottom: 12 }}>
@@ -433,7 +597,7 @@ export default function Recruiters() {
                                     <div style={{ fontSize: 16, color: "var(--text)", fontWeight: 500, fontFamily: "monospace" }}>{credentialsModal.password}</div>
                                 </div>
                             </div>
-                            
+
                             <div style={{ display: "flex", gap: 12 }}>
                                 <Button variant="outline" icon={<FaCopy />} onClick={copyCredentials} style={{ flex: 1 }}>Copy</Button>
                                 <Button variant="primary" onClick={() => setCredentialsModal(null)} style={{ flex: 1 }}>Done</Button>
@@ -456,13 +620,13 @@ export default function Recruiters() {
                         >
                             <h2 style={{ marginBottom: 8, fontSize: 20, color: "var(--text)", fontWeight: 700 }}>Assign Campaigns</h2>
                             <p style={{ color: "var(--text-secondary)", marginBottom: 24, fontSize: 14 }}>
-                                Select campaigns for {assignModal.first_name} {assignModal.last_name}. They will only have access to these selected campaigns.
+                                Select campaigns for {assignModal.name || `${assignModal.first_name || ""} ${assignModal.last_name || ""}`.trim()}. They will only have access to these selected campaigns.
                             </p>
-                            
+
                             <div style={{ maxHeight: 300, overflowY: "auto", marginBottom: 24, border: "1px solid var(--border)", borderRadius: "var(--radius-md)" }}>
                                 {campaigns.map(c => (
-                                    <div key={c._id} style={{ 
-                                        display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", 
+                                    <div key={c._id} style={{
+                                        display: "flex", alignItems: "center", gap: 12, padding: "12px 16px",
                                         borderBottom: "1px solid var(--border)", cursor: "pointer",
                                         background: selectedCampaigns.includes(c._id) ? "rgba(16, 185, 129, 0.05)" : "transparent"
                                     }} onClick={() => {
@@ -472,9 +636,9 @@ export default function Recruiters() {
                                             setSelectedCampaigns([...selectedCampaigns, c._id]);
                                         }
                                     }}>
-                                        <input 
-                                            type="checkbox" 
-                                            checked={selectedCampaigns.includes(c._id)} 
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedCampaigns.includes(c._id)}
                                             onChange={() => {}}
                                             style={{ cursor: "pointer", width: 16, height: 16 }}
                                         />
@@ -488,7 +652,7 @@ export default function Recruiters() {
                                     <div style={{ padding: 20, textAlign: "center", color: "var(--text-muted)" }}>No campaigns available.</div>
                                 )}
                             </div>
-                            
+
                             <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
                                 <Button variant="outline" onClick={() => setAssignModal(null)}>Cancel</Button>
                                 <Button variant="primary" onClick={handleSaveAssign}>Save Assignments</Button>
@@ -537,14 +701,14 @@ export default function Recruiters() {
                                         <FaTimes />
                                     </button>
                                 </div>
-                                
+
                                 <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 24 }}>
-                                    
+
                                     {/* Action bar */}
                                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                                        <Button variant="outline" size="sm" iconLeft={<FaChartBar />} onClick={() => handleAssignClick(selectedRecruiter)}>Assign Campaigns</Button>
+                                        <Button variant="outline" size="sm" iconLeft={<FaChartBar />} onClick={() => handleOpenAssign(selectedRecruiter)}>Assign Campaigns</Button>
                                         <Button variant="outline" size="sm" iconLeft={<FaRedo />} onClick={() => handleForceReset(selectedRecruiter.id)}>Force Password Reset</Button>
-                                        <Button variant="danger" size="sm" iconLeft={selectedRecruiter.status === 'suspended' ? <FaCheck /> : <FaBan />} 
+                                        <Button variant="danger" size="sm" iconLeft={selectedRecruiter.status === 'suspended' ? <FaCheck /> : <FaBan />}
                                                 onClick={() => selectedRecruiter.status === 'suspended' ? handleActivate(selectedRecruiter.id) : handleSuspend(selectedRecruiter.id)}>
                                             {selectedRecruiter.status === 'suspended' ? 'Activate' : 'Suspend'}
                                         </Button>

@@ -99,8 +99,8 @@ export default function Settings() {
                                             <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>Sidebar Auto-Collapse</div>
                                             <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Automatically collapse the sidebar on small screens.</div>
                                         </div>
-                                        <div style={{ width: 44, height: 24, borderRadius: 12, background: settings?.sidebar_collapsed ? "#3B82F6" : "rgba(255,255,255,0.1)", position: "relative", cursor: "pointer" }} onClick={() => handleToggle('sidebar_collapsed')}>
-                                            <div style={{ width: 20, height: 20, borderRadius: "50%", background: settings?.sidebar_collapsed ? "white" : "var(--text-secondary)", position: "absolute", top: 2, left: settings?.sidebar_collapsed ? 22 : 2, transition: 'all 0.2s' }} />
+                                        <div style={{ width: 44, height: 24, borderRadius: 12, background: settings?.sidebar_auto_collapse ? "#3B82F6" : "rgba(255,255,255,0.1)", position: "relative", cursor: "pointer" }} onClick={() => handleToggle('sidebar_auto_collapse')}>
+                                            <div style={{ width: 20, height: 20, borderRadius: "50%", background: settings?.sidebar_auto_collapse ? "white" : "var(--text-secondary)", position: "absolute", top: 2, left: settings?.sidebar_auto_collapse ? 22 : 2, transition: 'all 0.2s' }} />
                                         </div>
                                     </div>
                                 </>
@@ -114,8 +114,8 @@ export default function Settings() {
                                             <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>Interview Reminders</div>
                                             <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Receive email and SMS reminders before the deadline.</div>
                                         </div>
-                                        <div style={{ width: 44, height: 24, borderRadius: 12, background: settings?.email_notifications ? "#3B82F6" : "rgba(255,255,255,0.1)", position: "relative", cursor: "pointer" }} onClick={() => handleToggle('email_notifications')}>
-                                            <div style={{ width: 20, height: 20, borderRadius: "50%", background: settings?.email_notifications ? "white" : "var(--text-secondary)", position: "absolute", top: 2, left: settings?.email_notifications ? 22 : 2, transition: 'all 0.2s' }} />
+                                        <div style={{ width: 44, height: 24, borderRadius: 12, background: settings?.interview_reminders ? "#3B82F6" : "rgba(255,255,255,0.1)", position: "relative", cursor: "pointer" }} onClick={() => handleToggle('interview_reminders')}>
+                                            <div style={{ width: 20, height: 20, borderRadius: "50%", background: settings?.interview_reminders ? "white" : "var(--text-secondary)", position: "absolute", top: 2, left: settings?.interview_reminders ? 22 : 2, transition: 'all 0.2s' }} />
                                         </div>
                                     </div>
                                     <div className="c-divider" />
@@ -124,8 +124,8 @@ export default function Settings() {
                                             <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>Company Updates</div>
                                             <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Get notified when the hiring team adds instructions.</div>
                                         </div>
-                                        <div style={{ width: 44, height: 24, borderRadius: 12, background: settings?.sms_notifications ? "#3B82F6" : "rgba(255,255,255,0.1)", position: "relative", cursor: "pointer" }} onClick={() => handleToggle('sms_notifications')}>
-                                            <div style={{ width: 20, height: 20, borderRadius: "50%", background: settings?.sms_notifications ? "white" : "var(--text-secondary)", position: "absolute", top: 2, left: settings?.sms_notifications ? 22 : 2, transition: 'all 0.2s' }} />
+                                        <div style={{ width: 44, height: 24, borderRadius: 12, background: settings?.company_updates ? "#3B82F6" : "rgba(255,255,255,0.1)", position: "relative", cursor: "pointer" }} onClick={() => handleToggle('company_updates')}>
+                                            <div style={{ width: 20, height: 20, borderRadius: "50%", background: settings?.company_updates ? "white" : "var(--text-secondary)", position: "absolute", top: 2, left: settings?.company_updates ? 22 : 2, transition: 'all 0.2s' }} />
                                         </div>
                                     </div>
                                     <div className="c-divider" />
@@ -150,8 +150,8 @@ export default function Settings() {
                                             <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>The language of the dashboard interface.</div>
                                         </div>
                                         <select 
-                                            value={settings?.language}
-                                            onChange={(e) => updateSettings({ language: e.target.value })}
+                                            value={settings?.portal_language}
+                                            onChange={(e) => updateSettings({ portal_language: e.target.value })}
                                             style={{ padding: "8px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", color: "white", borderRadius: 8 }}
                                         >
                                             <option value="en">English</option>
@@ -165,8 +165,8 @@ export default function Settings() {
                                             <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>Live Subtitles</div>
                                             <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Show AI-generated text subtitles during the interview.</div>
                                         </div>
-                                        <div style={{ width: 44, height: 24, borderRadius: 12, background: settings?.subtitles ? "#3B82F6" : "rgba(255,255,255,0.1)", position: "relative", cursor: "pointer" }} onClick={() => handleToggle('subtitles')}>
-                                            <div style={{ width: 20, height: 20, borderRadius: "50%", background: settings?.subtitles ? "white" : "var(--text-secondary)", position: "absolute", top: 2, left: settings?.subtitles ? 22 : 2, transition: 'all 0.2s' }} />
+                                        <div style={{ width: 44, height: 24, borderRadius: 12, background: settings?.live_subtitles ? "#3B82F6" : "rgba(255,255,255,0.1)", position: "relative", cursor: "pointer" }} onClick={() => handleToggle('live_subtitles')}>
+                                            <div style={{ width: 20, height: 20, borderRadius: "50%", background: settings?.live_subtitles ? "white" : "var(--text-secondary)", position: "absolute", top: 2, left: settings?.live_subtitles ? 22 : 2, transition: 'all 0.2s' }} />
                                         </div>
                                     </div>
                                 </>

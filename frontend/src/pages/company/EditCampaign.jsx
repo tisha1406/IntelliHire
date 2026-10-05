@@ -1,18 +1,14 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import React, { useState } from "react";
+
 import { motion, AnimatePresence } from "framer-motion";
-import {
-    FaArrowLeft,
-    FaArrowRight,
-    FaCheckCircle,
-    FaPlus
-} from "react-icons/fa";
+import { FaArrowLeft, FaArrowRight, FaCheckCircle, FaTrash, FaPlus } from "react-icons/fa";
 
 import { useAuthContext } from "../../context/AuthContext";
+
 import campaignService from "../../services/company/campaignService";
 import recruiterManagementService from "../../services/company/recruiterManagementService";
-
 // Common components
+
 import PageHeader from "../../components/common/PageHeader";
 import Stepper from "../../components/common/Stepper";
 import Button from "../../components/common/Button";
@@ -20,7 +16,8 @@ import Input from "../../components/common/Input";
 import Select from "../../components/common/Select";
 import Card from "../../components/common/Card";
 import Toast from "../../components/common/Toast";
-
+import { VALID_VOICES, isLegacyVoice } from "../../utils/voiceConstants";
+import { DIFFICULTY_LEVELS } from "../../utils/difficultyConstants";
 import "../../styles/company/Campaign.css";
 
 const DEPARTMENTS = [
@@ -40,19 +37,95 @@ const EMPLOYMENT_TYPES = [
     { value: "Remote", label: "Remote" }
 ];
 
+import { SettingsAPI } from "../../api/settings";
+
+const INTERVIEW_TYPES = [
+    { value: "technical", label: "Technical" },
+    { value: "resume_experience", label: "Resume / Experience" },
+    { value: "hr_behavioral", label: "HR / Behavioral" },
+    { value: "situational_case", label: "Situational / Case" },
+    { value: "mixed", label: "Mixed" }
+];
+
+const CRITICALITY_OPTIONS = [
+    { value: "critical", label: "Critical" },
+    { value: "required", label: "Required" },
+    { value: "preferred", label: "Preferred" }
+];
+
 import { usePermissions } from "../../context/PermissionsContext";
+
+import { useParams, useNavigate } from "react-router-dom";
 
 export default function EditCampaign() {
     const navigate = useNavigate();
-    const { id } = useParams();
     const { user, loading } = useAuthContext();
     const { platform } = usePermissions();
-
+    const { id } = useParams();
     const [pageLoading, setPageLoading] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
-
     const [currentStep, setCurrentStep] = useState(0);
 
+    const [strategies, setStrategies] = useState([]);
+    const [originalSnapshot, setOriginalSnapshot] = useState(null);
+    
+    React.useEffect(() => {
+        SettingsAPI.getStrategies().then(res => {
+            const allStrategies = Array.isArray(res) 
+                ? res 
+                : (Array.isArray(res?.data) ? res.data : []);
+            if (platform?.allowed_strategies) {
+                setStrategies(allStrategies.filter(s => s.is_active && platform.allowed_strategies.includes(s.name)));
+            }
+        }).catch(err => console.error(err));
+    }, [platform]);
+
+    
+    React.useEffect(() => {
+        const loadCampaign = async () => {
+            try {
+                setPageLoading(true);
+                const res = await campaignService.getCampaign(id);
+                const campaign = res.data;
+                setFormData({
+                    name: campaign.name || "",
+                    department: campaign.department || "",
+                    location: campaign.location || "",
+                    deadline: campaign.deadline ? campaign.deadline.substring(0, 10) : "",
+                    salary: campaign.salary || "",
+                    description: campaign.description || "",
+                    employmentType: campaign.employment_type || "",
+                    requirements: campaign.requirements || [],
+                    interviewDuration: campaign.interview_settings?.duration || 45,
+                    strictness: campaign.difficulty_band || campaign.interview_settings?.strictness || "medium",
+                    interviewType: campaign.interview_type || campaign.interview_settings?.type || "technical",
+                    strategy_id: campaign.strategy_id || "",
+                    mixed_composition: campaign.mixed_composition || {
+                        technical: 0,
+                        resume_experience: 0,
+                        hr_behavioral: 0,
+                        situational_case: 0
+                    },
+                    budget_override_target: campaign.budget_override?.target_questions || "",
+                    difficulty_band: campaign.difficulty_band || "",
+                    language: campaign.language || "",
+                    voice_id: campaign.voice_id || "",
+                    assigned_recruiter_ids: campaign.assigned_recruiter_ids || []
+                });
+                if (campaign.strategy_snapshot) {
+                    setOriginalSnapshot(campaign.strategy_snapshot);
+                }
+            } catch (err) {
+                console.error(err);
+                setToastMessage("Failed to load campaign.");
+                setTimeout(() => navigate("/company/campaigns"), 1500);
+            } finally {
+                setPageLoading(false);
+            }
+        };
+        loadCampaign();
+    }, [id, navigate]);
+
+    // Form inputs state
     const [formData, setFormData] = useState({
         name: "",
         department: "",
@@ -61,17 +134,33 @@ export default function EditCampaign() {
         salary: "",
         description: "",
         employmentType: "",
-        requirements: [],
+        requirements: [
+            { skill: "React experience", criticality: "required" },
+            { skill: "TypeScript fluency", criticality: "preferred" }
+        ],
         interviewDuration: 45,
-        strictness: "High",
-        interviewType: "Technical",
+        strictness: "medium", // Default fallback if needed
+        interviewType: "technical",
+        strategy_id: "",
+        mixed_composition: {
+            technical: 0,
+            resume_experience: 0,
+            hr_behavioral: 0,
+            situational_case: 0
+        },
+        budget_override_target: "",
+        difficulty_band: "",
+        language: "",
+        voice_id: "",
         assigned_recruiter_ids: []
     });
 
     const [reqInput, setReqInput] = useState("");
+    const [reqCriticality, setReqCriticality] = useState("required");
     const [recruiters, setRecruiters] = useState([]);
     const [errors, setErrors] = useState({});
     const [toastMessage, setToastMessage] = useState(null);
+    const [submitting, setSubmitting] = useState(false);
 
     const steps = [
         "Basic Information",
@@ -81,129 +170,56 @@ export default function EditCampaign() {
         "Review & Publish"
     ];
 
-    useEffect(() => {
-        const loadRecruiters = async () => {
-            try {
-                const res = await recruiterManagementService.getRecruiters();
-                setRecruiters(res.data?.data || res.data || []);
-            } catch (err) {}
-        };
-        loadRecruiters();
-        loadCampaign();
-    }, [id]);
-
-    const loadCampaign = async () => {
-        try {
-            setPageLoading(true);
-
-            const res = await campaignService.getCampaign(id);
-
-            console.log("API:", res.data);
-
-
-            const campaign = res.data;
-
-            setFormData({
-                name: campaign.name || "",
-                department: campaign.department || "",
-                location: campaign.location || "",
-                deadline: campaign.deadline
-                    ? campaign.deadline.substring(0, 10)
-                    : "",
-                salary: campaign.salary || "",
-                description: campaign.description || "",
-                employmentType: campaign.employment_type || "",
-                requirements: campaign.requirements || [],
-                interviewDuration:
-                    campaign.interview_settings?.duration || 45,
-                strictness:
-                    campaign.interview_settings?.strictness || "High",
-                interviewType:
-                    campaign.interview_settings?.type || "Technical",
-                assigned_recruiter_ids: campaign.assigned_recruiter_ids || []
-            });
-            console.log("FORM:", formData);
-            
-        } catch (err) {
-            console.error(err);
-            setToastMessage("Failed to load campaign.");
-
-            setTimeout(() => {
-                navigate("/company/campaigns");
-            }, 1500);
-        } finally {
-            setPageLoading(false);
-        }
-    };
-
     const validateStep = () => {
         const errs = {};
-
         if (currentStep === 0) {
-            if (!formData.name)
-                errs.name = "Campaign name is required.";
-
-            if (!formData.department)
-                errs.department = "Department is required.";
-
-            if (!formData.location)
-                errs.location = "Location is required.";
-
-            if (!formData.deadline)
-                errs.deadline = "Deadline is required.";
+            if (!formData.name) errs.name = "Campaign name is required.";
+            if (!formData.department) errs.department = "Department is required.";
+            if (!formData.location) errs.location = "Location is required.";
+            if (!formData.deadline) errs.deadline = "Deadline is required.";
+        } else if (currentStep === 1) {
+            if (!formData.description) errs.description = "Job description is required.";
+            if (!formData.employmentType) errs.employmentType = "Employment type is required.";
+        } else if (currentStep === 2) {
+            if (formData.requirements.length === 0) {
+                errs.requirements = "Please add at least one job requirement.";
+            }
+        } else if (currentStep === 3) {
+            if (!formData.strategy_id) errs.strategy_id = "Strategy is required.";
+            if (formData.interviewType === "mixed") {
+                const sum = (formData.mixed_composition.technical || 0) +
+                            (formData.mixed_composition.resume_experience || 0) +
+                            (formData.mixed_composition.hr_behavioral || 0) +
+                            (formData.mixed_composition.situational_case || 0);
+                if (Math.abs(sum - 1.0) > 0.01) {
+                    errs.mixed_composition = "Mixed composition must total exactly 1.0 (100%)";
+                }
+            }
         }
-
-        else if (currentStep === 1) {
-
-            if (!formData.description)
-                errs.description = "Job description is required.";
-
-            if (!formData.employmentType)
-                errs.employmentType =
-                    "Employment type is required.";
-        }
-
-        else if (currentStep === 2) {
-
-            if (formData.requirements.length === 0)
-                errs.requirements =
-                    "Please add at least one job requirement.";
-        }
-
         setErrors(errs);
-
         return Object.keys(errs).length === 0;
     };
 
+    const selectedStrategy = strategies.find(s => s.strategy_id === formData.strategy_id) || (originalSnapshot?.definition?.strategy_id === formData.strategy_id ? originalSnapshot.definition : null);
+
     const handleNext = () => {
         if (validateStep()) {
-            setCurrentStep((prev) =>
-                Math.min(steps.length - 1, prev + 1)
-            );
+            setCurrentStep((prev) => Math.min(steps.length - 1, prev + 1));
         }
     };
 
     const handleBack = () => {
-        setCurrentStep((prev) =>
-            Math.max(0, prev - 1)
-        );
+        setCurrentStep((prev) => Math.max(0, prev - 1));
     };
 
     const handleAddRequirement = () => {
         const value = reqInput.trim();
 
-        if (
-            value &&
-            !formData.requirements.includes(value)
-        ) {
+        if (value && !formData.requirements.find(r => r.skill === value)) {
             setFormData({
                 ...formData,
-                requirements: [
-                    ...formData.requirements,
-                    value
-                ]
+                requirements: [...formData.requirements, { skill: value, criticality: reqCriticality }]
             });
-
             setReqInput("");
         }
     };
@@ -211,70 +227,84 @@ export default function EditCampaign() {
     const handleRemoveRequirement = (index) => {
         setFormData({
             ...formData,
-            requirements: formData.requirements.filter(
-                (_, idx) => idx !== index
-            )
+            requirements: formData.requirements.filter((_, idx) => idx !== index)
         });
     };
 
     const handleSubmit = async () => {
 
-        if (loading) return;
+    if (loading) return;
 
-        if (!user?.companyId) {
-            setToastMessage("Company information not found.");
-            return;
+    if (!user?.companyId) {
+        setToastMessage("Company information not found.");
+        return;
+    }
+
+    if (!validateStep()) return;
+
+    try {
+
+        setSubmitting(true);
+
+        const payload = {
+            name: formData.name.trim(),
+            department: formData.department.trim(),
+            location: formData.location.trim(),
+            deadline: formData.deadline,
+            salary: formData.salary.trim(),
+            description: formData.description.trim(),
+            employment_type: formData.employmentType.trim(),
+            assigned_recruiter_ids: formData.assigned_recruiter_ids,
+            requirements: formData.requirements,
+            interview_type: formData.interviewType,
+            strategy_id: formData.strategy_id,
+            interview_settings: {
+                duration: formData.interviewDuration,
+                strictness: formData.strictness,
+                type: formData.interviewType
+            }
+        };
+
+        if (formData.interviewType === "mixed") {
+            payload.mixed_composition = formData.mixed_composition;
         }
 
-        if (!validateStep()) return;
-
-        try {
-
-            setSubmitting(true);
-
-            await campaignService.updateCampaign(id, {
-                name: formData.name.trim(),
-
-                department: formData.department.trim(),
-
-                location: formData.location.trim(),
-
-                deadline: formData.deadline,
-
-                salary: formData.salary.trim(),
-
-                description: formData.description.trim(),
-
-                employment_type: formData.employmentType.trim(),
-                assigned_recruiter_ids: formData.assigned_recruiter_ids,
-
-                requirements: formData.requirements,
-
-                interview_settings: {
-                    duration: formData.interviewDuration,
-                    strictness: formData.strictness,
-                    type: formData.interviewType
-                }
-            });
-
-            setToastMessage("Campaign Updated Successfully.");
-
-            setTimeout(() => {
-                navigate("/company/campaigns");
-            }, 1500);
-
-        } catch (err) {
-
-            console.error(err);
-
-            setToastMessage("Failed to update campaign.");
-
-        } finally {
-
-            setSubmitting(false);
-
+        if (formData.budget_override_target !== "") {
+            payload.budget_override = { target_questions: parseInt(formData.budget_override_target) };
         }
-    };
+
+        if (formData.difficulty_band) {
+            payload.difficulty_band = formData.difficulty_band;
+        }
+
+        if (formData.language) {
+            payload.language = formData.language;
+        }
+
+        if (formData.voice_id) {
+            payload.voice_id = formData.voice_id;
+        }
+
+        await campaignService.updateCampaign(id, payload);
+
+        setToastMessage("Campaign Updated Successfully.");
+
+        setTimeout(() => {
+            navigate("/company/campaigns");
+        }, 1500);
+
+    } catch (err) {
+
+        console.log(err);
+
+        setToastMessage("Failed to update campaign.");
+
+    } finally {
+
+        setSubmitting(false);
+
+    }
+};
 
     const slideVariants = {
         enter: { opacity: 0, x: 20 },
@@ -282,6 +312,7 @@ export default function EditCampaign() {
         exit: { opacity: 0, x: -20 }
     };
 
+    
     if (pageLoading) {
         return (
             <div className="new-campaign-page">
@@ -291,533 +322,374 @@ export default function EditCampaign() {
     }
 
     return (
-    <div className="new-campaign-page">
-
-        <PageHeader
-            title="Edit Campaign"
-            subtitle="Update campaign details, requirements and AI interview settings."
-            breadcrumbs={[
-                { label: "Campaigns", path: "/company/campaigns" },
-                { label: "Edit Campaign" }
-            ]}
-            actions={
-                <Button
-                    variant="ghost"
-                    iconLeft={<FaArrowLeft />}
-                    onClick={() => navigate("/company/campaigns")}
-                >
-                    Back to List
-                </Button>
-            }
-        />
-
-        <Card className="wizard-card-container">
-
-            <Stepper
-                steps={steps}
-                currentStep={currentStep}
-                className="new-camp-stepper"
+        <div className="new-campaign-page">
+            <PageHeader
+                title="Edit Campaign"
+                subtitle="Update campaign details, requirements, and AI screening parameters."
+                breadcrumbs={[
+                    { label: "Campaigns", path: "/company/campaigns" },
+                    { label: "Edit Campaign" }
+                ]}
+                actions={
+                    <Button variant="ghost" iconLeft={<FaArrowLeft />} onClick={() => navigate("/company/campaigns")}>
+                        Back to List
+                    </Button>
+                }
             />
 
-            <div className="wizard-form-body">
+            <Card className="wizard-card-container">
+                <Stepper steps={steps} currentStep={currentStep} className="new-camp-stepper" />
 
-                <AnimatePresence mode="wait">
-
-                    <motion.div
-                        key={currentStep}
-                        variants={slideVariants}
-                        initial="enter"
-                        animate="center"
-                        exit="exit"
-                        transition={{ duration: 0.25 }}
-                        className="step-animation-wrapper"
-                    >
-
-                        {/* STEP 1 */}
-
-                        {currentStep === 0 && (
-
-                            <div className="step-fields-layout">
-
-                                <h3>Basic Campaign Details</h3>
-
-                                <div className="form-grid-2x">
-
-                                    <Input
-                                        label="Campaign / Job Title"
-                                        placeholder="e.g. Lead Frontend Architect"
-                                        value={formData.name}
-                                        onChange={(e) =>
-                                            setFormData({
-                                                ...formData,
-                                                name: e.target.value
-                                            })
-                                        }
-                                        error={errors.name}
-                                    />
-
-                                    <Select
-                                        label="Department"
-                                        options={DEPARTMENTS}
-                                        value={formData.department}
-                                        onChange={(e) =>
-                                            setFormData({
-                                                ...formData,
-                                                department: e.target.value
-                                            })
-                                        }
-                                        error={errors.department}
-                                        placeholder="Choose department..."
-                                    />
-
-                                </div>
-
-                                <div className="form-grid-3x">
-
-                                    <Input
-                                        label="Location"
-                                        placeholder="e.g. Remote / New York"
-                                        value={formData.location}
-                                        onChange={(e) =>
-                                            setFormData({
-                                                ...formData,
-                                                location: e.target.value
-                                            })
-                                        }
-                                        error={errors.location}
-                                    />
-
-                                    <Input
-                                        label="Salary Range"
-                                        placeholder="e.g. $120,000 - $150,000"
-                                        value={formData.salary}
-                                        onChange={(e) =>
-                                            setFormData({
-                                                ...formData,
-                                                salary: e.target.value
-                                            })
-                                        }
-                                    />
-
-                                    <Input
-                                        label="Deadline Date"
-                                        type="date"
-                                        value={formData.deadline}
-                                        onChange={(e) =>
-                                            setFormData({
-                                                ...formData,
-                                                deadline: e.target.value
-                                            })
-                                        }
-                                        error={errors.deadline}
-                                    />
-
-                                </div>
-
-
-                                <div style={{ marginTop: 24 }}>
-                                    <h4 style={{ marginBottom: 12, fontSize: 16, color: "var(--text)" }}>Assign Recruiters</h4>
-                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                                        {recruiters.map(r => (
-                                            <label key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", background: "var(--bg)", padding: "10px 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
-                                                <input 
-                                                    type="checkbox" 
-                                                    checked={formData.assigned_recruiter_ids.includes(r.id)} 
-                                                    onChange={(e) => {
-                                                        const isChecked = e.target.checked;
-                                                        setFormData(prev => ({
-                                                            ...prev,
-                                                            assigned_recruiter_ids: isChecked 
-                                                                ? [...prev.assigned_recruiter_ids, r.id]
-                                                                : prev.assigned_recruiter_ids.filter(id => id !== r.id)
-                                                        }));
-                                                    }}
-                                                />
-                                                <span>{r.first_name} {r.last_name}</span>
-                                            </label>
-                                        ))}
-                                        {recruiters.length === 0 && <span style={{ color: "var(--text-muted)", fontSize: 14 }}>No recruiters found.</span>}
+                <div className="wizard-form-body">
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={currentStep}
+                            variants={slideVariants}
+                            initial="enter"
+                            animate="center"
+                            exit="exit"
+                            transition={{ duration: 0.25 }}
+                            className="step-animation-wrapper"
+                        >
+                            {/* STEP 1: BASIC INFO */}
+                            {currentStep === 0 && (
+                                <div className="step-fields-layout">
+                                    <h3>Basic Campaign Details</h3>
+                                    <div className="form-grid-2x">
+                                        <Input
+                                            label="Campaign / Job Title"
+                                            placeholder="e.g. Lead Frontend Architect"
+                                            value={formData.name}
+                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                            error={errors.name}
+                                        />
+                                        <Select
+                                            label="Department"
+                                            options={DEPARTMENTS}
+                                            value={formData.department}
+                                            onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                                            error={errors.department}
+                                            placeholder="Choose department..."
+                                        />
+                                    </div>
+                                    <div className="form-grid-3x">
+                                        <Input
+                                            label="Location"
+                                            placeholder="e.g. Remote / New York"
+                                            value={formData.location}
+                                            onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                                            error={errors.location}
+                                        />
+                                        <Input
+                                            label="Salary Range"
+                                            placeholder="e.g. $140,000 - $160,000"
+                                            value={formData.salary}
+                                            onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
+                                        />
+                                        <Input
+                                            label="Deadline Date"
+                                            type="date"
+                                            value={formData.deadline}
+                                            onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+                                            error={errors.deadline}
+                                        />
                                     </div>
                                 </div>
+                            )}
 
-                            </div>
-
-                        )}
-
-                        {/* STEP 2 */}
-
-                        {currentStep === 1 && (
-
-                            <div className="step-fields-layout">
-
-                                <h3>Job Overview & Work Type</h3>
-
-                                <Select
-                                    label="Employment Type"
-                                    options={EMPLOYMENT_TYPES}
-                                    value={formData.employmentType}
-                                    onChange={(e) =>
-                                        setFormData({
-                                            ...formData,
-                                            employmentType: e.target.value
-                                        })
-                                    }
-                                    error={errors.employmentType}
-                                    placeholder="Choose type..."
-                                />
-
-                                <div className="custom-input-group">
-
-                                    <label className="input-label">
-                                        Detailed Job Description
-                                    </label>
-
-                                    <textarea
-                                        value={formData.description}
-                                        onChange={(e) =>
-                                            setFormData({
-                                                ...formData,
-                                                description: e.target.value
-                                            })
-                                        }
-                                        className={`custom-textarea ${
-                                            errors.description
-                                                ? "textarea-error"
-                                                : ""
-                                        }`}
-                                        placeholder="Introduce the candidate to your company, responsibilities and expectations..."
-                                        rows={6}
+                            {/* STEP 2: JOB DESCRIPTION */}
+                            {currentStep === 1 && (
+                                <div className="step-fields-layout">
+                                    <h3>Job Overview & Work Type</h3>
+                                    <Select
+                                        label="Employment Type"
+                                        options={EMPLOYMENT_TYPES}
+                                        value={formData.employmentType}
+                                        onChange={(e) => setFormData({ ...formData, employmentType: e.target.value })}
+                                        error={errors.employmentType}
+                                        placeholder="Choose type..."
                                     />
+                                    <div className="custom-input-group">
+                                        <label className="input-label">Detailed Job Description</label>
+                                        <textarea
+                                            value={formData.description}
+                                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                            className={`custom-textarea ${errors.description ? "textarea-error" : ""}`}
+                                            placeholder="Introduce the candidate to your company, key deliverables, and day-to-day objectives..."
+                                            rows={6}
+                                        />
+                                        {errors.description && <span className="input-error-msg">{errors.description}</span>}
+                                    </div>
+                                </div>
+                            )}
 
-                                    {errors.description && (
-                                        <span className="input-error-msg">
-                                            {errors.description}
-                                        </span>
+                            {/* STEP 3: REQUIREMENTS */}
+                            {currentStep === 2 && (
+                                <div className="step-fields-layout">
+                                    <h3>Competencies & Requirements</h3>
+                                    <p className="step-instruction-text">
+                                        List critical qualifications. Our AI agents will match candidates' resumes against these items.
+                                    </p>
+                                    <div className="requirement-adder-row" style={{ display: 'flex', gap: '10px' }}>
+                                        <div style={{ flex: 2 }}>
+                                            <Input
+                                                placeholder="e.g. 5+ years Go development"
+                                                value={reqInput}
+                                                onChange={(e) => setReqInput(e.target.value)}
+                                            />
+                                        </div>
+                                        <div style={{ flex: 1 }}>
+                                            <Select
+                                                options={CRITICALITY_OPTIONS}
+                                                value={reqCriticality}
+                                                onChange={(e) => setReqCriticality(e.target.value)}
+                                            />
+                                        </div>
+                                        <Button variant="outline" iconLeft={<FaPlus />} onClick={handleAddRequirement}>
+                                            Add
+                                        </Button>
+                                    </div>
+                                    {errors.requirements && <p className="input-error-msg">{errors.requirements}</p>}
+
+                                    <div className="requirements-dynamic-list">
+                                        {formData.requirements.map((req, idx) => (
+                                            <div key={idx} className="req-pill-item compact-chip">
+                                                <span>{req.skill} <small>({req.criticality})</small></span>
+                                                <button className="delete-pill-btn" onClick={() => handleRemoveRequirement(idx)}>
+                                                    &times;
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* STEP 4: INTERVIEW SETTINGS */}
+                            {currentStep === 3 && (
+                                <div className="step-fields-layout">
+                                    <h3>Configure AI Agent Parameters</h3>
+                                    
+                                    <div className="form-grid-2x">
+                                        <Select
+                                            label="Interview Strategy"
+                                            placeholder="Select strategy..."
+                                            options={[
+                                                ...strategies.filter(s => !formData.interviewType || s.applicable_interview_types.includes(formData.interviewType)).map(s => ({ value: s.strategy_id, label: s.name }))
+                                            ]}
+                                            value={formData.strategy_id}
+                                            onChange={(e) => setFormData({ ...formData, strategy_id: e.target.value })}
+                                            error={errors.strategy_id}
+                                        />
+                                        <Select
+                                            label="Interview Type"
+                                            placeholder="Select type..."
+                                            options={[
+                                                ...INTERVIEW_TYPES
+                                            ]}
+                                            value={formData.interviewType}
+                                            onChange={(e) => setFormData({ ...formData, interviewType: e.target.value })}
+                                        />
+                                    </div>
+
+                                    {selectedStrategy && selectedStrategy.description && (
+                                        <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '5px', marginBottom: '20px' }}>
+                                            {selectedStrategy.description}
+                                        </p>
                                     )}
 
-                                </div>
-
-                            </div>
-
-                        )}
-
-                                                {/* STEP 3 */}
-
-                        {currentStep === 2 && (
-
-                            <div className="step-fields-layout">
-
-                                <h3>Competencies & Requirements</h3>
-
-                                <p className="step-instruction-text">
-                                    List the important skills and qualifications
-                                    required for this role. The AI interviewer
-                                    will use these to evaluate candidates.
-                                </p>
-
-                                <div className="requirement-adder-row">
-
-                                    <Input
-                                        placeholder="e.g. 5+ years React experience"
-                                        value={reqInput}
-                                        onChange={(e) =>
-                                            setReqInput(e.target.value)
-                                        }
-                                    />
-
-                                    <Button
-                                        variant="outline"
-                                        iconLeft={<FaPlus />}
-                                        onClick={handleAddRequirement}
-                                    >
-                                        Add
-                                    </Button>
-
-                                </div>
-
-                                {errors.requirements && (
-                                    <p className="input-error-msg">
-                                        {errors.requirements}
-                                    </p>
-                                )}
-
-                                <div className="requirements-dynamic-list">
-
-                                    {formData.requirements.map((req, idx) => (
-
-                                        <div
-                                            key={idx}
-                                            className="req-pill-item compact-chip"
-                                        >
-
-                                            <span>{req}</span>
-
-                                            <button
-                                                className="delete-pill-btn"
-                                                onClick={() =>
-                                                    handleRemoveRequirement(idx)
-                                                }
-                                            >
-                                                &times;
-                                            </button>
-
+                                    {formData.interviewType === "mixed" && (
+                                        <div className="mixed-composition-section" style={{ marginTop: '20px' }}>
+                                            <h4>Mixed Composition (Target interview emphasis)</h4>
+                                            {errors.mixed_composition && <p className="input-error-msg">{errors.mixed_composition}</p>}
+                                            <div className="form-grid-2x">
+                                                <Input label="Technical" type="number" step="0.1" min="0" max="1"
+                                                    value={formData.mixed_composition.technical}
+                                                    onChange={e => setFormData({ ...formData, mixed_composition: { ...formData.mixed_composition, technical: parseFloat(e.target.value) || 0 } })} />
+                                                <Input label="Resume / Experience" type="number" step="0.1" min="0" max="1"
+                                                    value={formData.mixed_composition.resume_experience}
+                                                    onChange={e => setFormData({ ...formData, mixed_composition: { ...formData.mixed_composition, resume_experience: parseFloat(e.target.value) || 0 } })} />
+                                                <Input label="HR / Behavioral" type="number" step="0.1" min="0" max="1"
+                                                    value={formData.mixed_composition.hr_behavioral}
+                                                    onChange={e => setFormData({ ...formData, mixed_composition: { ...formData.mixed_composition, hr_behavioral: parseFloat(e.target.value) || 0 } })} />
+                                                <Input label="Situational / Case" type="number" step="0.1" min="0" max="1"
+                                                    value={formData.mixed_composition.situational_case}
+                                                    onChange={e => setFormData({ ...formData, mixed_composition: { ...formData.mixed_composition, situational_case: parseFloat(e.target.value) || 0 } })} />
+                                            </div>
                                         </div>
+                                    )}
 
-                                    ))}
+                                    {selectedStrategy && (
+                                        <div className="budget-override-section" style={{ marginTop: '20px', padding: '15px', background: 'var(--bg-card-hover)', borderRadius: '8px' }}>
+                                            <h4>Question Budget</h4>
+                                            {selectedStrategy.budget_mode === "distinct_topics" ? (
+                                                <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                                                    Based on distinct topics
+                                                </p>
+                                            ) : (
+                                                <>
+                                                    <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                                                        Target: {selectedStrategy.target_questions} questions | Adjustable: {selectedStrategy.min_questions + (selectedStrategy.company_override_bounds?.target_questions_min_delta || 0)}–{selectedStrategy.max_questions + (selectedStrategy.company_override_bounds?.target_questions_max_delta || 0)}
+                                                    </p>
+                                                    <div className="form-grid-2x">
+                                                        {selectedStrategy.min_questions !== selectedStrategy.max_questions && (
+                                                            <Input
+                                                                label="Target Questions Override (Optional)"
+                                                                type="number"
+                                                                min={selectedStrategy.min_questions + (selectedStrategy.company_override_bounds?.target_questions_min_delta || 0)}
+                                                                max={selectedStrategy.max_questions + (selectedStrategy.company_override_bounds?.target_questions_max_delta || 0)}
+                                                                placeholder={`Default: ${selectedStrategy.target_questions}`}
+                                                                value={formData.budget_override_target}
+                                                                onChange={(e) => setFormData({ ...formData, budget_override_target: e.target.value })}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                </>
+                                            )}
+                                            {selectedStrategy.difficulty_policy?.band_constrainable !== false && (
+                                                <div className="form-grid-2x" style={{ marginTop: '15px' }}>
+                                                    <Select
+                                                        label="Difficulty"
+                                                        placeholder="Select difficulty..."
+                                                        options={DIFFICULTY_LEVELS}
+                                                        value={formData.difficulty_band}
+                                                        onChange={(e) => setFormData({ ...formData, difficulty_band: e.target.value })}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
 
+                                    <div className="form-grid-2x" style={{ marginTop: '20px' }}>
+                                        <Select
+                                            label="Language"
+                                            placeholder="Platform Default"
+                                            options={[
+                                                ...(platform?.allowed_languages || ["English"]).map(l => ({ value: l, label: l }))
+                                            ]}
+                                            value={formData.language}
+                                            onChange={(e) => setFormData({ ...formData, language: e.target.value })}
+                                        />
+                                        <Select
+                                            label="Voice"
+                                            placeholder="Platform Default"
+                                            options={
+                                                formData.voice_id && isLegacyVoice(formData.voice_id)
+                                                    ? [
+                                                        ...VALID_VOICES,
+                                                        { value: formData.voice_id, label: `${formData.voice_id} (Legacy - Unavailable)`, disabled: true }
+                                                    ]
+                                                    : VALID_VOICES
+                                            }
+                                            value={formData.voice_id}
+                                            onChange={(e) => setFormData({ ...formData, voice_id: e.target.value })}
+                                        />
+                                    </div>
                                 </div>
+                            )}
 
-                            </div>
+                            {/* STEP 5: REVIEW */}
+                            {currentStep === 5 - 1 && (
+                                <div className="step-fields-layout review-step-layout">
+                                    <div className="review-alert-tag">
+                                        <FaCheckCircle className="review-check" />
+                                        <div>
+                                            <h4>Ready to Publish</h4>
+                                            <p>Verify details below. Once published, candidate portals will activate.</p>
+                                        </div>
+                                    </div>
 
-                        )}
+                                    <div className="review-summary-cards">
+                                        <div className="review-card">
+                                            <span>Campaign</span>
+                                            <h4>{formData.name}</h4>
+                                        </div>
+                                        <div className="review-card">
+                                            <span>Department</span>
+                                            <h4>{formData.department}</h4>
+                                        </div>
+                                        <div className="review-card">
+                                            <span>Salary</span>
+                                            <h4>{formData.salary || "Not Specified"}</h4>
+                                        </div>
+                                        <div className="review-card">
+                                            <span>Location</span>
+                                            <h4>{formData.location}</h4>
+                                        </div>
+                                        <div className="review-card">
+                                            <span>Deadline</span>
+                                            <h4>{formData.deadline}</h4>
+                                        </div>
+                                        <div className="review-card">
+                                            <span>Interview Type</span>
+                                            <h4>{formData.interviewType}</h4>
+                                        </div>
+                                        <div className="review-card">
+                                            <span>Interview Strategy</span>
+                                            <h4>{selectedStrategy ? selectedStrategy.name : formData.strategy_id}</h4>
+                                        </div>
+                                        <div className="review-card">
+                                            <span>Language</span>
+                                            <h4>{formData.language || "Platform Default"}</h4>
+                                        </div>
+                                        <div className="review-card">
+                                            <span>Voice</span>
+                                            <h4>{formData.voice_id ? formData.voice_id.charAt(0).toUpperCase() + formData.voice_id.slice(1) : "Platform Default"}</h4>
+                                        </div>
+                                        <div className="review-card">
+                                            <span>Question Target</span>
+                                            <h4>{formData.budget_override_target || (selectedStrategy ? (selectedStrategy.budget_mode === "distinct_topics" ? "Based on distinct topics" : selectedStrategy.target_questions) : "Default")}</h4>
+                                        </div>
+                                    </div>
 
-                        {/* STEP 4 */}
-
-                        {currentStep === 3 && (
-
-                            <div className="step-fields-layout">
-
-                                <h3>Configure AI Interview Settings</h3>
-
-                                <div className="form-grid-2x">
-
-                                    <Select
-                                        label="AI Strictness Policy (Difficulty)"
-                                        options={(platform?.difficulty_levels || []).map(d => ({ value: d, label: d }))}
-                                        value={formData.strictness}
-                                        onChange={(e) =>
-                                            setFormData({
-                                                ...formData,
-                                                strictness: e.target.value
-                                            })
-                                        }
-                                        placeholder="Select strictness..."
-                                    />
-
-                                    <Select
-                                        label="Interview Type"
-                                        options={(platform?.interview_types || []).map(t => ({ value: t, label: t }))}
-                                        value={formData.interviewType}
-                                        onChange={(e) =>
-                                            setFormData({
-                                                ...formData,
-                                                interviewType: e.target.value
-                                            })
-                                        }
-                                        placeholder="Select type..."
-                                    />
-
+                                    <div className="review-block-full">
+                                        <span>Expected Candidate Requirements</span>
+                                        <div className="review-reqs-wrap">
+                                            {formData.requirements.map((req, idx) => (
+                                                <span key={idx} className="compact-chip read-only">
+                                                    {req.skill} <small>({req.criticality})</small>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
+                            )}
+                        </motion.div>
+                    </AnimatePresence>
+                </div>
 
-                                <div className="duration-slider-section">
+                <div className="wizard-form-footer">
+                    <Button variant="ghost" onClick={handleBack} disabled={currentStep === 0}>
+                        Back
+                    </Button>
 
-                                    <div className="slider-labels">
+                    {currentStep === steps.length - 1 ? (
+                        <Button variant="success" onClick={handleSubmit} disabled={submitting}>
+                            Publish Campaign
+                        </Button>
+                    ) : (
+                        <Button variant="primary" onClick={handleNext} iconRight={<FaArrowRight />}>
+                            Next Step
+                        </Button>
+                    )}
+                </div>
+            </Card>
 
-                                        <label className="input-label">
-                                            Interview Duration
-                                        </label>
-
-                                        <strong>
-                                            {formData.interviewDuration} minutes
-                                        </strong>
-
-                                    </div>
-
-                                    <input
-                                        type="range"
-                                        min="15"
-                                        max="90"
-                                        step="5"
-                                        value={formData.interviewDuration}
-                                        onChange={(e) =>
-                                            setFormData({
-                                                ...formData,
-                                                interviewDuration: parseInt(
-                                                    e.target.value
-                                                )
-                                            })
-                                        }
-                                        className="custom-range-slider"
-                                    />
-
-                                    <div className="slider-endpoints">
-
-                                        <span>15 mins</span>
-
-                                        <span>90 mins</span>
-
-                                    </div>
-
-                                </div>
-
-                            </div>
-
-                        )}
-
-                                                {/* STEP 5 */}
-
-                        {currentStep === 4 && (
-
-                            <div className="step-fields-layout review-step-layout">
-
-                                <div className="review-alert-tag">
-
-                                    <FaCheckCircle className="review-check" />
-
-                                    <div>
-                                        <h4>Ready to Update</h4>
-
-                                        <p>
-                                            Verify the campaign details below
-                                            before saving your changes.
-                                        </p>
-                                    </div>
-
-                                </div>
-
-                                <div className="review-summary-cards">
-
-                                    <div className="review-card">
-                                        <span>Campaign</span>
-                                        <h4>{formData.name}</h4>
-                                    </div>
-
-                                    <div className="review-card">
-                                        <span>Department</span>
-                                        <h4>{formData.department}</h4>
-                                    </div>
-
-                                    <div className="review-card">
-                                        <span>Salary</span>
-                                        <h4>
-                                            {formData.salary || "Not Specified"}
-                                        </h4>
-                                    </div>
-
-                                    <div className="review-card">
-                                        <span>Location</span>
-                                        <h4>{formData.location}</h4>
-                                    </div>
-
-                                    <div className="review-card">
-                                        <span>Deadline</span>
-                                        <h4>{formData.deadline}</h4>
-                                    </div>
-
-                                    <div className="review-card">
-                                        <span>Interview Type</span>
-                                        <h4>{formData.interviewType}</h4>
-                                    </div>
-
-                                    <div className="review-card">
-                                        <span>AI Strictness</span>
-                                        <h4>{formData.strictness}</h4>
-                                    </div>
-
-                                </div>
-
-                                <div className="review-block-full">
-
-                                    <span>
-                                        Expected Candidate Requirements
-                                    </span>
-
-                                    <div className="review-reqs-wrap">
-
-                                        {formData.requirements.map((req, idx) => (
-
-                                            <span
-                                                key={idx}
-                                                className="compact-chip read-only"
-                                            >
-                                                {req}
-                                            </span>
-
-                                        ))}
-
-                                    </div>
-
-                                </div>
-
-                            </div>
-
-                        )}
-
-                    </motion.div>
-
+            {/* Toast Alerts — fixed top-right */}
+            <div className="toast-portal">
+                <AnimatePresence>
+                    {toastMessage && (
+                        <>
+                            <motion.div
+                                className="toast-backdrop"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                            />
+                            <Toast message={toastMessage} type="success" onClose={() => setToastMessage(null)} />
+                        </>
+                    )}
                 </AnimatePresence>
-
             </div>
-
-            <div className="wizard-form-footer">
-
-                <Button
-                    variant="ghost"
-                    onClick={handleBack}
-                    disabled={currentStep === 0}
-                >
-                    Back
-                </Button>
-
-                {currentStep === steps.length - 1 ? (
-
-                    <Button
-                        variant="success"
-                        onClick={handleSubmit}
-                        disabled={submitting}
-                    >
-                        Update Campaign
-                    </Button>
-
-                ) : (
-
-                    <Button
-                        variant="primary"
-                        onClick={handleNext}
-                        iconRight={<FaArrowRight />}
-                    >
-                        Next Step
-                    </Button>
-
-                )}
-
-            </div>
-
-        </Card>
-
-        <div className="toast-portal">
-
-            <AnimatePresence>
-
-                {toastMessage && (
-
-                    <>
-
-                        <motion.div
-                            className="toast-backdrop"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                        />
-
-                        <Toast
-                            message={toastMessage}
-                            type={
-                                toastMessage.toLowerCase().includes("failed")
-                                    ? "error"
-                                    : "success"
-                            }
-                            onClose={() => setToastMessage(null)}
-                        />
-
-                    </>
-
-                )}
-
-            </AnimatePresence>
-
         </div>
-
-    </div>
-);
+    );
 }

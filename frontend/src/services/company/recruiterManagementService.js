@@ -41,8 +41,10 @@ const recruiterManagementService = {
     },
 
     // ─── Password Management ────────────────────────────────────────────────
-    // These are still on the /company/recruiters endpoint since team.py
-    // doesn't have them yet. Falls back to the old endpoint for these ops.
+    // F-01: this comment previously claimed these fell back to the old,
+    // now-dead /company/recruiters router -- that was stale even before
+    // consolidation: the calls below always used BASE (/company/team),
+    // which already has all of these routes (see backend/app/api/company/team.py).
 
     resetPassword(id) {
         return api.post(`${BASE}/${id}/reset-password`);

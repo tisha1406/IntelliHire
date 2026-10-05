@@ -40,6 +40,9 @@ class EvaluationNormalizer:
             weaknesses=EvaluationNormalizer._deduplicate_and_limit(evaluation.weaknesses),
             missing_concepts=EvaluationNormalizer._deduplicate_and_limit(evaluation.missing_concepts),
             evidence_summary=evaluation.evidence_summary.strip(),
+            candidate_claim=evaluation.candidate_claim,
+            interview_evidence=evaluation.interview_evidence,
+            answer_text=request.candidate_answer,
             follow_up_signal=evaluation.follow_up_signal,
             qualitative_coverage_signal=evaluation.qualitative_coverage_signal
         )

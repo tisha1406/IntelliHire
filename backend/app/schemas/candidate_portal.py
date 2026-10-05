@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional, List
+from typing import Optional, List, Dict, Literal
 from datetime import datetime
 
 
@@ -82,6 +82,13 @@ class DashboardResponse(BaseModel):
     readiness_score: int
     steps: List[WorkflowStepOut]
 
+    # Checkpoint-5 fix: the candidate's own completed official interview
+    # session_id, so the dashboard's "View Report" action (next_action ==
+    # "VIEW_REPORT") can deep-link straight to
+    # /candidate/reports?session_id=... instead of a bare /candidate/reports
+    # (which has no session to show). None until official_completed is True.
+    official_session_id: Optional[str] = None
+
 
 # ==============================================================
 # Resume Schemas
@@ -132,30 +139,146 @@ class DocumentsResponse(BaseModel):
 # Report Schemas
 # ==============================================================
 
-class QuestionFeedback(BaseModel):
+# ==============================================================
+# Report Schemas (D-02)
+#
+# Reconciled directly against the LIVE output of
+# app.services.interview_result_service.InterviewResultService
+# .generate_result_report() as of D-01. Every field here corresponds to an
+# actual key that service returns — nothing invented, nothing preserved
+# merely because an earlier (stale, mock-era) version of this schema had it.
+#
+# generate_result_report() returns one of three shapes depending on
+# session.state and whether any evaluations exist:
+#   - IN_PROGRESS / COMPLETED_NO_DATA: only
+#     {session_id, status, has_report=False, message}
+#   - COMPLETED (has data): the full shape below, with no "message" key.
+# This is why every field below session_id/status/has_report is Optional —
+# that optionality reflects genuine conditional absence in the service
+# output, not defensive guessing.
+# ==============================================================
+
+class QuestionFeedbackItem(BaseModel):
+    """Matches InterviewResultService._build_question_feedback() exactly."""
     id: str
+    question_record_id: str
+    topic_id: str
     topic: str
     question: str
-    score: int
-    feedback: str
+    difficulty: Optional[str] = None
+    question_type: Optional[str] = None
+    # 0.0-1.0 (round(ev.overall_score, 2)) — distinct from score_100.
+    score: float
+    # 0-100, for direct display.
+    score_100: int
+    coverage_signal: Optional[str] = None
+    follow_up_signal: Optional[str] = None
+    evaluated_at: Optional[str] = None
+
+
+class TopicScore(BaseModel):
+    """Matches InterviewResultService._build_topic_scores() exactly.
+    questions_asked is the pre-existing INT count — unchanged by D-01, and
+    distinct from TopicEvidence.questions_asked (a list) below."""
+    topic_id: str
+    topic_name: str
+    questions_asked: int
+    answers_evaluated: int
+    average_score: float
+    score_100: int
+    strong_answers: int
+    partial_answers: int
+    weak_answers: int
+    insufficient_answers: int
+    qualitatively_covered: bool
+    coverage_score: float
+
+
+class QuestionRecordDetail(BaseModel):
+    """One entry of TopicEvidence.questions_asked — matches the dict built
+    in InterviewResultService._build_topic_evidence() exactly."""
+    record_id: str
+    question_text: str
+    question_type: Optional[str] = None
+    difficulty: Optional[str] = None
+    category: Optional[str] = None
+    turn_number: int
+    asked_at: Optional[str] = None
+
+
+# Report-layer vocabulary only (D-01 design decision) — intentionally NOT
+# moved into app.ai_interview.core.enums, since it is a report-aggregation
+# rollup, not an interview-engine decision input. A constrained Literal is
+# the project's existing convention for a fixed string vocabulary that does
+# not need its own enum class.
+FinalAssessment = Literal["strong", "acceptable", "basic", "insufficient", "not_demonstrated"]
+
+
+class TopicEvidence(BaseModel):
+    """D-01 evidence-model block. Matches
+    InterviewResultService._build_topic_evidence() exactly. A sibling list to
+    topic_scores — NOT merged into it, so TopicScore.questions_asked (int)
+    is never renamed or overloaded by this model's questions_asked (list)."""
+    topic_id: str
+    topic_name: str
+    # The actual dispatched question records for this topic. Empty for a
+    # topic that was never reached (see skip_reason below) — never fabricated.
+    questions_asked: List[QuestionRecordDetail] = []
+    resume_evidence: Optional[Literal["absent", "partial", "strong"]] = None
+    # What the candidate said — never proof, never scored.
+    candidate_claim: Optional[str] = None
+    interview_evidence: Optional[
+        Literal["not_demonstrated", "basic", "acceptable", "strong"]
+    ] = None
+    # Always populated by the service (_derive_final_assessment always
+    # returns a value, including "not_demonstrated" for zero evaluations).
+    final_assessment: FinalAssessment
+    followup_depth: int
+    followup_categories_used: List[str] = []
+    # Only set when the topic was genuinely never attempted; None otherwise.
+    skip_reason: Optional[str] = None
+
+
+class RequirementCoverageBucket(BaseModel):
+    total: int
+    verified: int
+    not_verified: int
+    never_reached: int
+
+
+class RequirementCoverage(BaseModel):
+    """Matches InterviewResultService._build_requirement_coverage_summary()
+    exactly. Keys of by_criticality are RequirementCriticality values
+    ("critical"|"required"|"preferred"|"resume_only") plus "unspecified"."""
+    by_criticality: Dict[str, RequirementCoverageBucket]
+    total_topics: int
+    total_verified: int
+    total_not_verified: int
+    total_never_reached: int
 
 
 class ReportResponse(BaseModel):
+    """Reconciled against the live service output — see module note above."""
+    session_id: str
+    status: Literal["COMPLETED", "IN_PROGRESS", "COMPLETED_NO_DATA"]
     has_report: bool
+
+    # Present only on the two early-return (non-COMPLETED-with-data) shapes.
+    message: Optional[str] = None
+
+    # Present only when status == "COMPLETED" and evaluations exist.
     overall_score: Optional[int] = None
-    technical_score: Optional[int] = None
-    communication_score: Optional[int] = None
-    confidence: Optional[int] = None
-    problem_solving: Optional[int] = None
-    soft_skills_score: Optional[int] = None
-    time_management: Optional[int] = None
-    resume_match: Optional[int] = None
-    radar_data: List[dict] = []
-    strengths: List[str] = []
-    weaknesses: List[str] = []
-    improvement_suggestions: List[str] = []
+    question_count: Optional[int] = None
+    completed_at: Optional[str] = None
+    question_feedback: Optional[List[QuestionFeedbackItem]] = None
+    topic_scores: Optional[List[TopicScore]] = None
+    strengths: Optional[List[str]] = None
+    weaknesses: Optional[List[str]] = None
+    improvement_suggestions: Optional[List[str]] = None
     company_remarks: Optional[str] = None
-    question_feedback: List[QuestionFeedback] = []
+    # D-01 additions:
+    requirement_coverage: Optional[RequirementCoverage] = None
+    topic_evidence: Optional[List[TopicEvidence]] = None
 
 
 # ==============================================================

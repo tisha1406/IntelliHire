@@ -30,6 +30,17 @@ class PriorityAllocator:
             if TopicSourceCode.MODE_REQUIRED in topic.sources:
                 priority = max(priority, 5)
                 mandatory = True
-                
+
+            # D-03: a situational scenario topic is only ever added when the
+            # campaign's interview_type/mixed_composition explicitly requests
+            # situational coverage (see TopicSelector) -- so, like
+            # MODE_REQUIRED, its presence already represents a deliberate
+            # configuration decision that must survive CoveragePlanner's
+            # max-topics truncation, not an opportunistic signal to be
+            # outranked by it.
+            if TopicSourceCode.SITUATIONAL_SCENARIO in topic.sources:
+                priority = max(priority, 5)
+                mandatory = True
+
             topic.priority = priority
             topic.mandatory = mandatory

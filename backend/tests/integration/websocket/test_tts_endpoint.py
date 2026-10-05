@@ -27,7 +27,7 @@ def test_tts_endpoint_success(client, candidate_token):
             assert response.headers["content-type"] == "audio/wav"
             
             # Verify that synthesize was called with authoritative text
-            mock_synthesize.assert_called_once_with("How do you handle async in Python?", None)
+            mock_synthesize.assert_called_once_with("How do you handle async in Python?", None, "shubh")
 
 def test_tts_endpoint_unauthorized_access(client):
     response = client.post(

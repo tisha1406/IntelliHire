@@ -11,6 +11,7 @@ from app.repositories.activity_log_repository import ActivityLogRepository
 from app.repositories.candidate_settings_repository import CandidateSettingsRepository
 from app.repositories.campaign_repository import CampaignRepository
 from app.repositories.company_repository import CompanyRepository
+from app.db.mongo import get_database
 
 from app.schemas.candidate_portal import (
     DashboardResponse,
@@ -29,6 +30,25 @@ from app.schemas.candidate_portal import (
     ActivityResponse,
     ActivityEntryOut
 )
+
+# B-01 regression fix: canonical defaults for every SettingsResponse field.
+# Used both when a candidate has no settings document yet, and to backfill
+# any field missing from an existing (legacy/partial) persisted document --
+# see get_settings() below. A document can be legally partial today because
+# update_settings()/CandidateSettingsRepository.upsert() does a sparse Mongo
+# $set of only the fields the frontend actually sent (e.g. a single toggle
+# via Settings.jsx's handleToggle), so the very first PUT a candidate ever
+# makes creates a document containing only that one field.
+SETTINGS_DEFAULTS: Dict[str, Any] = {
+    "high_contrast": False,
+    "reduced_motion": False,
+    "sidebar_auto_collapse": True,
+    "interview_reminders": True,
+    "company_updates": True,
+    "result_notifications": True,
+    "portal_language": "English",
+    "live_subtitles": True,
+}
 
 
 class CandidatePortalService:
@@ -98,6 +118,23 @@ class CandidatePortalService:
                 )
             ]
 
+        # Checkpoint-5 fix: resolve the candidate's own completed official
+        # interview session_id so the frontend can deep-link directly to its
+        # report. No session_id is ever persisted onto the candidate or
+        # workflow document elsewhere, so this looks it up the same way the
+        # company-side report endpoints already do (a direct query against
+        # interview_sessions) -- only when official_completed is True, to
+        # avoid an extra query on every dashboard load otherwise.
+        official_session_id = None
+        if workflow and workflow.get("official_completed"):
+            db = get_database()
+            latest_session = await db.interview_sessions.find_one(
+                {"candidate_id": candidate_id, "mode_id": {"$ne": "practice"}, "state": "completed"},
+                sort=[("completed_at", -1)],
+            )
+            if latest_session:
+                official_session_id = latest_session.get("session_id")
+
         return DashboardResponse(
             candidate_id=candidate_id,
             candidate_name=candidate.get("name", ""),
@@ -115,7 +152,8 @@ class CandidatePortalService:
             stage=workflow.get("stage", "") if workflow else "",
             next_action=workflow.get("next_action", "") if workflow else "",
             readiness_score=score,
-            steps=steps
+            steps=steps,
+            official_session_id=official_session_id,
         )
 
     async def get_resume_status(self, candidate_id: str) -> ResumeStatusResponse:
@@ -173,19 +211,14 @@ class CandidatePortalService:
         
     async def get_settings(self, candidate_id: str) -> SettingsResponse:
         settings = await self.settings_repo.get_by_candidate(candidate_id)
-        if not settings:
-            # Default
-            return SettingsResponse(
-                high_contrast=False,
-                reduced_motion=False,
-                sidebar_auto_collapse=True,
-                interview_reminders=True,
-                company_updates=True,
-                result_notifications=True,
-                portal_language="English",
-                live_subtitles=True
-            )
-        return SettingsResponse(**settings)
+        # Merge defaults first so any field absent from a legacy/partial
+        # persisted document (see SETTINGS_DEFAULTS comment above) still
+        # gets a meaningful value -- existing persisted values always win
+        # over the default, nothing is ever overwritten. This is an
+        # in-memory merge only; the persisted document itself is left as-is
+        # (no write-back/backfill into Mongo, no migration).
+        merged = {**SETTINGS_DEFAULTS, **(settings or {})}
+        return SettingsResponse(**merged)
         
     async def update_settings(self, candidate_id: str, data: dict):
         # Filter out None values
@@ -268,7 +301,8 @@ class CandidatePortalService:
         })
 
     # Dummy methods for Practice & Interview for Phase 1 (to be fleshed out with real engine later)
-    async def start_practice(self, candidate_id: str):
+    async def start_practice(self, token: "TokenPayload", session_service: Any):
+        candidate_id = token.candidate_id
         await self.workflow_repo.set_step_status(
             candidate_id, "stage", "PRACTICE_AVAILABLE",
             {
@@ -278,6 +312,17 @@ class CandidatePortalService:
             }
         )
         await self.log_activity(candidate_id, "PRACTICE_STARTED", "Started practice session")
+        
+        # Resolve campaign_id to create the session
+        candidate = await self.candidate_repo.get_by_id(candidate_id)
+        if not candidate:
+            raise ValueError("Candidate not found")
+            
+        campaign_id = str(candidate.get("campaign_id"))
+        
+        # Delegate to SessionCreationService
+        session_data = await session_service.create_session(token, campaign_id, is_practice=True)
+        return session_data
 
     async def complete_practice(self, candidate_id: str):
         await self.workflow_repo.set_step_status(
@@ -300,3 +345,21 @@ class CandidatePortalService:
             }
         )
         await self.log_activity(candidate_id, "INTERVIEW_STARTED", "Started official interview")
+
+    async def complete_interview(self, candidate_id: str):
+        """Checkpoint-4 fix: mirrors complete_practice() -- official_completed
+        was never set anywhere in the backend (only initialized to False at
+        invite time), so the dashboard's Official Interview step stayed
+        "available" forever instead of "completed", even after a candidate
+        finished the real interview. official_started is untouched here and
+        practice_completed/practice_completed_at are untouched (no cross-step
+        state is modified)."""
+        await self.workflow_repo.set_step_status(
+            candidate_id, "stage", "INTERVIEW_COMPLETED",
+            {
+                "official_completed": True,
+                "official_completed_at": datetime.now(UTC),
+                "next_action": "VIEW_REPORT"
+            }
+        )
+        await self.log_activity(candidate_id, "INTERVIEW_COMPLETED", "Completed official interview")

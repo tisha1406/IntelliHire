@@ -11,7 +11,6 @@ import {
     FaCog,
     FaClipboardList,
     FaFileAlt,
-    FaUserFriends,
     FaBell,
     FaBuilding,
     FaUserTie,
@@ -19,6 +18,7 @@ import {
 } from "react-icons/fa";
 import useAuth from "../../hooks/useAuth";
 import { usePermissions } from "../../context/PermissionsContext";
+import { logoutFromServer } from "../../api/client";
 
 import "../../styles/company/CompanySidebar.css";
 import "../../styles/company/overlay.css";
@@ -52,7 +52,6 @@ const companyMenuGroups = [
         title: "Company",
         items: [
             { title: "Recruiters",       path: "/company/recruiters",     icon: <FaUserTie /> },
-            { title: "Team Members",     path: "/company/team",           icon: <FaUserFriends /> },
             { title: "Notifications",    path: "/company/notifications",  icon: <FaBell /> },
             { title: "Company Profile",  path: "/company/profile",        icon: <FaBuilding /> },
             { title: "Subscription",     path: "/company/subscription",   icon: <FaCreditCard /> },
@@ -91,6 +90,16 @@ const recruiterMenuGroups = [
 function CompanySidebar({ sidebarOpen, setSidebarOpen }) {
     const { logout, companyProfile, user, isRecruiter, recruiterProfile } = useAuth();
     const { hasFeature } = usePermissions();
+
+    const handleLogout = async () => {
+        try {
+            await logoutFromServer(localStorage.getItem("accessToken"));
+        } catch {
+            // best-effort only -- local logout still proceeds below
+        }
+        logout();
+        setSidebarOpen(false);
+    };
 
     // Determine display name for sidebar header.
     // companyProfile is now populated for both Company Admins and Recruiters.
@@ -175,10 +184,7 @@ function CompanySidebar({ sidebarOpen, setSidebarOpen }) {
 
                 <button
                     className="logout-btn"
-                    onClick={() => {
-                        logout();
-                        setSidebarOpen(false);
-                    }}
+                    onClick={handleLogout}
                 >
                     <FaSignOutAlt />
                     <span>Logout</span>

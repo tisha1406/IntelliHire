@@ -21,7 +21,7 @@ export const ReportsAPI = {
     exportCSV: async (reportType, range) => {
         // Since we want to download the file directly, we usually do this differently,
         // but for now we can fetch and trigger a download blob.
-        const response = await fetch(`${import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"}/admin/reports/export/csv?report_type=${reportType}&range=${range}`, {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"}/admin/reports/export/csv?report_type=${reportType}&range=${range}`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${getToken()}`
@@ -36,7 +36,7 @@ export const ReportsAPI = {
         a.click();
     },
     exportPDF: async (reportType, range) => {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"}/admin/reports/export/pdf?report_type=${reportType}&range=${range}`, {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"}/admin/reports/export/pdf?report_type=${reportType}&range=${range}`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${getToken()}`

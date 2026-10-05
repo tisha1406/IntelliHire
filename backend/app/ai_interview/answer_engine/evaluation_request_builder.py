@@ -39,8 +39,9 @@ class EvaluationRequestBuilder:
         # 4. Construct Mode Criteria
         criteria = {
             "focus_areas": "General correctness and clarity", 
-            "difficulty_policy": mode.settings.difficulty_policy
         }
+        if mode.settings.difficulty_policy:
+            criteria["difficulty_policy"] = mode.settings.difficulty_policy
         
         # Adjust criteria based on mode
         if "Technical" in mode.name or "technical" in mode.settings.allowed_question_types:

@@ -37,7 +37,7 @@ async def get_platform_config(
     languages = company.get("allowed_languages") or ["English"]
     interview_modes = company.get("allowed_interview_modes") or ["Structured", "Conversational"]
     ai_models = company.get("allowed_llm_tiers") or ["Gemini"]
-    voices = company.get("allowed_voices") or ["en_us"]
+    voices = company.get("allowed_voices") or ["shubh", "simran", "rohan", "ishita", "sunny"]
     strategies = company.get("allowed_strategies") or ["default"]
 
     interview_types = company.get("allowed_interview_types") or ["Technical", "HR", "Behavioral"]

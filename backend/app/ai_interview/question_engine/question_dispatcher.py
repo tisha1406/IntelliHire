@@ -39,6 +39,15 @@ from app.ai_interview.question_engine.schemas import (
 )
 from app.ai_interview.question_engine.exceptions import QuestionDispatchError
 from app.ai_interview.schemas.session import InterviewSessionSchema, TopicProgress
+from app.ai_interview.core.enums import QuestionCategory
+
+# Follow-up categories — any dispatched question in these categories increments follow_up_count
+_FOLLOWUP_CATEGORIES = {
+    QuestionCategory.FOLLOWUP_CLARIFICATION,
+    QuestionCategory.FOLLOWUP_DEPTH,
+    QuestionCategory.FOLLOWUP_EVIDENCE,
+    QuestionCategory.FOLLOWUP_CHALLENGE,
+}
 
 
 class QuestionDispatcher:
@@ -96,13 +105,23 @@ class QuestionDispatcher:
             question_text=question.question_text,
             question_type=question.question_type,
             difficulty=question.difficulty,
+            # D-01 supporting change: persist the category already decided
+            # deterministically by QuestionTurnPlanner (plan.category, used
+            # just below for is_followup_dispatch). This records an
+            # already-made decision; it does not change what gets dispatched.
+            category=plan.category,
         )
 
         # ── Atomic commit (ordered, with rollback on failure) ─────────────────
         # Snapshot pre-mutation state for rollback.
         snapshot_total = session.questions_asked_total
         snapshot_topic_count = topic_progress.questions_asked
+        snapshot_followup_count = topic_progress.follow_up_count
         history_len_before = len(session.question_history)
+
+        # Determine whether this dispatch counts as a follow-up.
+        # plan.category is the deterministic category chosen by QuestionTurnPlanner.
+        is_followup_dispatch = plan.category in _FOLLOWUP_CATEGORIES
 
         try:
             # Step 1: Append to question history
@@ -114,15 +133,25 @@ class QuestionDispatcher:
             # Step 3: Increment global counter
             session.questions_asked_total += 1
 
-            # Step 4: Post-dispatch invariant verification
+            # Step 4 (new): Increment follow-up counter if this is a follow-up question.
+            # ONLY incremented here — never by the policy engine, never by LLM.
+            # Official sessions with strategy enforcement gate this via FollowUpPolicyEngine
+            # before dispatch is reached. Practice/legacy sessions never reach follow-up
+            # categories under FollowUpPolicyEngine, but safe to count anyway.
+            if is_followup_dispatch:
+                topic_progress.follow_up_count += 1
+
+            # Step 5: Post-dispatch invariant verification
             QuestionDispatcher._assert_post_dispatch_invariants(
-                session, topic_progress, snapshot_total, snapshot_topic_count
+                session, topic_progress, snapshot_total, snapshot_topic_count,
+                snapshot_followup_count, is_followup_dispatch
             )
 
         except Exception as exc:
             # Rollback all mutations to keep session consistent.
             session.questions_asked_total = snapshot_total
             topic_progress.questions_asked = snapshot_topic_count
+            topic_progress.follow_up_count = snapshot_followup_count
             # Remove the appended record if it was added
             if len(session.question_history) > history_len_before:
                 session.question_history = session.question_history[:history_len_before]
@@ -169,10 +198,13 @@ class QuestionDispatcher:
         topic_progress: TopicProgress,
         pre_total: int,
         pre_topic: int,
+        pre_followup: int,
+        is_followup_dispatch: bool,
     ) -> None:
         """Verify mutations are exactly +1 increments (no partial / double increment)."""
         expected_total = pre_total + 1
         expected_topic = pre_topic + 1
+        expected_followup = pre_followup + (1 if is_followup_dispatch else 0)
 
         if session.questions_asked_total != expected_total:
             raise RuntimeError(
@@ -184,4 +216,10 @@ class QuestionDispatcher:
             raise RuntimeError(
                 f"Post-dispatch invariant violation: expected topic questions_asked="
                 f"{expected_topic}, got {topic_progress.questions_asked}."
+            )
+
+        if topic_progress.follow_up_count != expected_followup:
+            raise RuntimeError(
+                f"Post-dispatch invariant violation: expected follow_up_count="
+                f"{expected_followup}, got {topic_progress.follow_up_count}."
             )

@@ -4,11 +4,11 @@ const BASE = "/api/recruiter/profile";
 
 const recruiterService = {
     getProfile() {
-        return api.get(BASE);
+        return api.get(`${BASE}/`);
     },
 
     updateProfile(data) {
-        return api.put(BASE, data);
+        return api.put(`${BASE}/`, data);
     },
 
     changePassword(data) {

@@ -27,7 +27,15 @@ import "../../styles/company/Candidates.css";
 
 export default function Candidates() {
     const USE_MOCK_DATA = false;
-    const { isRecruiter } = useAuthContext();
+    const { isRecruiter, isCompany } = useAuthContext();
+    // Checkpoint-1 fix: the Add Candidate flow was gated to isRecruiter only,
+    // so a Company-role user had no way to invite a candidate anywhere in
+    // the app (backend's POST /company/candidates/invite already accepts
+    // both roles via require_company_or_recruiter). specs.md's own demo
+    // script expects "Company: ... invite a candidate (working invite
+    // flow)". canInviteCandidates intentionally does NOT change any other
+    // behavior on this page (candidate list query, table columns, etc.).
+    const canInviteCandidates = isRecruiter || isCompany;
 
     const [candidates, setCandidates] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -165,9 +173,9 @@ export default function Candidates() {
 
     // Filter Logic
     const filteredCandidates = candidates.filter((cand) => {
-        const matchesSearch = cand.name.toLowerCase().includes(search.toLowerCase()) ||
-            cand.email.toLowerCase().includes(search.toLowerCase()) ||
-            cand.skills.some((s) => s.toLowerCase().includes(search.toLowerCase()));
+        const matchesSearch = (cand.name || "").toLowerCase().includes(search.toLowerCase()) ||
+            (cand.email || "").toLowerCase().includes(search.toLowerCase()) ||
+            (cand.skills || []).some((s) => (s || "").toLowerCase().includes(search.toLowerCase()));
 
         const matchesStage = selectedStage === "" || cand.currentStage === selectedStage;
 
@@ -253,13 +261,16 @@ export default function Candidates() {
 
     useEffect(() => {
         fetchCandidates();
-        // Recruiter: pre-load their assigned campaigns for create form
-        if (isRecruiter) {
+        // Pre-load campaigns for the Add Candidate form's campaign dropdown.
+        // GET /company/campaigns already scopes correctly per role (a
+        // recruiter gets only their assigned campaigns, a company admin
+        // gets all company campaigns) -- see campaigns.py's get_campaigns().
+        if (canInviteCandidates) {
             campaignService.getCampaigns()
                 .then(res => setAssignedCampaigns(res.data || []))
                 .catch(() => {});
         }
-    }, [isRecruiter]);
+    }, [canInviteCandidates]);
 
     const handleAddCandidate = async (e) => {
         e.preventDefault();
@@ -314,7 +325,7 @@ export default function Candidates() {
                 subtitle={isRecruiter ? "Candidates assigned to you" : "Manage candidate pipelines and AI screening."}
                 breadcrumbs={[{ label: "Candidates" }]}
                 actions={
-                    isRecruiter && (
+                    canInviteCandidates && (
                         <Button variant="primary" iconLeft={<FaUserPlus />} onClick={() => setShowAddModal(true)}>
                             Add Candidate
                         </Button>
@@ -322,8 +333,8 @@ export default function Candidates() {
                 }
             />
 
-            {/* Recruiter: Add Candidate Modal */}
-            {isRecruiter && showAddModal && (
+            {/* Add Candidate Modal (Company Admin and Recruiter) */}
+            {canInviteCandidates && showAddModal && (
                 <div style={{
                     position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
                     background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center",
