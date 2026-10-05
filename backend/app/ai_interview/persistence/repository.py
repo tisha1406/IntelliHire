@@ -12,6 +12,8 @@ from app.ai_interview.persistence.exceptions import (
     ClaimAlreadyHeldError
 )
 from app.ai_interview.persistence.validator import SessionPersistenceValidator
+from app.ai_interview.question_engine.enums import QuestionStatus
+from app.ai_interview.core.enums import InterviewState
 
 logger = logging.getLogger(__name__)
 
@@ -44,13 +46,22 @@ class InterviewSessionRepository:
             raise SessionNotFoundError(f"Session {session_id} not found.")
         return self._map_to_domain(doc)
 
-    async def find_active_session(self, candidate_id: str, campaign_id: str) -> Optional[InterviewSessionSchema]:
+    async def find_active_session(self, candidate_id: str, campaign_id: str, mode_id: Optional[str] = None) -> Optional[InterviewSessionSchema]:
         """Finds an existing active session for a candidate and campaign."""
-        doc = await self.collection.find_one({
+        query = {
             "candidate_id": candidate_id,
             "campaign_id": campaign_id,
-            "state": {"$nin": ["COMPLETED", "FAILED"]}
-        })
+            "state": {
+                "$nin": [
+                    InterviewState.COMPLETED.value,
+                    InterviewState.FAILED.value,
+                ]
+            }
+        }
+        if mode_id:
+            query["mode_id"] = mode_id
+
+        doc = await self.collection.find_one(query)
         if not doc:
             return None
         return self._map_to_domain(doc)
@@ -171,9 +182,9 @@ class InterviewSessionRepository:
             "version": expected_version,
             "question_history.record_id": question_record_id,
             "$or": [
-                {"question_history.status": {"$in": ["dispatched", "answer_received"]}},
+                {"question_history.status": {"$in": [QuestionStatus.DISPATCHED.value, QuestionStatus.ANSWER_RECEIVED.value]}},
                 {
-                    "question_history.status": "evaluating",
+                    "question_history.status": QuestionStatus.EVALUATING.value,
                     "question_history.evaluation_claim.expires_at": {"$lt": now.isoformat()}
                 }
             ]
@@ -183,7 +194,7 @@ class InterviewSessionRepository:
             query,
             {
                 "$set": {
-                    "question_history.$[q].status": "evaluating",
+                    "question_history.$[q].status": QuestionStatus.EVALUATING.value,
                     "question_history.$[q].evaluation_claim": claim_dict
                 },
                 "$inc": {"version": 1}
@@ -197,7 +208,7 @@ class InterviewSessionRepository:
                 "session_id": session_id,
                 "version": expected_version,
                 "question_history.record_id": question_record_id,
-                "question_history.status": "evaluating",
+                "question_history.status": QuestionStatus.EVALUATING.value,
                 "question_history.evaluation_claim.expires_at": {"$gte": now.isoformat()}
             })
             if held > 0:
@@ -284,7 +295,7 @@ class InterviewSessionRepository:
             {
                 "$set": {
                     "question_history.$[q].evaluation_claim": None,
-                    "question_history.$[q].status": "answer_received"
+                    "question_history.$[q].status": QuestionStatus.ANSWER_RECEIVED.value
                 },
                 "$inc": {"version": 1}
             },

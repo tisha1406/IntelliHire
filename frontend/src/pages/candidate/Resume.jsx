@@ -106,7 +106,7 @@ export default function Resume() {
                             <div>
                                 <div className="c-file-name">Resume Uploaded</div>
                                 <div className="c-file-meta">
-                                    Uploaded {new Date(statusData.uploaded_at).toLocaleDateString()}
+                                    Uploaded {statusData.uploaded_at ? new Date(statusData.uploaded_at).toLocaleDateString() : "Date unavailable"}
                                     {status === "processing" && " • Analyzing..."}
                                 </div>
                             </div>

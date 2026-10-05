@@ -70,6 +70,10 @@ export const useTextToSpeech = (apiBaseUrl, getToken) => {
         if (autoPlay && lastSpokenQuestionIdRef.current === question_record_id) {
             return;
         }
+
+        if (autoPlay) {
+            lastSpokenQuestionIdRef.current = question_record_id;
+        }
         
         stopAudio(); // Stop any currently playing audio
 
@@ -118,7 +122,6 @@ export const useTextToSpeech = (apiBaseUrl, getToken) => {
             
             audio.onplay = () => {
                 setIsPlaying(true);
-                lastSpokenQuestionIdRef.current = question_record_id;
             };
             audio.onended = () => setIsPlaying(false);
             audio.onerror = (e) => {

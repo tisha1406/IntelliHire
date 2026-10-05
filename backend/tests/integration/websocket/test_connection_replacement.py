@@ -7,13 +7,13 @@ def test_connection_replacement(client, candidate_token, mock_session, mock_coor
     If Connection A is active, and Connection B connects, Connection A is replaced.
     Connection A receives a connection_replaced event and can no longer send commands.
     """
-    with client.websocket_connect(f"/ws/interview/session_1?token={candidate_token}") as ws_a:
+    with client.websocket_connect(f"/api/ws/interview/session_1?token={candidate_token}") as ws_a:
         # A connects successfully
         assert ws_a.receive_json()["event_type"] == "connection_ready"
         assert ws_a.receive_json()["event_type"] == "session_snapshot"
         
         # B connects
-        with client.websocket_connect(f"/ws/interview/session_1?token={candidate_token}") as ws_b:
+        with client.websocket_connect(f"/api/ws/interview/session_1?token={candidate_token}") as ws_b:
             assert ws_b.receive_json()["event_type"] == "connection_ready"
             assert ws_b.receive_json()["event_type"] == "session_snapshot"
             

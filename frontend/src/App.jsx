@@ -26,7 +26,6 @@ import Jobs from "./pages/company/Jobs";
 import JobForm from "./pages/company/JobForm";
 import Interviews from "./pages/company/Interviews";
 import Reports from "./pages/company/Reports";
-import Team from "./pages/company/Team";
 import Notifications from "./pages/company/Notifications";
 import RecruiterProfile from "./pages/company/RecruiterProfile";
 import EditCampaign from "./pages/company/EditCampaign";
@@ -160,9 +159,13 @@ function App() {
                     element={<JobForm />}
                 />
 
+                {/* F-01: Recruiters.jsx and Team.jsx were consolidated into one
+                    page (recruiterManagementService is the single canonical
+                    service). Both URLs are kept so no existing bookmark/link
+                    to either path breaks. */}
                 <Route
                     path="team"
-                    element={<Team />}
+                    element={<Recruiters />}
                 />
 
                 <Route

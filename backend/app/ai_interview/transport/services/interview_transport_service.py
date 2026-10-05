@@ -39,7 +39,8 @@ from app.ai_interview.transport.schemas.ws_errors import (
 
 from app.repositories.resume_repository import ResumeRepository
 from app.repositories.interview_mode_repository import InterviewModeRepository
-from app.ai_interview.schemas.interview_mode import InterviewModeDefinition
+from app.ai_interview.schemas.interview_mode import InterviewModeDefinition, InterviewModeSettings, InterviewModeStatus
+from app.ai_interview.question_engine.enums import QuestionStatus
 from app.ai_interview.transport.services.resume_context_bridge import ResumeContextBridge
 from app.ai_interview.resume_processing.schemas import CandidateInterviewContext
 from app.ai_interview.schemas.session import InterviewSessionSchema
@@ -60,13 +61,57 @@ class InterviewTransportService:
         self.mode_repo = mode_repo
         self.coordinator = coordinator
 
-    async def _load_candidate_context(self, candidate_id: str) -> CandidateInterviewContext:
-        resume_doc = await self.resume_repo.get_by_candidate(candidate_id)
+    async def _load_candidate_context(self, session: InterviewSessionSchema) -> CandidateInterviewContext:
+        if session.mode_id == "practice":
+            from app.ai_interview.resume_processing.schemas import CandidateInterviewContext, ExtractionMetadata
+            from app.ai_interview.schemas.resume import StructuredResume
+            from app.ai_interview.resume_processing.enums import ExtractionQualityStatus
+            
+            return CandidateInterviewContext(
+                candidate_id=session.candidate_id,
+                structured_resume=StructuredResume(
+                    professional_summary="Practice Candidate Text",
+                    education=[],
+                    experience=[],
+                    skills=[],
+                    projects=[],
+                    certifications=[],
+                    metadata={}
+                ),
+                extraction_metadata=ExtractionMetadata(
+                    source_type="practice",
+                    extractor_name="none",
+                    extractor_version="1.0",
+                    character_count=0,
+                    detected_sections=[],
+                    warning_count=0,
+                    processing_duration_ms=0.0
+                ),
+                quality_status=ExtractionQualityStatus.USABLE,
+                warnings=[]
+            )
+            
+        resume_doc = await self.resume_repo.get_by_candidate(session.candidate_id)
         if not resume_doc:
             raise RuntimeError("Resume analysis not found")
-        return ResumeContextBridge.build(resume_doc, candidate_id)
+        return ResumeContextBridge.build(resume_doc, session.candidate_id)
 
     async def _load_mode(self, mode_id: str, version: int) -> InterviewModeDefinition:
+        if mode_id == "practice":
+            from datetime import datetime, timezone
+            return InterviewModeDefinition(
+                mode_id="practice",
+                name="Practice Mode",
+                description="Conversational practice mode to help candidates warm up.",
+                version=1,
+                status=InterviewModeStatus.PUBLISHED,
+                settings=InterviewModeSettings(
+                    allowed_question_types=["initial", "follow_up"],
+                    question_style="conversational",
+                ),
+                created_at=datetime.now(timezone.utc)
+            )
+
         mode_doc = await self.mode_repo.get_by_mode_id(mode_id)
         if not mode_doc:
             raise RuntimeError(f"Mode {mode_id} not found")
@@ -105,11 +150,11 @@ class InterviewTransportService:
             total_question_budget=session.blueprint.total_question_budget,
             min_questions=session.blueprint.min_questions,
             current_topic_id=session.current_topic_id,
-            current_question=self._build_question_snapshot(last_q) if last_q and last_q.status.value == "dispatched" else None,
+            current_question=self._build_question_snapshot(last_q) if last_q and last_q.status == QuestionStatus.DISPATCHED else None,
             is_paused=session.state == InterviewState.PAUSED,
             is_completed=session.state == InterviewState.COMPLETED,
             is_failed=session.state == InterviewState.FAILED,
-            waiting_for_answer=bool(last_q and last_q.status.value == "dispatched"),
+            waiting_for_answer=bool(last_q and last_q.status == QuestionStatus.DISPATCHED),
             **recovery_hints
         )
 
@@ -149,12 +194,12 @@ class InterviewTransportService:
         if last_q:
             from datetime import datetime, timezone
             now = datetime.now(timezone.utc)
-            if last_q.status.value == "evaluating":
+            if last_q.status == QuestionStatus.EVALUATING:
                 if last_q.evaluation_claim and last_q.evaluation_claim.expires_at > now:
                     recovery_hints["evaluation_in_progress"] = True
                 else:
                     recovery_hints["pending_evaluation"] = True  # Claim expired, needs re-eval
-            elif last_q.status.value in ("answer_received", "evaluation_pending"):
+            elif last_q.status in (QuestionStatus.ANSWER_RECEIVED, QuestionStatus.EVALUATION_PENDING):
                 recovery_hints["pending_evaluation"] = True
         
         # 3. Emit Snapshot
@@ -162,7 +207,7 @@ class InterviewTransportService:
         await event_emitter.emit_session_snapshot(session_id, snapshot)
         
         # 4. Replays & Reminders
-        if session.state == InterviewState.IN_PROGRESS and last_q and last_q.status.value == "dispatched":
+        if session.state == InterviewState.IN_PROGRESS and last_q and last_q.status == QuestionStatus.DISPATCHED:
             await event_emitter.emit_question_ready(
                 session_id, 
                 QuestionReadyData(**self._build_question_snapshot(last_q).model_dump())
@@ -207,7 +252,7 @@ class InterviewTransportService:
         )
 
         # 2. Run Engine (Synchronous thread)
-        candidate_context = await self._load_candidate_context(session.candidate_id)
+        candidate_context = await self._load_candidate_context(session)
         mode = await self._load_mode(session.mode_id, session.mode_version)
         loop = asyncio.get_event_loop()
         
@@ -225,6 +270,7 @@ class InterviewTransportService:
 
         # 3. Persist Output
         if result.interview_completed:
+            session.generation_claim = None
             try:
                 await self.repo.save(
                     session, 
@@ -248,6 +294,7 @@ class InterviewTransportService:
             return
 
         # Save active question
+        session.generation_claim = None
         try:
             await self.repo.save(
                 session, 
@@ -272,6 +319,9 @@ class InterviewTransportService:
             correlation_id=command.command_id
         )
         
+        if session.mode_id == "practice":
+            logger.info(f"[INTERVIEW] PRACTICE_QUESTION_READY session={session_id} question_id={result.question.record_id} question_number={result.question.turn_number}")
+            
         await event_emitter.emit_question_ready(
             session_id,
             QuestionReadyData(**self._build_question_snapshot(result.question).model_dump()),
@@ -297,28 +347,35 @@ class InterviewTransportService:
             await event_emitter.emit_error(session_id, build_error_payload(WsErrorCode.QUESTION_NOT_FOUND, command.command_id))
             return
 
-        if active_question.status.value == "evaluated":
+        if active_question.status == QuestionStatus.EVALUATED:
             await event_emitter.emit_error(session_id, build_error_payload(WsErrorCode.QUESTION_STATUS_CONFLICT, command.command_id))
             return
 
         from datetime import datetime, timezone
         now = datetime.now(timezone.utc)
-        if active_question.status.value == "evaluating" and active_question.evaluation_claim and active_question.evaluation_claim.expires_at > now:
+        if active_question.status == QuestionStatus.EVALUATING and active_question.evaluation_claim and active_question.evaluation_claim.expires_at > now:
             await event_emitter.emit_error(session_id, build_error_payload(WsErrorCode.EVALUATION_IN_PROGRESS, command.command_id))
             return
 
-        # 1. Acquire BOTH Evaluation and Generation claims (Phase 9 invariant for single-save)
+        logger.info(f"[INTERVIEW] ANSWER_RECEIVED session={session_id} mode={session.mode_id} question={target_q_id} length={len(command.payload.answer_text)}")
+
+        # 1. Acquire Claims (Phase 9 invariant for single-save)
         try:
-            eval_claim = await self.repo.claim_evaluation(
-                session_id, 
-                question_record_id=target_q_id,
-                expected_version=session.version,
-                lease_seconds=settings.EVALUATION_LEASE_SECONDS
-            )
-            # version was incremented by claim_evaluation, so +1
+            eval_claim = None
+            if session.mode_id != "practice":
+                eval_claim = await self.repo.claim_evaluation(
+                    session_id, 
+                    question_record_id=target_q_id,
+                    expected_version=session.version,
+                    lease_seconds=settings.EVALUATION_LEASE_SECONDS
+                )
+            
+            # version was incremented by claim_evaluation if it was claimed
+            expected_gen_version = session.version + 1 if eval_claim else session.version
+            
             gen_claim = await self.repo.claim_question_generation(
                 session_id,
-                expected_version=session.version + 1,
+                expected_version=expected_gen_version,
                 lease_seconds=settings.GENERATION_LEASE_SECONDS
             )
         except (ClaimAlreadyHeldError, OptimisticConcurrencyError) as e:
@@ -327,6 +384,7 @@ class InterviewTransportService:
 
         # Reload session at N+2
         session = await self.repo.get_by_id(session_id)
+        active_question = next((q for q in session.question_history if q.record_id == target_q_id), None)
         
         await event_emitter.emit_answer_received(
             session_id,
@@ -345,7 +403,7 @@ class InterviewTransportService:
             question_record_id=target_q_id,
             answer_text=command.payload.answer_text
         )
-        candidate_context = await self._load_candidate_context(session.candidate_id)
+        candidate_context = await self._load_candidate_context(session)
         mode = await self._load_mode(session.mode_id, session.mode_version)
         loop = asyncio.get_event_loop()
         
@@ -358,21 +416,53 @@ class InterviewTransportService:
         except Exception as e:
             logger.exception("Engine failed during evaluation/generation")
             # Release both claims on failure
-            await self.repo.release_evaluation(session_id, target_q_id, session.version, eval_claim.claim_id)
-            await self.repo.release_question_generation(session_id, session.version + 1, gen_claim.claim_id)
+            if eval_claim:
+                await self.repo.release_evaluation(session_id, target_q_id, session.version, eval_claim.claim_id)
+            await self.repo.release_question_generation(session_id, expected_gen_version, gen_claim.claim_id)
             await event_emitter.emit_error(session_id, build_error_payload(WsErrorCode.EVALUATION_FAILED, command.command_id))
             return
 
-        # 3. Persist Output
+        # 3. Handle Generator Failure
+        if result.action == RuntimeAction.FAIL:
+            from app.ai_interview.runtime.runtime_controller import RuntimeController
+            RuntimeController.execute_transition(session, RuntimeAction.FAIL)
+            # A terminal session may not retain active claims
+            # (SessionPersistenceValidator invariant 1); without this the save
+            # below raised PersistenceInvariantError and the FAILED state was
+            # never persisted. Same clearing as the completed/continue paths;
+            # the DB-side fencing ids are still passed to save().
+            session.generation_claim = None
+            if active_question:
+                active_question.evaluation_claim = None
+            try:
+                await self.repo.save(
+                    session,
+                    expected_version=session.version,
+                    evaluation_fencing_id=eval_claim.claim_id if eval_claim else None,
+                    generation_fencing_id=gen_claim.claim_id
+                )
+                logger.info(f"[INTERVIEW] ANSWER_PERSISTED session={session_id} question={target_q_id} mode={session.mode_id} status={active_question.status.value if active_question else 'unknown'}")
+            except Exception as e:
+                await self._handle_persistence_error(session_id, command.command_id, e)
+                return
+                
+            await event_emitter.emit_error(session_id, build_error_payload(WsErrorCode.GENERATION_FAILED, command.command_id))
+            return
+
+        # 4. Persist Output
         if result.interview_completed:
+            session.generation_claim = None
+            if active_question:
+                active_question.evaluation_claim = None
             try:
                 # Discard gen_claim since no question was generated, just let it expire or clear implicitly
                 await self.repo.save(
                     session,
                     expected_version=session.version,
-                    evaluation_fencing_id=eval_claim.claim_id,
+                    evaluation_fencing_id=eval_claim.claim_id if eval_claim else None,
                     idempotency_evaluation_question_id=target_q_id
                 )
+                logger.info(f"[INTERVIEW] ANSWER_PERSISTED session={session_id} question={target_q_id} mode={session.mode_id} status={active_question.status.value if active_question else 'unknown'}")
             except Exception as e:
                 await self._handle_persistence_error(session_id, command.command_id, e)
                 return
@@ -382,40 +472,50 @@ class InterviewTransportService:
                     session_id,
                     EvaluationCompleteData(
                         question_record_id=target_q_id,
-                        topic_id=result.evaluation.get("topic_id", ""),
-                        overall_score=result.evaluation.get("overall_score", 0.0),
-                        follow_up_signal=result.evaluation.get("follow_up_signal", "NONE"),
-                        qualitative_coverage_signal=result.evaluation.get("qualitative_coverage_signal", "NOT_COVERED")
+                        topic_id=result.evaluation.topic_id,
+                        overall_score=result.evaluation.overall_score,
+                        follow_up_signal=result.evaluation.follow_up_signal.value,
+                        qualitative_coverage_signal=result.evaluation.qualitative_coverage_signal.value
                     ),
                     correlation_id=command.command_id
                 )
                 
             # Phase 12: Generate final result and propagate to Candidate
-            try:
-                from app.services.interview_result_service import InterviewResultService
-                from app.repositories.candidate_repository import CandidateRepository
-                
-                result_service = InterviewResultService()
-                report = await result_service.generate_result_report(session_id)
-                
-                if report and report.get("has_report"):
-                    cand_repo = CandidateRepository()
-                    overall_score = report.get("overall_score", 0)
-                    ai_recommendations = report.get("company_remarks", "")
+            if session.mode_id != "practice":
+                logger.info(f"[INTERVIEW] OFFICIAL_INTERVIEW_COMPLETED session={session_id}")
+                try:
+                    from app.services.interview_result_service import InterviewResultService
+                    from app.repositories.candidate_repository import CandidateRepository
                     
-                    # Update candidate with final scores and state
-                    await cand_repo.update(
-                        str(session.candidate_id),
-                        {
-                            "interviewScore": overall_score,
-                            "aiMatch": overall_score,
-                            "aiRecommendations": ai_recommendations,
-                            "currentStage": "AI Interview Completed",
-                            "status": "Interviewed",
-                        }
-                    )
-            except Exception as e:
-                logger.error(f"Failed to propagate result to candidate {session.candidate_id}: {e}")
+                    result_service = InterviewResultService()
+                    report = await result_service.generate_result_report(session_id)
+                    
+                    if report and report.get("has_report"):
+                        cand_repo = CandidateRepository()
+                        overall_score = report.get("overall_score", 0)
+                        ai_recommendations = report.get("company_remarks", "")
+                        
+                        # Update candidate with final scores and state
+                        await cand_repo.update(
+                            str(session.candidate_id),
+                            {
+                                "interviewScore": overall_score,
+                                "aiMatch": overall_score,
+                                "aiRecommendations": ai_recommendations,
+                                "currentStage": "AI Interview Completed",
+                                "status": "Interviewed",
+                            }
+                        )
+                except Exception as e:
+                    logger.error(f"Failed to propagate result to candidate {session.candidate_id}: {e}")
+            else:
+                logger.info(f"[INTERVIEW] PRACTICE_COMPLETED session={session_id} candidate={session.candidate_id}")
+                try:
+                    from app.services.candidate_portal_service import CandidatePortalService
+                    portal_service = CandidatePortalService()
+                    await portal_service.complete_practice(str(session.candidate_id))
+                except Exception as e:
+                    logger.error(f"Failed to mark practice as complete for candidate {session.candidate_id}: {e}")
 
             await event_emitter.emit_decision_ready(session_id, DecisionReadyData(action="complete"), correlation_id=command.command_id)
             await event_emitter.emit_interview_completed(
@@ -426,11 +526,14 @@ class InterviewTransportService:
             return
 
         # Interview continues
+        session.generation_claim = None
+        if active_question:
+            active_question.evaluation_claim = None
         try:
             await self.repo.save(
                 session,
                 expected_version=session.version,
-                evaluation_fencing_id=eval_claim.claim_id,
+                evaluation_fencing_id=eval_claim.claim_id if eval_claim else None,
                 generation_fencing_id=gen_claim.claim_id,
                 idempotency_evaluation_question_id=target_q_id,
                 idempotency_question_id=result.question.record_id if result.question else None
@@ -445,10 +548,10 @@ class InterviewTransportService:
                 session_id,
                 EvaluationCompleteData(
                     question_record_id=target_q_id,
-                    topic_id=result.evaluation.get("topic_id", ""),
-                    overall_score=result.evaluation.get("overall_score", 0.0),
-                    follow_up_signal=result.evaluation.get("follow_up_signal", "NONE"),
-                    qualitative_coverage_signal=result.evaluation.get("qualitative_coverage_signal", "NOT_COVERED")
+                    topic_id=result.evaluation.topic_id,
+                    overall_score=result.evaluation.overall_score,
+                    follow_up_signal=result.evaluation.follow_up_signal.value,
+                    qualitative_coverage_signal=result.evaluation.qualitative_coverage_signal.value
                 ),
                 correlation_id=command.command_id
             )
@@ -501,7 +604,7 @@ class InterviewTransportService:
         
         # Replay question if pending
         last_q = session.question_history[-1] if session.question_history else None
-        if last_q and last_q.status.value == "dispatched":
+        if last_q and last_q.status == QuestionStatus.DISPATCHED:
             await event_emitter.emit_question_ready(
                 session_id, 
                 QuestionReadyData(**self._build_question_snapshot(last_q).model_dump()),

@@ -164,6 +164,187 @@ DUMMY_COMPANIES = [
 ]
 
 
+async def seed_interview_modes():
+    from app.repositories.interview_mode_repository import InterviewModeRepository
+    from app.ai_interview.schemas.interview_mode import InterviewModeDefinition, InterviewModeSettings
+    from app.ai_interview.core.enums import InterviewModeStatus
+    
+    repo = InterviewModeRepository()
+    
+    modes_to_seed = [
+        InterviewModeDefinition(
+            mode_id="balanced",
+            name="Balanced",
+            description="Standard balanced interview approach.",
+            version=1,
+            status=InterviewModeStatus.PUBLISHED,
+            settings=InterviewModeSettings(
+                allowed_question_types=["initial", "follow_up"],
+                difficulty_policy="adaptive",
+                follow_up_policy="balanced",
+                question_budget_policy="standard",
+                threshold_configuration={"competency_threshold": 0.7},
+                question_style="conversational"
+            ),
+            created_at=datetime.now(UTC),
+            created_by="seed_script",
+            published_at=datetime.now(UTC)
+        ),
+        InterviewModeDefinition(
+            mode_id="structured",
+            name="Structured",
+            description="Strict structured interview.",
+            version=1,
+            status=InterviewModeStatus.PUBLISHED,
+            settings=InterviewModeSettings(
+                allowed_question_types=["initial"],
+                difficulty_policy="fixed",
+                follow_up_policy="none",
+                question_budget_policy="strict",
+                threshold_configuration={},
+                question_style="formal"
+            ),
+            created_at=datetime.now(UTC),
+            created_by="seed_script",
+            published_at=datetime.now(UTC)
+        ),
+        InterviewModeDefinition(
+            mode_id="technical",
+            name="Technical",
+            description="Technical coding and architecture focus.",
+            version=1,
+            status=InterviewModeStatus.PUBLISHED,
+            settings=InterviewModeSettings(
+                allowed_question_types=["initial", "follow_up", "skill_specific", "project_specific"],
+                difficulty_policy="adaptive",
+                follow_up_policy="deep_dive",
+                question_budget_policy="flexible",
+                threshold_configuration={"technical_depth": 0.8},
+                question_style="technical"
+            ),
+            created_at=datetime.now(UTC),
+            created_by="seed_script",
+            published_at=datetime.now(UTC)
+        ),
+        InterviewModeDefinition(
+            mode_id="deep_technical",
+            name="Deep Technical",
+            description="Extremely deep technical grilling.",
+            version=1,
+            status=InterviewModeStatus.PUBLISHED,
+            settings=InterviewModeSettings(
+                allowed_question_types=["initial", "skill_specific"],
+                difficulty_policy="hard",
+                follow_up_policy="aggressive",
+                question_budget_policy="extended",
+                threshold_configuration={"technical_depth": 0.9},
+                question_style="technical_grill"
+            ),
+            created_at=datetime.now(UTC),
+            created_by="seed_script",
+            published_at=datetime.now(UTC)
+        )
+    ]
+    
+    for mode in modes_to_seed:
+        existing = await repo.get_by_mode_id(mode.mode_id)
+        if existing:
+            print(f"[OK] Mode {mode.name} already exists")
+        else:
+            await repo.create(mode.model_dump())
+            print(f"[OK] Created Mode: {mode.name}")
+
+
+async def seed_situational_scenarios():
+    """D-03: deterministic seed data for the situational/case scenario bank.
+
+    role_or_domain keys are lowercase to match ScenarioRepository's own
+    normalization. A small, realistic set per role plus one "general"
+    fallback bucket (used when a campaign's role has no dedicated scenario)
+    -- intentionally small, per the task's "do not create a huge scenario
+    dataset" constraint.
+    """
+    from app.repositories.scenario_repository import ScenarioRepository
+    from app.ai_interview.blueprint_planning.scenario_schemas import Scenario
+    from app.ai_interview.core.enums import DifficultyLevel
+
+    repo = ScenarioRepository()
+
+    scenarios_to_seed = [
+        Scenario(
+            scenario_id="sit_backend_001",
+            role_or_domain="backend engineer",
+            topic_name="Handling a Production Outage During a Launch",
+            scenario_context=(
+                "You are the on-call engineer. Fifteen minutes after a major feature "
+                "launch, error rates spike and customers report failed checkouts. The "
+                "launch cannot be easily rolled back without losing in-flight orders, "
+                "and your lead is unreachable for the next hour."
+            ),
+            difficulty=DifficultyLevel.MEDIUM,
+            is_active=True,
+        ),
+        Scenario(
+            scenario_id="sit_frontend_001",
+            role_or_domain="frontend engineer",
+            topic_name="Shipping Under a Conflicting Design Change",
+            scenario_context=(
+                "Two days before a release deadline, the design team requests a "
+                "significant layout change to a core flow that your component "
+                "library does not yet support, and QA has not yet signed off on the "
+                "current build."
+            ),
+            difficulty=DifficultyLevel.MEDIUM,
+            is_active=True,
+        ),
+        Scenario(
+            scenario_id="sit_data_001",
+            role_or_domain="data scientist",
+            topic_name="A Model's Offline Metrics Don't Match Production",
+            scenario_context=(
+                "A model that performed well in offline evaluation is now showing "
+                "degraded business metrics two weeks after deployment, and "
+                "stakeholders are asking whether to roll it back immediately."
+            ),
+            difficulty=DifficultyLevel.HARD,
+            is_active=True,
+        ),
+        Scenario(
+            scenario_id="sit_pm_001",
+            role_or_domain="product manager",
+            topic_name="Conflicting Priorities Between Engineering and Sales",
+            scenario_context=(
+                "Engineering says a critical piece of technical debt must be "
+                "addressed this quarter or future velocity will suffer, while Sales "
+                "says a specific customer-requested feature is needed to close a "
+                "major deal closing in three weeks."
+            ),
+            difficulty=DifficultyLevel.MEDIUM,
+            is_active=True,
+        ),
+        Scenario(
+            scenario_id="sit_general_001",
+            role_or_domain="general",
+            topic_name="Disagreeing With a Decision You Must Implement",
+            scenario_context=(
+                "Your manager has made a decision you believe is the wrong call for "
+                "the team, and they are not open to revisiting it, but you are "
+                "responsible for implementing it."
+            ),
+            difficulty=DifficultyLevel.EASY,
+            is_active=True,
+        ),
+    ]
+
+    for scenario in scenarios_to_seed:
+        existing = await repo.get_one({"scenario_id": scenario.scenario_id})
+        if existing:
+            print(f"[OK] Scenario {scenario.scenario_id} already exists")
+        else:
+            await repo.create(scenario.model_dump())
+            print(f"[OK] Created Scenario: {scenario.scenario_id} ({scenario.role_or_domain})")
+
+
 async def seed_admin():
     user_repo = UserRepository()
 
@@ -526,7 +707,10 @@ async def seed_company_interviews():
 
         # Create Session if session_status is set
         if cand["session_status"]:
+            import uuid
+
             session_doc = {
+                "session_id": str(uuid.uuid4()),
                 "company_id": company_id,
                 "campaign_id": campaign_id,
                 "candidate_id": cand_id,
@@ -616,6 +800,10 @@ async def main():
 
     try:
         await seed_admin()
+
+        await seed_interview_modes()
+
+        await seed_situational_scenarios()
 
         await seed_companies()
 

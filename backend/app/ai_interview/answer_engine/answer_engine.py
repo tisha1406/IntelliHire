@@ -15,6 +15,7 @@ from app.ai_interview.answer_engine.exceptions import (
     EvaluationValidationError, AnswerEvaluationError,
     EvaluationApplicationError
 )
+from app.ai_interview.question_engine.enums import QuestionStatus
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ class AnswerEngine:
         question_record = next((q for q in session.question_history if q.record_id == request.question_record_id), None)
         if question_record:
             # We don't fail if it's missing here, EvaluationRequestBuilder already validates correlation
-            question_record.status = "evaluation_pending"
+            question_record.status = QuestionStatus.EVALUATION_PENDING
             
         # 3. Evaluator loop (Retry safely on transient / validation errors)
         raw_evaluation = None
@@ -82,6 +83,6 @@ class AnswerEngine:
         EvaluationApplicator.apply(session, topic_progress, result, assessment)
         
         if question_record:
-            question_record.status = "evaluated"
+            question_record.status = QuestionStatus.EVALUATED
             
         return result

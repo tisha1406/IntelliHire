@@ -1,4 +1,5 @@
 import pytest
+from datetime import datetime, timezone, timedelta
 from app.ai_interview.core.enums import InterviewState, TopicState, DifficultyLevel, DecisionReasonCode
 from app.ai_interview.runtime import (
     RuntimeController, SessionInitializer, StateMachine, TopicStateManager,
@@ -135,3 +136,59 @@ def test_runtime_controller_flow(mock_blueprint):
     RuntimeController.execute_transition(session, RuntimeAction.PAUSE)
     decision = RuntimeController.get_allowed_action(session)
     assert decision.allowed_action == RuntimeAction.RESUME
+
+def test_budget_exhaustion_exactly_at_limit():
+    """
+    Regression test proving that exactly 3 questions evaluated on a 3-question budget
+    leads to COMPLETION, ensuring no 4th question is asked in Practice Mode.
+    """
+    blueprint = InterviewBlueprint(
+        blueprint_version="1.0",
+        total_question_budget=3,
+        min_questions=3,
+        max_questions=3,
+        emergency_max_questions=5,
+        topics=[
+            TopicBlueprint(topic_id="t1", topic_name="Introduction", source="SRC", priority=5, mandatory=True, initial_difficulty=DifficultyLevel.MEDIUM, allowed_question_types=[]),
+            TopicBlueprint(topic_id="t2", topic_name="Recent Work", source="SRC", priority=4, mandatory=True, initial_difficulty=DifficultyLevel.MEDIUM, allowed_question_types=[]),
+            TopicBlueprint(topic_id="t3", topic_name="Proudest Project", source="SRC", priority=3, mandatory=True, initial_difficulty=DifficultyLevel.MEDIUM, allowed_question_types=[])
+        ]
+    )
+    
+    session = SessionInitializer.initialize(
+        blueprint=blueprint, candidate_id="c1", company_id="c1", campaign_id="c1", mode_id="practice", mode_version=1
+    )
+    
+    # Simulate 3 questions asked
+    session.questions_asked_total = 3
+    
+    should_complete, trace = CompletionEngine.evaluate(session)
+    
+    # Must complete exactly at the budget limit
+    assert should_complete is True
+    assert DecisionReasonCode.QUESTION_BUDGET_REACHED in trace.reason_codes
+    assert trace.questions_asked_total == 3
+
+def test_execute_transition_sets_completed_at(mock_blueprint):
+    session = SessionInitializer.initialize(
+        blueprint=mock_blueprint, candidate_id="c1", company_id="c1", campaign_id="c1", mode_id="m1", mode_version=1
+    )
+    # Transition to IN_PROGRESS so COMPLETE is legal
+    RuntimeController.execute_transition(session, RuntimeAction.INITIALIZE)
+    RuntimeController.execute_transition(session, RuntimeAction.START)
+    
+    assert session.state == InterviewState.IN_PROGRESS
+    assert session.completed_at is None
+    
+    time_before = datetime.now(timezone.utc)
+    
+    RuntimeController.execute_transition(session, RuntimeAction.COMPLETE)
+    
+    time_after = datetime.now(timezone.utc)
+    
+    assert session.state == InterviewState.COMPLETED
+    assert session.completed_at is not None
+    assert session.completed_at.tzinfo is not None
+    assert session.completed_at.tzinfo == timezone.utc
+    assert time_before <= session.completed_at <= time_after + timedelta(seconds=1)
+

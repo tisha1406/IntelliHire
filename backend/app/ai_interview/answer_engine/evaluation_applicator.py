@@ -36,8 +36,17 @@ class EvaluationApplicator:
                 overall_score=evaluation.overall_score,
                 qualitative_coverage_signal=evaluation.qualitative_coverage_signal,
                 follow_up_signal=evaluation.follow_up_signal,
+                candidate_claim=evaluation.candidate_claim,
+                interview_evidence=evaluation.interview_evidence,
+                answer_text=evaluation.answer_text,
                 timestamp=evaluation.evaluated_at
             )
+            
+            # Persist latest evidence state to topic_progress
+            if evaluation.candidate_claim:
+                topic_progress.candidate_claim = evaluation.candidate_claim
+            if evaluation.interview_evidence:
+                topic_progress.interview_evidence = evaluation.interview_evidence
             
             # 3. Update Aggregates
             agg = topic_progress.evaluation_aggregate
@@ -61,6 +70,16 @@ class EvaluationApplicator:
             if coverage_assessment.is_covered:
                 topic_progress.qualitatively_covered = True
                 
+            # Adaptive Difficulty
+            from app.ai_interview.runtime.adaptive_difficulty_engine import AdaptiveDifficultyEngine
+            AdaptiveDifficultyEngine.adapt(
+                session=session,
+                topic_progress=topic_progress,
+                overall_score=evaluation.overall_score,
+                strategy=session.strategy_snapshot,
+                interview_evidence=evaluation.interview_evidence
+            )
+                
             # 5. Append to history
             session.evaluation_history.append(record)
             
@@ -70,5 +89,7 @@ class EvaluationApplicator:
             topic_progress.coverage_score = original_topic_progress.coverage_score
             topic_progress.readiness_score = original_topic_progress.readiness_score
             topic_progress.qualitatively_covered = original_topic_progress.qualitatively_covered
+            topic_progress.candidate_claim = original_topic_progress.candidate_claim
+            topic_progress.interview_evidence = original_topic_progress.interview_evidence
             session.evaluation_history = original_evaluation_history
             raise EvaluationApplicationError(f"Failed to apply evaluation safely: {str(e)}")

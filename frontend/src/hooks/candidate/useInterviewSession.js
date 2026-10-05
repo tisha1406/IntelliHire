@@ -16,6 +16,7 @@ export function useInterviewSession(sessionId) {
 
     const ws = useRef(null);
     const reconnectTimeout = useRef(null);
+    const hasSentStart = useRef(false);
 
     const connect = useCallback(() => {
         if (!token || !sessionId) return;
@@ -27,7 +28,7 @@ export function useInterviewSession(sessionId) {
         // Ensure WebSocket URL is correct for your Vite proxy or full URL
         const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
         const wsHost = import.meta.env.VITE_WS_URL || `${window.location.hostname}:8000`;
-        const wsUrl = `${wsProtocol}//${wsHost}/api/ws/interview?token=${token}`;
+        const wsUrl = `${wsProtocol}//${wsHost}/api/ws/interview/${sessionId}?token=${token}`;
 
         const socket = new WebSocket(wsUrl);
 
@@ -68,6 +69,7 @@ export function useInterviewSession(sessionId) {
 
     const handleEvent = (message) => {
         const { event_type, data } = message;
+        console.log(`[INTERVIEW] WS_EVENT_RECEIVED event=${event_type} session=${sessionId}`);
 
         switch (event_type) {
             case "session_snapshot":
@@ -76,14 +78,35 @@ export function useInterviewSession(sessionId) {
                 if (data.current_question) {
                     setCurrentQuestion(data.current_question);
                     setIsEvaluating(data.evaluation_in_progress || data.pending_evaluation);
+                    hasSentStart.current = true;
                 } else {
                     setCurrentQuestion(null);
                     setIsEvaluating(false);
+                    
+                    if (data.is_failed) {
+                        setError("Interview failed. Please restart the interview.");
+                    } else if (!data.is_completed && !hasSentStart.current && data.interview_state === "created") {
+                        if (ws.current?.readyState === WebSocket.OPEN) {
+                            console.log(`[INTERVIEW] WS_START_SENT session=${sessionId} command=start_interview`);
+                            ws.current.send(JSON.stringify({
+                                command_type: "start_interview",
+                                command_id: `cmd_start_${Date.now()}`,
+                                session_id: sessionId,
+                                payload: {}
+                            }));
+                            hasSentStart.current = true;
+                        } else {
+                            console.log(`[INTERVIEW] Cannot send WS_START because socket state is ${ws.current?.readyState}`);
+                        }
+                    } else {
+                        console.log(`[INTERVIEW] Did not send WS_START. is_completed=${data.is_completed} hasSentStart=${hasSentStart.current} state=${data.interview_state}`);
+                    }
                 }
                 break;
                 
             case "question_ready":
-                setCurrentQuestion(data.question);
+            case "next_question_ready":
+                setCurrentQuestion(data);
                 setIsEvaluating(false);
                 break;
 
@@ -113,6 +136,14 @@ export function useInterviewSession(sessionId) {
                 
             case "error":
                 setError(data.message || data.error_code);
+                setIsEvaluating(false);
+                break;
+
+            case "decision_ready":
+            case "question_generating":
+            case "connection_ready":
+            case "interview_started":
+                // Backend informative events, currently not driving UI state directly
                 break;
 
             default:
@@ -126,7 +157,7 @@ export function useInterviewSession(sessionId) {
                 command_type: "submit_answer",
                 command_id: `cmd_${Date.now()}`,
                 session_id: sessionId,
-                data: {
+                payload: {
                     question_record_id: currentQuestion.record_id,
                     answer_text: text
                 }

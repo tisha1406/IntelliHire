@@ -8,14 +8,27 @@ const subscriptionApi = {
     calculatePrice: (features, limits, billing_cycle, is_upgrade = false) => 
         api.post("/company/subscription/calculate", { features, limits, billing_cycle, is_upgrade }).then(res => res.data),
         
-    changeSubscription: (features, limits, billing_cycle) => 
-        api.post("/company/subscription/change", { features, limits, billing_cycle }).then(res => res.data),
-        
-    createChangePayment: (amount, currency = "INR") => 
+    // allowed_languages/allowed_voices/allowed_llm_tiers/allowed_interview_modes
+    // are optional (backend: SubscriptionChangeRequest) — the AI-config fields
+    // a company narrows/widens as part of a plan change. Previously this
+    // function's signature only declared the first 3 params, so callers
+    // passing these (e.g. ChangeSubscription.jsx) had them silently dropped.
+    changeSubscription: (features, limits, billing_cycle, allowed_languages, allowed_voices, allowed_llm_tiers, allowed_interview_modes) =>
+        api.post("/company/subscription/change", {
+            features, limits, billing_cycle,
+            allowed_languages, allowed_voices, allowed_llm_tiers, allowed_interview_modes,
+        }).then(res => res.data),
+
+    createChangePayment: (amount, currency = "INR") =>
         api.post("/company/subscription/change/payment", { amount, currency }).then(res => res.data),
-        
-    verifyChangePayment: (payment_id, order_id, features, limits, billing_cycle, pricing) => 
-        api.post("/company/subscription/change/verify", { payment_id, order_id, features, limits, billing_cycle, pricing }).then(res => res.data),
+
+    // Same optional AI-config fields as changeSubscription above (backend:
+    // ChangePaymentVerifyRequest).
+    verifyChangePayment: (payment_id, order_id, features, limits, billing_cycle, pricing, allowed_languages, allowed_voices, allowed_llm_tiers, allowed_interview_modes) =>
+        api.post("/company/subscription/change/verify", {
+            payment_id, order_id, features, limits, billing_cycle, pricing,
+            allowed_languages, allowed_voices, allowed_llm_tiers, allowed_interview_modes,
+        }).then(res => res.data),
         
     createRenewalPayment: (amount, currency = "INR") => 
         api.post("/company/subscription/renew/payment", { amount, currency }).then(res => res.data),

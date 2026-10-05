@@ -3,6 +3,7 @@ import { LayoutDashboard, FileText, Video, BarChart2, User, Settings, HelpCircle
 import useSidebar from "../../hooks/useSidebar";
 import { useAuthContext } from "../../context/AuthContext";
 import { useCandidateDashboard } from "../../hooks/candidate/useCandidate";
+import { logoutFromServer } from "../../api/client";
 
 import "../../styles/candidate/sidebar.css";
 
@@ -26,6 +27,19 @@ export default function CandidateSidebar() {
     const { data: dashboard, isLoading } = useCandidateDashboard();
 
     const isActive = (path) => location.pathname.startsWith(path);
+
+    const handleLogout = async () => {
+        // logoutFromServer already catches/logs its own failures and never
+        // rejects; this catch is only defense-in-depth so a future change to
+        // that contract could never leave logout() uncalled or surface an
+        // unhandled rejection to the user.
+        try {
+            await logoutFromServer(localStorage.getItem("accessToken"));
+        } catch {
+            // best-effort only -- local logout still proceeds below
+        }
+        logout();
+    };
 
     return (
         <aside className={`c-sidebar ${collapsed ? "collapsed" : ""}`}>
@@ -125,7 +139,7 @@ export default function CandidateSidebar() {
                         <span className="c-user-name">{dashboard?.candidate_name || "Candidate"}</span>
                         <span className="c-user-role">Candidate</span>
                     </div>
-                    <button className="c-user-logout" onClick={logout} title="Log Out">
+                    <button className="c-user-logout" onClick={handleLogout} title="Log Out">
                         <LogOut size={18} />
                     </button>
                 </div>

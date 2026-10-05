@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+import hashlib
 import secrets
 
 from fastapi import Depends, HTTPException, status
@@ -38,6 +39,8 @@ class TokenPayload(BaseModel):
 
     sub: str
     role: str
+    name: str | None = None
+    email: str | None = None
     company_id: str | None = None
     campaign_id: str | None = None
     candidate_id: str | None = None
@@ -83,9 +86,17 @@ def create_access_token(
     candidate_id: str | None = None,
     recruiter_id: str | None = None,
     must_change_password: bool = False,
+    name: str | None = None,
+    email: str | None = None,
 ) -> str:
     """
     Create a short-lived JWT access token.
+
+    `name`/`email` are display identity claims only (G-03): they mirror the
+    DB-resolved identity at login time and must never be treated as an
+    authorization source. They are appended last (not inserted earlier in
+    the signature) and default to None, so every existing positional caller
+    keeps the same argument meaning it always had.
     """
 
     now = datetime.now(UTC)
@@ -97,6 +108,8 @@ def create_access_token(
     payload = {
         "sub": user_id,
         "role": role,
+        "name": name,
+        "email": email,
         "company_id": company_id,
         "campaign_id": campaign_id,
         "candidate_id": candidate_id,
@@ -127,6 +140,30 @@ def create_refresh_token() -> str:
     """
 
     return secrets.token_urlsafe(64)
+
+
+def hash_refresh_token(refresh_token: str) -> str:
+    """
+    Hash a raw refresh token for storage/lookup.
+
+    Single source of truth for the hashing scheme (sha256), used by both
+    login (store) and refresh (look up + rotate) so the two paths can never
+    drift apart. The refresh token itself is opaque (not a JWT, no claims)
+    and is never accepted in place of an access token -- decode_jwt() only
+    ever validates a real signed JWT, so a raw refresh token simply fails to
+    decode if it is ever sent as a Bearer access token.
+    """
+
+    return hashlib.sha256(refresh_token.encode()).hexdigest()
+
+
+def refresh_token_expiry() -> datetime:
+    """
+    The absolute expiry timestamp for a refresh token minted right now,
+    using the existing (previously unused) REFRESH_TOKEN_EXPIRE_DAYS setting.
+    """
+
+    return datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
 
 # ==========================================================

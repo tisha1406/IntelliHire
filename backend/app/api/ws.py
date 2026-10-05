@@ -1,5 +1,6 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import logging
+import asyncio
 from typing import Optional
 
 from app.db.mongo import get_database
@@ -26,7 +27,7 @@ from app.ai_interview.answer_engine.llm_answer_evaluator import LLMAnswerEvaluat
 logger = logging.getLogger("intellihire")
 
 router = APIRouter(
-    prefix="/ws",
+    prefix="/api/ws",
     tags=["WebSocket"],
 )
 
@@ -81,8 +82,10 @@ async def interview_websocket(
             
             try:
                 command: WsCommandBase = command_router.parse(session_id, raw_text)
+                logger.info(f"[INTERVIEW] WS_COMMAND_RECEIVED session={session_id} command={command.command_type}")
                 
                 if command.command_type == "start_interview":
+                    logger.info(f"[INTERVIEW] WS_COMMAND_DISPATCHED session={session_id} command={command.command_type}")
                     await transport_service.handle_start_interview(session_id, command, context)
                 elif command.command_type == "submit_answer":
                     await transport_service.handle_submit_answer(session_id, command, context)
@@ -101,15 +104,16 @@ async def interview_websocket(
                 elif type(ce).__name__ == "WsDuplicateCommandError":
                     code = WsErrorCode.DUPLICATE_COMMAND
                     
+                logger.warning(f"[INTERVIEW] WS_COMMAND_PARSE_FAILED session={session_id} error_type={type(ce).__name__}")
                 payload = build_error_payload(code, override_message=str(ce))
                 await event_emitter.emit_error(session_id, payload)
                 
             except Exception as e:
-                logger.exception(f"Unhandled error processing WS command for session {session_id}")
+                logger.exception(f"[INTERVIEW] WS_COMMAND_PARSE_FAILED session={session_id} error_type={type(e).__name__}")
                 payload = build_error_payload(WsErrorCode.INTERNAL_ERROR)
                 await event_emitter.emit_error(session_id, payload)
 
-    except (WebSocketDisconnect, RuntimeError):
+    except (WebSocketDisconnect, RuntimeError, asyncio.CancelledError):
         # Disconnect is safe; state remains IN_PROGRESS in MongoDB
         # RuntimeError is thrown by Starlette/AnyIO if the socket is closed while waiting to receive (e.g. replaced)
         logger.info({"event": "ws_disconnect", "session_id": session_id})

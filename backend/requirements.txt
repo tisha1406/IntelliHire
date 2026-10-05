@@ -46,8 +46,15 @@ python-docx==1.2.0
 # ==========================
 # PDF Reports
 # ==========================
+# Jinja2/weasyprint remain pinned (unused by D-05's implementation) --
+# weasyprint's native Pango/Cairo/GDK-Pixbuf dependency chain fails to import
+# on this Windows dev environment (confirmed during the D-05 audit: OSError
+# loading libgobject-2.0-0), exactly the risk specs.md §33 flagged. D-05
+# instead uses reportlab (pure Python, no native dependencies) for real PDF
+# generation -- see app/reports/pdf_renderer.py.
 Jinja2==3.1.6
 weasyprint==66.0
+reportlab==5.0.0
 
 # ==========================
 # HTTP Requests
@@ -72,3 +79,6 @@ loguru==0.7.3
 # ==========================
 pytest==8.4.1
 pytest-asyncio==1.1.0
+# D-05: used only by tests, for structural validation that generated PDFs
+# are real/parseable (page count, extractable text) rather than dummy bytes.
+pypdf==6.19.0

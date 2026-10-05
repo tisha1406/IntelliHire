@@ -19,6 +19,7 @@ const VoiceControls = ({
         audioData,
         audioMimeType,
         error: recorderError,
+        autoStopped,
         startRecording,
         stopRecording,
         cancelRecording
@@ -37,9 +38,18 @@ const VoiceControls = ({
         stopAudio
     } = useTextToSpeech(apiBaseUrl, getToken);
 
+    const lastProcessedAudioRef = React.useRef(null);
+
     // Auto-transcribe when audio is available
     useEffect(() => {
-        if (audioData && audioMimeType && session_id && question_record_id) {
+        if (
+            audioData && 
+            audioMimeType && 
+            session_id && 
+            question_record_id && 
+            lastProcessedAudioRef.current !== audioData
+        ) {
+            lastProcessedAudioRef.current = audioData;
             const processAudio = async () => {
                 const transcript = await transcribeAudio(session_id, question_record_id, audioData, audioMimeType);
                 if (transcript) {
@@ -56,6 +66,15 @@ const VoiceControls = ({
             playQuestion(session_id, question_record_id, question_text, true);
         }
     }, [session_id, question_record_id, question_text, playQuestion, disabled]);
+
+    // Cleanup resources if disabled (e.g., WS disconnect or evaluation starts)
+    useEffect(() => {
+        if (disabled) {
+            cancelRecording();
+            cancelTranscription();
+            stopAudio();
+        }
+    }, [disabled, cancelRecording, cancelTranscription, stopAudio]);
 
     const handlePlayQuestion = () => {
         if (isPlaying) {
@@ -124,6 +143,12 @@ const VoiceControls = ({
             {(recorderError || transcriptionError) && (
                 <div style={{ fontSize: '14px', color: '#EF4444' }}>
                     {recorderError || transcriptionError}
+                </div>
+            )}
+
+            {autoStopped && recorderStatus === 'idle' && !recorderError && !transcriptionError && (
+                <div style={{ fontSize: '14px', color: '#F59E0B' }}>
+                    Recording automatically stopped at the 28-second limit. If your answer was cut off, you can finish it in the text box below.
                 </div>
             )}
 

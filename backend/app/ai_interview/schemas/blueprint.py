@@ -15,6 +15,15 @@ class TopicBlueprint(BaseModel):
         default=2,
         description="Number of questions allocated to this topic. Enforced by Phase 5 QuestionTurnPlanner."
     )
+    # D-03: immutable snapshot of the scenario selected for this topic (only
+    # set when source includes SITUATIONAL_SCENARIO). Snapshotted here rather
+    # than referencing the live scenario document so an edit/deactivation of
+    # the scenario bank after session creation can never change an
+    # in-progress interview. D-04 will read scenario_context from here to
+    # populate QuestionTurnPlan.scenario_context (question_turn_planner.py);
+    # that wiring is explicitly out of scope for D-03.
+    scenario_id: Optional[str] = None
+    scenario_context: Optional[str] = None
 
 
 class InterviewBlueprint(BaseModel):

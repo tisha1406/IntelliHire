@@ -1,15 +1,16 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useParams, Link } from "react-router-dom";
-import { FaArrowLeft, FaDownload, FaPrint, FaStar, FaCheckCircle, FaTimesCircle, FaSpinner } from "react-icons/fa";
+import { FaArrowLeft, FaDownload, FaPrint, FaCheckCircle, FaTimesCircle, FaSpinner, FaLightbulb } from "react-icons/fa";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from "recharts";
+import { Target, Activity, Building } from "lucide-react";
 
 import candidateService from "../../services/company/candidateService";
 import interviewService from "../../services/company/interviewService";
 import Button from "../../components/common/Button";
 import StatusBadge from "../../components/common/StatusBadge";
 
-const SCORE_COLOR = (s) => s >= 90 ? "#10B981" : s >= 75 ? "#F59E0B" : "#EF4444";
+const SCORE_COLOR = (s) => s >= 80 ? "#10B981" : s >= 60 ? "#F59E0B" : "#EF4444";
 
 const ScoreBar = ({ value, color }) => (
     <div style={{ width: "100%", height: 8, background: "rgba(255,255,255,0.07)", borderRadius: 999, overflow: "hidden" }}>
@@ -27,6 +28,9 @@ export default function CandidateReport() {
     const [candidate, setCandidate] = useState(null);
     const [report, setReport] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [sessionStatus, setSessionStatus] = useState(null);
+    const [completedSessionId, setCompletedSessionId] = useState(null);
+    const [isDownloading, setIsDownloading] = useState(false);
 
     useEffect(() => {
         const fetchCandidate = async () => {
@@ -37,10 +41,16 @@ export default function CandidateReport() {
 
                 try {
                     const interviewsRes = await interviewService.getInterviews();
-                    const session = interviewsRes.interviews?.find(i => String(i.candidate_id) === String(id) && i.status === "Completed");
-                    if (session) {
-                        const reportRes = await interviewService.getInterviewResults(session.id);
-                        setReport(reportRes);
+                    // Match pending or completed
+                    const candidateSessions = (interviewsRes.data?.interviews || interviewsRes.interviews || []).filter(i => String(i.candidate_id) === String(id));
+                    const completedSession = candidateSessions.find(i => i.status === "Completed");
+                    
+                    if (completedSession) {
+                        const reportRes = await interviewService.getInterviewResults(completedSession.id);
+                        setReport(reportRes.data || reportRes);
+                        setCompletedSessionId(completedSession.id);
+                    } else if (candidateSessions.length > 0) {
+                        setSessionStatus(candidateSessions[0].status);
                     }
                 } catch (e) {
                     console.error("Failed to fetch detailed AI report:", e);
@@ -58,23 +68,53 @@ export default function CandidateReport() {
         return (
             <div style={{ textAlign: "center", padding: "100px 0", color: "var(--text-secondary)" }}>
                 <FaSpinner className="spin-icon" style={{ fontSize: 32, marginBottom: 12 }} />
-                <p>Generating report...</p>
+                <p>Retrieving authentic candidate data...</p>
             </div>
         );
     }
 
     if (!candidate) return <div style={{ padding: 40, color: "var(--text-secondary)" }}>Candidate report not found.</div>;
 
-    const aiMatch = candidate.aiMatch ?? candidate.match_score ?? 88;
-    const resumeScore = candidate.resumeScore ?? 85;
-    const interviewScore = candidate.interviewScore ?? 85;
+    const handleDownloadPdf = async () => {
+        if (!completedSessionId || isDownloading) return;
+        setIsDownloading(true);
+        try {
+            const res = await interviewService.downloadInterviewResultsPdf(completedSessionId);
+            const blob = new Blob([res.data], { type: "application/pdf" });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.setAttribute("download", `interview_report_${completedSessionId}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error("Failed to download report PDF:", err);
+        } finally {
+            setIsDownloading(false);
+        }
+    };
 
-    const scoreData = [
-        { label: "AI Match Score", value: aiMatch },
-        { label: "Resume Score", value: resumeScore },
-        { label: "Interview Score", value: interviewScore },
-        { label: "Overall Rating", value: Math.round((aiMatch + resumeScore + interviewScore) / 3) },
-    ];
+    // We do NOT use aiMatch or resumeScore anymore since they are either redundant or unimplemented
+    const scoreData = [];
+    
+    if (report && report.has_report) {
+        scoreData.push({ label: "Overall Interview Score", value: report.overall_score || 0 });
+        
+        // Add up to 3 topics
+        const sortedTopics = [...(report.topic_scores || [])].sort((a,b) => b.score_100 - a.score_100).slice(0, 3);
+        sortedTopics.forEach(t => {
+            scoreData.push({ label: t.topic_name, value: t.score_100 || 0 });
+        });
+    }
+
+    // Dynamic radar charting based purely on real topics
+    const radarData = report?.topic_scores?.map(ts => ({
+        subject: ts.topic_name || ts.topic_id,
+        A: ts.score_100 || 0,
+        fullMark: 100
+    })) || [];
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 28, animation: "fadeInPage 0.4s ease-out" }}>
@@ -87,7 +127,7 @@ export default function CandidateReport() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                     <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", marginBottom: 4 }}>
-                        AI Candidate Report
+                        IntelliHire Candidate Report
                     </h1>
                     <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
                         Generated · {new Date().toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" })}
@@ -98,7 +138,15 @@ export default function CandidateReport() {
                         <Button variant="outline" icon={<FaArrowLeft />} size="sm">Back</Button>
                     </Link>
                     <Button variant="outline" icon={<FaPrint />} size="sm" onClick={() => window.print()}>Print</Button>
-                    <Button variant="primary" icon={<FaDownload />} size="sm">Download PDF</Button>
+                    <Button
+                        variant="primary"
+                        icon={<FaDownload />}
+                        size="sm"
+                        onClick={handleDownloadPdf}
+                        disabled={!completedSessionId || isDownloading}
+                    >
+                        {isDownloading ? "Preparing..." : "Download PDF"}
+                    </Button>
                 </div>
             </div>
 
@@ -121,154 +169,145 @@ export default function CandidateReport() {
                     display: "flex", alignItems: "center", justifyContent: "center",
                     border: "3px solid rgba(255,255,255,0.1)", flexShrink: 0
                 }}>
-                    {candidate.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                    {candidate.name?.split(" ").map(n => n[0]).join("").slice(0, 2)}
                 </div>
                 <div style={{ flex: 1 }}>
                     <h2 style={{ fontSize: 20, fontWeight: 800, color: "var(--text)", marginBottom: 4 }}>{candidate.name}</h2>
-                    <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 8 }}>{candidate.experience}</p>
-                    <p style={{ fontSize: 12, color: "var(--text-secondary)" }}>{candidate.education}</p>
+                    <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 8 }}>{candidate.experience || "Experience Not Available"}</p>
+                    <p style={{ fontSize: 12, color: "var(--text-secondary)" }}>{candidate.education || "Education Not Available"}</p>
                 </div>
                 <div style={{ textAlign: "right" }}>
                     <StatusBadge status={candidate.status} />
                     <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 8 }}>
-                        Applied {new Date(candidate.applicationDate).toLocaleDateString("en-US", { day: "numeric", month: "short" })}
+                        Applied {candidate.applicationDate ? new Date(candidate.applicationDate).toLocaleDateString("en-US", { day: "numeric", month: "short" }) : "Recently"}
                     </p>
                 </div>
             </motion.div>
 
-            {/* Score breakdown */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15 }}
-                style={{
-                    background: "var(--card)", border: "1px solid var(--border)",
-                    borderRadius: "var(--radius-md)", padding: "28px",
-                    boxShadow: "var(--shadow)"
-                }}
-            >
-                <h4 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", marginBottom: 22 }}>
-                    <FaStar style={{ color: "#F59E0B", marginRight: 8 }} />
-                    Score Breakdown
-                </h4>
-                <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-                    {scoreData.map(s => (
-                        <div key={s.label}>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{s.label}</span>
-                                <span style={{ fontSize: 14, fontWeight: 800, color: SCORE_COLOR(s.value) }}>{s.value}%</span>
-                            </div>
-                            <ScoreBar value={s.value} color={SCORE_COLOR(s.value)} />
-                        </div>
-                    ))}
-                </div>
-            </motion.div>
-
-            {/* Skills & AI Rec */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    style={{
-                        background: "var(--card)", border: "1px solid var(--border)",
-                        borderRadius: "var(--radius-md)", padding: "22px", boxShadow: "var(--shadow)"
-                    }}
-                >
-                    <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 14 }}>Skills Assessed</h4>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                        {candidate.skills.map(skill => (
-                            <div key={skill} style={{ display: "flex", alignItems: "center", gap: 6,
-                                padding: "5px 12px", background: "rgba(16,185,129,0.1)", color: "#10B981",
-                                borderRadius: 999, fontSize: 12, fontWeight: 600,
-                                border: "1px solid rgba(16,185,129,0.2)"
-                            }}>
-                                <FaCheckCircle style={{ fontSize: 10 }} />
-                                {skill}
-                            </div>
-                        ))}
+            {/* In-Progress / No Data fallback */}
+            {(!report || report.has_report === false) && (
+                <div style={{ textAlign: "center", padding: "60px 20px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12 }}>
+                    <div style={{ width: 64, height: 64, margin: "0 auto", background: "rgba(59,130,246,0.1)", color: "var(--primary)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
+                        <Activity size={32} />
                     </div>
-                </motion.div>
-
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.25 }}
-                    style={{
-                        background: "var(--card)", border: "1px solid var(--border)",
-                        borderRadius: "var(--radius-md)", padding: "22px", boxShadow: "var(--shadow)"
-                    }}
-                >
-                    <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 14 }}>AI Recommendation</h4>
-                    <p style={{
-                        fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.7,
-                        padding: 14, background: "rgba(139,92,246,0.06)",
-                        border: "1px solid rgba(139,92,246,0.15)", borderRadius: "var(--radius-sm)"
-                    }}>
-                        {candidate.aiRecommendations}
+                    <h3 style={{ fontSize: 20, fontWeight: 700, color: "var(--text)", marginBottom: 8 }}>
+                        {sessionStatus === "In Progress" ? "Interview In Progress" : "No Report Available"}
+                    </h3>
+                    <p style={{ color: "var(--text-secondary)", maxWidth: 400, margin: "0 auto", lineHeight: 1.5 }}>
+                        {sessionStatus === "In Progress" 
+                            ? "The candidate is currently completing their interview. Check back soon for the full AI evaluation." 
+                            : report?.message || "There is no completed interview report for this candidate yet."}
                     </p>
-                </motion.div>
-            </div>
+                </div>
+            )}
 
-            {/* Notes */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                style={{
-                    background: "var(--card)", border: "1px solid var(--border)",
-                    borderRadius: "var(--radius-md)", padding: "22px", boxShadow: "var(--shadow)"
-                }}
-            >
-                <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 12 }}>Recruiter Notes</h4>
-                <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.7 }}>
-                    {candidate.notes}
-                </p>
-            </motion.div>
-            {/* Extended AI Evaluation from Phase 12 Result Service */}
-            {report && (
+            {/* Score breakdown & Real Evaluation */}
+            {report && report.has_report && (
                 <>
-                    {/* Radar Chart & Topic Scores */}
+                    {scoreData.length > 0 && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.15 }}
+                            style={{
+                                background: "var(--card)", border: "1px solid var(--border)",
+                                borderRadius: "var(--radius-md)", padding: "28px",
+                                boxShadow: "var(--shadow)"
+                            }}
+                        >
+                            <h4 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", marginBottom: 22 }}>
+                                <Target size={16} style={{ color: "var(--primary)", marginRight: 8, display: "inline" }} />
+                                Authentic Score Breakdown
+                            </h4>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+                                {scoreData.map(s => (
+                                    <div key={s.label}>
+                                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                                            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{s.label}</span>
+                                            <span style={{ fontSize: 14, fontWeight: 800, color: SCORE_COLOR(s.value) }}>{s.value}/100</span>
+                                        </div>
+                                        <ScoreBar value={s.value} color={SCORE_COLOR(s.value)} />
+                                    </div>
+                                ))}
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* Detailed Topic Evaluation */}
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.35 }}
                         style={{
                             background: "var(--card)", border: "1px solid var(--border)",
-                            borderRadius: "var(--radius-md)", padding: "22px", boxShadow: "var(--shadow)"
+                            borderRadius: "var(--radius-md)", padding: "28px", boxShadow: "var(--shadow)"
                         }}
                     >
-                        <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 12 }}>Detailed Topic Evaluation</h4>
-                        <div style={{ display: "flex", gap: 32, flexWrap: "wrap", alignItems: "center", justifyContent: "center" }}>
-                            {report.radar_data && (
+                        <h4 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", marginBottom: 24 }}>Detailed Topic Evaluation</h4>
+                        <div style={{ display: "flex", gap: 32, flexWrap: "wrap", alignItems: "flex-start", justifyContent: "center" }}>
+                            {radarData.length >= 3 ? (
                                 <div style={{ width: 400, height: 350 }}>
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <RadarChart cx="50%" cy="50%" outerRadius="70%" data={report.radar_data}>
+                                        <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
                                             <PolarGrid stroke="var(--border)" />
                                             <PolarAngleAxis dataKey="subject" tick={{ fill: "var(--text-secondary)", fontSize: 12 }} />
-                                            <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: "var(--text-muted)", fontSize: 10 }} />
-                                            <Radar name="Candidate" dataKey="A" stroke="var(--primary)" fill="var(--primary)" fillOpacity={0.3} />
+                                            <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                                            <Radar name="Candidate" dataKey="A" stroke="var(--primary)" fill="var(--primary)" fillOpacity={0.3} strokeWidth={2} />
                                         </RadarChart>
                                     </ResponsiveContainer>
                                 </div>
+                            ) : (
+                                <div style={{ width: 400, height: 200, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 14, textAlign: "center" }}>
+                                    Not enough specific topic dimensions to plot radar chart.
+                                </div>
                             )}
                             
-                            <div style={{ flex: 1, minWidth: 280, display: "flex", flexDirection: "column", gap: 16 }}>
+                            <div style={{ flex: 1, minWidth: 280, display: "flex", flexDirection: "column", gap: 20 }}>
+                                {report.company_remarks && (
+                                    <div style={{ padding: 16, background: "rgba(59, 130, 246, 0.05)", border: "1px solid rgba(59, 130, 246, 0.2)", borderRadius: 8 }}>
+                                        <div style={{ fontSize: 13, fontWeight: 700, color: "#3B82F6", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                                            <Building size={14} /> Hiring Manager Remarks
+                                        </div>
+                                        <p style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.5, margin: 0 }}>
+                                            "{report.company_remarks}"
+                                        </p>
+                                    </div>
+                                )}
                                 <div>
-                                    <h5 style={{ fontSize: 13, color: "#10B981", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                                    <h5 style={{ fontSize: 14, color: "#10B981", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
                                         <FaCheckCircle /> Identified Strengths
                                     </h5>
-                                    <ul style={{ margin: 0, paddingLeft: 18, color: "var(--text)", fontSize: 13, lineHeight: 1.6 }}>
-                                        {report.strengths?.map((str, i) => <li key={i}>{str}</li>)}
-                                    </ul>
+                                    {report.strengths?.length > 0 ? (
+                                        <ul style={{ margin: 0, paddingLeft: 18, color: "var(--text)", fontSize: 13, lineHeight: 1.6 }}>
+                                            {report.strengths.map((str, i) => <li key={i} style={{marginBottom: 8}}>{str}</li>)}
+                                        </ul>
+                                    ) : (
+                                        <div style={{ fontSize: 13, color: "var(--text-muted)" }}>No specific strengths highlighted.</div>
+                                    )}
                                 </div>
                                 <div>
-                                    <h5 style={{ fontSize: 13, color: "#EF4444", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                                    <h5 style={{ fontSize: 14, color: "#EF4444", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
                                         <FaTimesCircle /> Areas for Improvement
                                     </h5>
-                                    <ul style={{ margin: 0, paddingLeft: 18, color: "var(--text)", fontSize: 13, lineHeight: 1.6 }}>
-                                        {report.weaknesses?.map((wk, i) => <li key={i}>{wk}</li>)}
-                                    </ul>
+                                    {report.weaknesses?.length > 0 ? (
+                                        <ul style={{ margin: 0, paddingLeft: 18, color: "var(--text)", fontSize: 13, lineHeight: 1.6 }}>
+                                            {report.weaknesses.map((wk, i) => <li key={i} style={{marginBottom: 8}}>{wk}</li>)}
+                                        </ul>
+                                    ) : (
+                                        <div style={{ fontSize: 13, color: "var(--text-muted)" }}>No specific weaknesses highlighted.</div>
+                                    )}
+                                </div>
+                                <div>
+                                    <h5 style={{ fontSize: 14, color: "#F59E0B", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                                        <FaLightbulb /> AI Recommendations
+                                    </h5>
+                                    {report.improvement_suggestions?.length > 0 ? (
+                                        <ul style={{ margin: 0, paddingLeft: 18, color: "var(--text)", fontSize: 13, lineHeight: 1.6 }}>
+                                            {report.improvement_suggestions.map((wk, i) => <li key={i} style={{marginBottom: 8}}>{wk}</li>)}
+                                        </ul>
+                                    ) : (
+                                        <div style={{ fontSize: 13, color: "var(--text-muted)" }}>No specific recommendations.</div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -281,25 +320,38 @@ export default function CandidateReport() {
                         transition={{ delay: 0.4 }}
                         style={{
                             background: "var(--card)", border: "1px solid var(--border)",
-                            borderRadius: "var(--radius-md)", padding: "22px", boxShadow: "var(--shadow)",
+                            borderRadius: "var(--radius-md)", padding: "28px", boxShadow: "var(--shadow)",
                             marginBottom: 40
                         }}
                     >
-                        <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 16 }}>Question-by-Question Feedback</h4>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                            {report.question_feedback?.map((q, idx) => (
-                                <div key={idx} style={{ padding: 16, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", borderRadius: 8 }}>
-                                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                                        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--primary)" }}>{q.topic}</span>
-                                        <span style={{ fontSize: 12, fontWeight: 800, color: SCORE_COLOR(q.score * 10) }}>Score: {q.score}/10</span>
+                        <h4 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", marginBottom: 20 }}>Question-by-Question Breakdown</h4>
+                        {report.question_feedback?.length > 0 ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                                {report.question_feedback.map((q, idx) => (
+                                    <div key={idx} style={{ padding: "16px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--surface)" }}>
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                                            <div>
+                                                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--primary)", marginBottom: 4, display: "block" }}>{q.topic || q.topic_id}</span>
+                                                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", lineHeight: 1.5 }}>{q.question}</div>
+                                            </div>
+                                            <div style={{ fontSize: 18, fontWeight: 800, color: SCORE_COLOR(q.score_100 || 0), flexShrink: 0, marginLeft: 16 }}>
+                                                {q.score_100 || 0}/100
+                                            </div>
+                                        </div>
+                                        <div style={{ padding: "12px", background: "rgba(255,255,255,0.03)", borderRadius: 8, fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.6, borderLeft: "3px solid var(--border)" }}>
+                                            {q.coverage_signal === "qualitatively_covered" ? "Answer was considered comprehensive." 
+                                            : q.coverage_signal === "insufficient_detail" ? "Answer lacked sufficient detail."
+                                            : q.coverage_signal === "missing" ? "No valid answer provided."
+                                            : "Answer partially covered the required areas."} 
+                                        </div>
                                     </div>
-                                    <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>Q: {q.question}</p>
-                                    <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>
-                                        <strong>Feedback: </strong> {q.feedback}
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div style={{ padding: 24, textAlign: "center", color: "var(--text-muted)", fontSize: 14 }}>
+                                No specific question feedback was recorded.
+                            </div>
+                        )}
                     </motion.div>
                 </>
             )}

@@ -56,7 +56,9 @@ class CoveragePlanner:
                 priority=t.priority,
                 mandatory=t.mandatory,
                 initial_difficulty=initial_difficulty,
-                allowed_question_types=allowed_q_types
+                allowed_question_types=allowed_q_types,
+                scenario_id=t.scenario_id,
+                scenario_context=t.scenario_context,
             )
             blueprint_topics.append(tb)
             

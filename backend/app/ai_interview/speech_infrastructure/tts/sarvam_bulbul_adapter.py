@@ -19,12 +19,16 @@ class SarvamBulbulAdapter(TextToSpeechProvider):
     def __init__(
         self, 
         api_key: Optional[str] = None, 
-        model: str = "bulbul:v1",
+        model: str = "bulbul:v3",
+        language_code: str = "en-IN",
+        speaker: str = "shubh",
         base_url: str = "https://api.sarvam.ai",
         timeout: float = 30.0
     ):
         self.api_key = api_key or os.environ.get("SARVAM_API_KEY", "dummy_key")
         self.model = model
+        self.language_code = language_code
+        self.speaker = speaker
         self.base_url = base_url
         self.timeout = timeout
         self.headers = {
@@ -32,7 +36,7 @@ class SarvamBulbulAdapter(TextToSpeechProvider):
             "Content-Type": "application/json"
         }
 
-    async def synthesize(self, text: str, language: Optional[str] = None) -> SpeechSynthesisResult:
+    async def synthesize(self, text: str, language: Optional[str] = None, speaker: Optional[str] = None) -> SpeechSynthesisResult:
         """
         Calls Sarvam Bulbul API to synthesize speech.
         """
@@ -41,8 +45,8 @@ class SarvamBulbulAdapter(TextToSpeechProvider):
             
         data = {
             "inputs": [text.strip()],
-            "target_language_code": language or "hi-IN",
-            "speaker": "meera", # Can be configured
+            "target_language_code": language or self.language_code,
+            "speaker": speaker or self.speaker, # Allow override for campaign voice
             "pitch": 0,
             "pace": 1.0,
             "loudness": 1.5,

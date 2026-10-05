@@ -17,8 +17,13 @@ from pydantic import BaseModel, Field
 
 from app.ai_interview.schemas.session import OperationClaim
 
-from app.ai_interview.core.enums import DifficultyLevel, QuestionType
+from app.ai_interview.core.enums import (
+    DifficultyLevel, QuestionType, QuestionCategory, TopicDimension,
+    InterviewType, ResumeEvidence, RequirementCriticality, InterviewEvidence,
+    BehavioralSpecificity
+)
 from app.ai_interview.question_engine.enums import TurnDenialReason, QuestionEngineFailureCode, QuestionStatus
+from datetime import datetime
 
 
 # ---------------------------------------------------------------------------
@@ -52,6 +57,11 @@ class QuestionRecord(BaseModel):
     question_text: str
     question_type: QuestionType
     difficulty: DifficultyLevel
+    category: Optional[QuestionCategory] = None
+    dimension: Optional[TopicDimension] = None
+    prompt_family_used: Optional[str] = None
+    asked_at: Optional[datetime] = None
+    
     status: QuestionStatus = Field(
         default=QuestionStatus.DISPATCHED,
         description="Tracks the lifecycle state of this turn."
@@ -92,6 +102,20 @@ class QuestionTurnPlan(BaseModel):
 
     allowed: bool
     denial_reason: Optional[TurnDenialReason] = None
+    
+    interview_type: Optional[InterviewType] = None
+    strategy: Optional[str] = None
+    strategy_id: Optional[str] = None
+    question_style: Optional[str] = None
+    dimension: Optional[TopicDimension] = None
+    category: Optional[QuestionCategory] = None
+    resume_evidence: Optional[ResumeEvidence] = None
+    candidate_claim: Optional[str] = None
+    interview_evidence: Optional[InterviewEvidence] = None
+    campaign_requirement: Optional[str] = None
+    requirement_criticality: Optional[RequirementCriticality] = None
+    scenario_context: Optional[str] = None
+    specificity_required: Optional[BehavioralSpecificity] = None
 
 
 # ---------------------------------------------------------------------------
@@ -111,6 +135,22 @@ class QuestionGenerationRequest(BaseModel):
 
     topic_id: str
     topic_name: str
+    
+    mode_id: str = "technical"
+    question_style: str = "technical"
+    
+    interview_type: Optional[InterviewType] = None
+    strategy: Optional[str] = None
+    strategy_id: Optional[str] = None
+    dimension: Optional[TopicDimension] = None
+    category: Optional[QuestionCategory] = None
+    resume_evidence: Optional[ResumeEvidence] = None
+    candidate_claim: Optional[str] = None
+    interview_evidence: Optional[InterviewEvidence] = None
+    campaign_requirement: Optional[str] = None
+    requirement_criticality: Optional[RequirementCriticality] = None
+    scenario_context: Optional[str] = None
+    specificity_required: Optional[BehavioralSpecificity] = None
 
     difficulty: DifficultyLevel
     allowed_question_types: List[QuestionType]
@@ -123,12 +163,16 @@ class QuestionGenerationRequest(BaseModel):
     relevant_projects: List[str] = Field(default_factory=list)
     relevant_experience: List[str] = Field(default_factory=list)
 
-    # Topic-relevant job requirements
-    relevant_job_requirements: List[str] = Field(default_factory=list)
+
 
     # Bounded previous-question context for duplicate avoidance at generation time.
     # Max length enforced by QuestionRequestBuilder (MAX_PREVIOUS_QUESTIONS_CONTEXT).
     previous_questions: List[str] = Field(default_factory=list)
+
+    # Previous turn context for follow-up questions
+    previous_question_for_followup: Optional[str] = None
+    previous_answer: Optional[str] = None
+    previous_evaluation: Optional[Dict[str, Any]] = None
 
     # Structural counters for prompt context (informational only — generator
     # must not use these to make runtime decisions).

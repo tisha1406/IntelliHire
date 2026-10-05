@@ -95,6 +95,16 @@ async def create_indexes():
     )
 
     # ==========================================================
+    # Strategies
+    # ==========================================================
+    await _safe_create_index(
+        db.strategies,
+        [("strategy_id", 1), ("version", 1)],
+        unique=True,
+        name="idx_strategy_version_unique",
+    )
+
+    # ==========================================================
     # Interview Mode Definitions
     # ==========================================================
     await _safe_create_index(

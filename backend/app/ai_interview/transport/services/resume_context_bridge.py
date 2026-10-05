@@ -45,14 +45,19 @@ class ResumeContextBridge:
         for ex in data.get("experience", []):
             experience_list.append(Experience(
                 title=ex.get("title", ""),
-                org=ex.get("org", ""),
+                # ResumeProcessingService persists the employer as "company"
+                # (ExperienceItem); "org" is the engine/legacy name.
+                org=ex.get("org") or ex.get("company") or "",
                 description=ex.get("description"),
                 duration=ex.get("duration")
             ))
 
-        # Map Skills (sometimes a list of strings, sometimes a list of dicts)
+        # Map Skills (sometimes a list of strings, sometimes a list of dicts).
+        # ResumeProcessingService persists skills as "technical_skills" (a
+        # list of strings); "skills" is the engine/legacy name. soft_skills
+        # are intentionally NOT mapped: they would become interview topics.
         skills_list = []
-        for sk in data.get("skills", []):
+        for sk in (data.get("skills") or data.get("technical_skills") or []):
             if isinstance(sk, dict):
                 skills_list.append(Skill(
                     name=sk.get("name", ""),
@@ -108,6 +113,6 @@ class ResumeContextBridge:
             candidate_id=candidate_id,
             structured_resume=structured,
             extraction_metadata=metadata,
-            quality_status=ExtractionQualityStatus.HIGH,  # Assume high if it made it to DB
+            quality_status=ExtractionQualityStatus.USABLE,  # Assume high if it made it to DB
             warnings=[]
         )

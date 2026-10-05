@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     # AI API Keys
     # ==========================================================
     GROQ_API_KEY: str
+    GROQ_MODEL: str = "openai/gpt-oss-20b"
     GEMINI_API_KEY: str
     SARVAM_API_KEY: str
     
@@ -39,8 +40,11 @@ class Settings(BaseSettings):
     SPEECH_STT_PROVIDER: str = "sarvam"
     SPEECH_TTS_PROVIDER: str = "sarvam"
     
-    SARVAM_STT_MODEL: str = "saaras:v1"
-    SARVAM_TTS_MODEL: str = "bulbul:v1"
+    SARVAM_STT_MODEL: str = "saaras:v3"
+    SARVAM_STT_LANGUAGE: str = "en-IN"
+    SARVAM_TTS_MODEL: str = "bulbul:v3"
+    SARVAM_TTS_LANGUAGE: str = "en-IN"
+    SARVAM_TTS_SPEAKER: str = "shubh"
     
     STT_MAX_ATTEMPTS: int = 3
     STT_MAX_OPERATION_TIME_SECONDS: int = 60
@@ -55,6 +59,9 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
 
     DEBUG: bool = True
+
+    # Maximum file upload size for resumes (MB)
+    MAX_UPLOAD_SIZE_MB: int = 5
 
     # ==========================================================
     # Phase 9 — Interview Transport

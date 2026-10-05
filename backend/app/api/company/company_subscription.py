@@ -67,7 +67,7 @@ async def calculate_company_usage(company_id: str) -> dict:
     comp_oid = ObjectId(company_id)
     
     recruiters = await db.users.count_documents({"company_id": comp_oid, "role": "recruiter"})
-    campaigns = await db.interviewcampaigns.count_documents({"company_id": comp_oid})
+    campaigns = await db.interview_campaigns.count_documents({"company_id": comp_oid})
     candidates = await db.candidates.count_documents({"company_id": comp_oid})
     
     return {
@@ -119,14 +119,26 @@ async def get_current_subscription(
 async def get_subscription_options(
     token: TokenPayload = Depends(require_role(UserRole.COMPANY))
 ):
+    # Task 13: languages/voices now come from the real master-data
+    # collections (same direct-db-access style as calculate_company_usage()
+    # above) instead of a hardcoded, incorrect list. Only `name` is
+    # extracted -- the frontend (ChangeSubscription.jsx) expects a flat
+    # array of strings, the same shape this already returned, matching
+    # what campaign creation validates allowed_languages/allowed_voices
+    # against (app/api/company/campaigns.py compares against the display
+    # name, not the language code or voice provider).
+    db = get_database()
+    languages = [doc["name"] async for doc in db.languages.find({})]
+    voices = [doc["name"] async for doc in db.voices.find({})]
+
     return success_response(
         data={
             "features": SubscriptionPricingService.FEATURE_PRICING,
             "limits": SubscriptionPricingService.LIMIT_PRICING,
             "billing_cycles": ["1_year", "2_years", "3_years", "monthly"],
             "config_options": {
-                "languages": ["English", "Hindi", "Spanish", "French", "German"],
-                "voices": ["Aditi", "Raveena", "Joanna", "Matthew", "Brian"],
+                "languages": languages,
+                "voices": voices,
                 "llm_tiers": ["Groq", "OpenAI", "Anthropic", "Gemini"],
                 "interview_modes": ["Balanced", "Structured", "Technical", "Behavioral", "Stress"]
             }
@@ -355,14 +367,36 @@ async def verify_payment(
 ):
     repo = CompanyRepository()
     company = await repo.get_by_id(token.company_id)
-    
+    if not company: raise HTTPException(status_code=404, detail="Company not found")
+
+    db = get_database()
+
+    # Confirmed bug fix: a Payment's own `amount` was never checked against
+    # anything, so an order created (and verified) for an arbitrary/zero
+    # amount could activate the subscription. The authoritative amount is
+    # the server's own company.subscription.pricing.total -- the same value
+    # the correct flow already uses to create the order in the first place
+    # (see create_payment_order() above) -- never a client-supplied figure.
+    # This is checked, and the payment left untouched on mismatch, BEFORE
+    # PaymentService.verify_payment() runs, so a failed check never marks
+    # the Payment "success" or touches the subscription.
+    existing_payment = await db.payments.find_one({"order_id": request.order_id})
+    if not existing_payment:
+        raise HTTPException(status_code=404, detail="Payment order not found.")
+
+    authoritative_amount = round(float(company.get("subscription", {}).get("pricing", {}).get("total", 0.0)), 2)
+    paid_amount = round(float(existing_payment.get("amount", 0.0)), 2)
+    if paid_amount != authoritative_amount:
+        raise HTTPException(
+            status_code=400,
+            detail="Payment amount does not match the amount due for this subscription.",
+        )
+
     payment_service = PaymentService()
     is_valid = await payment_service.verify_payment(token.company_id, request.payment_id, request.order_id)
-    
+
     if not is_valid: raise HTTPException(status_code=400, detail="Payment verification failed.")
-        
-    db = get_database()
-    
+
     sub = company.get("subscription", {})
     cycle = sub.get("billing_cycle", "annual")
     days = get_billing_cycle_days(cycle)

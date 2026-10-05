@@ -66,7 +66,19 @@ export default function Dashboard() {
         if (action === "WAITING_ANALYSIS") return { title: "Analysis Pending", desc: "Our AI is currently reviewing your resume against the job description.", icon: Activity, cta: "View Status", link: "/candidate/resume" };
         if (action === "PRACTICE") return { title: "Practice Interview", desc: "The hiring company recommends completing a practice interview to test your setup.", icon: Play, cta: "Start Practice", link: "/candidate/interview/practice", duration: "10 min" };
         if (action === "OFFICIAL_INTERVIEW") return { title: "Official Interview", desc: `You are ready to begin the official interview for ${dashboard?.company_name}. Ensure you are in a quiet environment.`, icon: Video, cta: "Begin Interview", link: "/candidate/interview/official", duration: dashboard?.interview_duration };
-        return { title: "View Final Report", desc: "Your interview has been processed. View your comprehensive performance report.", icon: File, cta: "View Report", link: "/candidate/reports" };
+        return {
+            title: "View Final Report",
+            desc: "Your interview has been processed. View your comprehensive performance report.",
+            icon: File,
+            cta: "View Report",
+            // Checkpoint-5 fix: deep-link to the candidate's own completed
+            // official session so Reports.jsx doesn't land on its "please
+            // select a session" empty state. Falls back to the bare route
+            // only if the backend hasn't resolved a session_id yet.
+            link: dashboard?.official_session_id
+                ? `/candidate/reports?session_id=${dashboard.official_session_id}`
+                : "/candidate/reports",
+        };
     };
 
     const nextAction = getNextAction();

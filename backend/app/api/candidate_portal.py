@@ -17,6 +17,9 @@ from app.schemas.candidate_portal import (
     CompletePracticeResponse, InterviewStatusResponse, StartInterviewResponse,
     ActivityResponse, DocumentsResponse
 )
+from app.schemas.interview import CreateSessionResponse
+from app.ai_interview.transport.services.session_creation_service import SessionCreationService
+from app.api.interview import get_session_creation_service
 
 router = APIRouter(
     prefix="/api/candidate",
@@ -164,11 +167,14 @@ async def get_activity(token: TokenPayload = Depends(get_candidate_context)):
     return success_response(data=data)
 
 
-@router.post("/practice/start", response_model=APIResponse[bool])
-async def start_practice(token: TokenPayload = Depends(get_candidate_context)):
+@router.post("/practice/start", response_model=APIResponse[CreateSessionResponse])
+async def start_practice(
+    token: TokenPayload = Depends(get_candidate_context),
+    session_service: SessionCreationService = Depends(get_session_creation_service)
+):
     service = CandidatePortalService()
-    await service.start_practice(token.candidate_id)
-    return success_response(data=True)
+    session_data = await service.start_practice(token, session_service)
+    return success_response(data=CreateSessionResponse(**session_data))
 
 
 @router.post("/practice/complete", response_model=APIResponse[bool])
@@ -182,6 +188,13 @@ async def complete_practice(token: TokenPayload = Depends(get_candidate_context)
 async def start_interview(token: TokenPayload = Depends(get_candidate_context)):
     service = CandidatePortalService()
     await service.start_interview(token.candidate_id)
+    return success_response(data=True)
+
+
+@router.post("/interview/complete", response_model=APIResponse[bool])
+async def complete_interview(token: TokenPayload = Depends(get_candidate_context)):
+    service = CandidatePortalService()
+    await service.complete_interview(token.candidate_id)
     return success_response(data=True)
 
 

@@ -17,6 +17,11 @@ const interviewService = {
 
     getInterviewResults(sessionId) {
         return api.get(`${BASE}/${sessionId}/results`);
+    },
+
+    // D-05: real PDF download, same blob convention as exportService/reportService.
+    downloadInterviewResultsPdf(sessionId) {
+        return api.get(`${BASE}/${sessionId}/results/pdf`, { responseType: "blob" });
     }
 };
 

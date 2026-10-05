@@ -82,9 +82,9 @@ def build_user_message(request: QuestionGenerationRequest) -> str:
         parts.append("Candidate experience relevant to this topic:")
         parts.extend(f"  - {e}" for e in request.relevant_experience)
 
-    if request.relevant_job_requirements:
-        parts.append("Job requirements relevant to this topic:")
-        parts.extend(f"  - {r}" for r in request.relevant_job_requirements)
+    if request.campaign_requirement:
+        parts.append("Campaign requirement relevant to this topic:")
+        parts.append(f"  - {request.campaign_requirement}")
 
     if request.previous_questions:
         parts.append(

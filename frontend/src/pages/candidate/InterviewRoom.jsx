@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { 
     Mic, Camera, AlertCircle, CheckCircle2, Play, Activity, 
     ArrowRight, ShieldAlert, MonitorSpeaker, Wifi, Target, 
     BrainCircuit, Settings2, Clock, Globe, Loader2, Send
 } from "lucide-react";
-import { useCandidateDashboard, useStartPractice, useCompletePractice, useStartInterview } from "../../hooks/candidate/useCandidate";
+import { useCandidateDashboard, useStartPractice, useCompletePractice, useStartInterview, useCompleteInterview } from "../../hooks/candidate/useCandidate";
 import { useInterviewSession } from "../../hooks/candidate/useInterviewSession";
 import "../../styles/candidate/interview.css";
 
@@ -44,14 +44,21 @@ export default function InterviewRoom() {
     const [answerText, setAnswerText] = useState("");
     const { token } = useAuth();
     
+    const [practiceSessionId, setPracticeSessionId] = useState(null);
+    
+    const getToken = useCallback(() => token, [token]);
+
     const isPractice = id === "practice";
-    const isPreInterview = id === "official";
-    const isLiveInterview = !isPractice && !isPreInterview;
+    const isPreInterview = (id === "official" || id === "practice") && !practiceSessionId;
+    const isLiveInterview = !isPreInterview;
 
     const { data: dashboard, isLoading: dashLoading } = useCandidateDashboard();
-    const { mutate: startPractice } = useStartPractice();
+    const { mutate: startPractice, isPending: isStartingPractice } = useStartPractice();
     const { mutate: completePractice } = useCompletePractice();
     const { mutate: startInterview, isPending: isStartingSession } = useStartInterview();
+    const { mutate: completeInterview } = useCompleteInterview();
+
+    const sessionIdToUse = isPractice ? practiceSessionId : (isPreInterview ? null : id);
 
     const { 
         connectionState, 
@@ -60,25 +67,67 @@ export default function InterviewRoom() {
         isCompleted, 
         error, 
         submitAnswer 
-    } = useInterviewSession(isLiveInterview ? id : null);
+    } = useInterviewSession(sessionIdToUse);
 
     const timer = useTimer(isPractice ? 15 * 60 : parseInt(dashboard?.interview_duration || 45) * 60);
 
+    // Checkpoint-3 fix: the practice session reaching its deterministic
+    // COMPLETE state (isCompleted, from useInterviewSession's WebSocket
+    // runtime state) only ever navigated to the completion screen -- it
+    // never called completePractice(), so POST /api/candidate/practice/complete
+    // (the only place that sets candidate_workflows.practice_completed=True)
+    // was never invoked. That left the dashboard's Practice step permanently
+    // "available" and the Official Interview step permanently "locked"
+    // (its status is derived from practice_completed), even after a
+    // candidate fully finished practice. The ref guards against firing the
+    // mutation more than once for the same completed session.
+    const hasPersistedPracticeCompletionRef = useRef(false);
+    // Checkpoint-4 fix: same gap as above, for the official interview side --
+    // official_completed was never set anywhere in the backend (it is only
+    // ever initialized to False at invite time), so the dashboard's Official
+    // Interview step never reflected "completed" after a candidate actually
+    // finished. POST /api/candidate/interview/complete (and
+    // CandidatePortalService.complete_interview()) are new, minimal,
+    // mirroring the existing complete_practice() pattern exactly -- no
+    // change to the AI interview engine itself.
+    const hasPersistedOfficialCompletionRef = useRef(false);
+
     useEffect(() => {
         if (isCompleted) {
+            if (isPractice && !hasPersistedPracticeCompletionRef.current) {
+                hasPersistedPracticeCompletionRef.current = true;
+                completePractice();
+            } else if (!isPractice && !hasPersistedOfficialCompletionRef.current) {
+                hasPersistedOfficialCompletionRef.current = true;
+                completeInterview();
+            }
             navigate(`/candidate/interview/${id}/complete`);
         }
-    }, [isCompleted, navigate, id]);
+    }, [isCompleted, navigate, id, isPractice, completePractice, completeInterview]);
 
     const handleStart = () => {
         if (isPractice) {
-            startPractice();
-            // Practice is mocked for now
+            startPractice(undefined, {
+                onSuccess: (res) => {
+                    if (res?.data?.session_id) {
+                        setPracticeSessionId(res.data.session_id);
+                    } else if (res?.session_id) {
+                        setPracticeSessionId(res.session_id);
+                    } else {
+                        console.error("Practice start succeeded but no session_id was returned from the backend.");
+                    }
+                }
+            });
         } else {
             if (!dashboard?.campaign_id) return;
             startInterview(dashboard.campaign_id, {
                 onSuccess: (res) => {
-                    navigate(`/candidate/interview/${res.data.session_id}`);
+                    const sessionId = res?.data?.session_id || res?.session_id;
+                    if (sessionId) {
+                        navigate(`/candidate/interview/${sessionId}`);
+                    } else {
+                        console.error("Interview start succeeded but no session_id was returned from the backend.");
+                    }
                 }
             });
         }
@@ -90,10 +139,10 @@ export default function InterviewRoom() {
         setAnswerText("");
     };
 
-    const handleTranscriptReady = (transcript) => {
+    const handleTranscriptReady = useCallback((transcript) => {
         // Append transcript to existing text or set it directly
         setAnswerText(prev => prev ? `${prev} ${transcript}` : transcript);
-    };
+    }, []);
 
     if (dashLoading) {
         return <div className="c-interview-room" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader2 className="c-pulse-icon" /></div>;
@@ -222,9 +271,9 @@ export default function InterviewRoom() {
                                     <span className="c-meta-value">1 of 1</span>
                                 </div>
                             </div>
-                            <button className="c-start-btn" onClick={handleStart} disabled={isStartingSession}>
-                                {isStartingSession ? <Loader2 size={20} className="c-pulse-icon" /> : <Play size={20} />} 
-                                {isStartingSession ? "Creating Session..." : "Start Official Interview"}
+                            <button className="c-start-btn" onClick={handleStart} disabled={isPractice ? isStartingPractice : isStartingSession}>
+                                {(isPractice ? isStartingPractice : isStartingSession) ? <Loader2 size={20} className="c-pulse-icon" /> : <Play size={20} />} 
+                                {(isPractice ? isStartingPractice : isStartingSession) ? "Creating Session..." : (isPractice ? "Start Practice Interview" : "Start Official Interview")}
                             </button>
                         </div>
                     </>
@@ -255,11 +304,11 @@ export default function InterviewRoom() {
 
                                 <div style={{ width: "100%", maxWidth: 800, display: "flex", flexDirection: "column", gap: 16 }}>
                                     <VoiceControls
-                                        session_id={id}
+                                        session_id={sessionIdToUse}
                                         question_record_id={currentQuestion.record_id}
                                         question_text={currentQuestion.question_text}
                                         apiBaseUrl={api.defaults.baseURL}
-                                        getToken={() => token}
+                                        getToken={getToken}
                                         onTranscriptReady={handleTranscriptReady}
                                         disabled={isEvaluating || connectionState !== "CONNECTED"}
                                     />

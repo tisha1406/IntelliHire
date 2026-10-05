@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 import secrets
 import string
+from fastapi import HTTPException
 from passlib.context import CryptContext
 
 from app.repositories.company_repository import CompanyRepository
@@ -163,4 +164,28 @@ class CompanyService:
         return await self.update_company(company_id, {"subscription.status": "suspended"}, updated_by)
         
     async def activate_company(self, company_id: str, updated_by: str) -> bool:
+        """
+        Admin Activate is NOT a payment bypass (confirmed by the Task 11
+        audit). The only intended path into "active" for a company that is
+        pending_verification/pending_payment/expired/cancelled/trial is the
+        real subscription confirm -> payment order -> payment verify flow
+        in app/api/company/company_subscription.py. This method only
+        restores a company an admin previously suspended.
+        """
+        company = await self.company_repo.get_by_id(company_id)
+        if not company:
+            raise HTTPException(status_code=404, detail="Company not found.")
+
+        current_status = company.get("subscription", {}).get("status")
+        if current_status != "suspended":
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Cannot activate a company with subscription status '{current_status}'. "
+                    "Admin Activate only restores a suspended company; pending_verification, "
+                    "pending_payment, expired, cancelled, and trial subscriptions must complete "
+                    "the real payment verification flow instead."
+                ),
+            )
+
         return await self.update_company(company_id, {"subscription.status": "active"}, updated_by)

@@ -9,7 +9,49 @@ from app.resume_processing.cleaner import ResumeCleaner
 from app.repositories.resume_repository import ResumeRepository
 from app.repositories.candidate_workflow_repository import CandidateWorkflowRepository
 from app.repositories.notification_repository import NotificationRepository
+from pydantic import BaseModel, Field
+from typing import List
 
+class ExperienceItem(BaseModel):
+    title: str
+    company: str
+    duration: str
+    description: str
+
+class EducationItem(BaseModel):
+    degree: str
+    institution: str
+    year: str
+
+class ProjectItem(BaseModel):
+    name: str
+    description: str
+
+class RadarDataItem(BaseModel):
+    subject: str
+    A: int
+    fullMark: int
+
+class ResumeStructuredOutput(BaseModel):
+    overall_score: int
+    ats_score: int
+    role_match: int
+    completeness: int
+    technical_skills: List[str]
+    soft_skills: List[str]
+    experience: List[ExperienceItem]
+    education: List[EducationItem]
+    projects: List[ProjectItem]
+    missing_skills: List[str]
+    certifications: List[str]
+    languages_known: List[str]
+    radar_data: List[RadarDataItem]
+    strengths: List[str]
+    weaknesses: List[str]
+    improve_ats: str
+    missing_keywords: List[str]
+    grammar_score: int
+    formatting_score: int
 
 class ResumeProcessingService:
 
@@ -35,7 +77,11 @@ class ResumeProcessingService:
         # 1. Update Workflow Status to Processing
         await self.workflow_repo.set_step_status(
             candidate_id, "stage", "RESUME_PROCESSING",
-            {"resume_processing": True, "resume_uploaded": True}
+            {
+                "resume_processing": True, 
+                "resume_uploaded": True,
+                "resume_uploaded_at": datetime.now(UTC)
+            }
         )
 
         try:
@@ -136,42 +182,7 @@ class ResumeProcessingService:
             }
 
         prompt = """
-        You are an expert ATS (Applicant Tracking System). Analyze the following resume text and extract the information into a structured JSON format.
-        
-        The JSON MUST have the following schema EXACTLY, no extra text, only valid JSON:
-        {
-            "overall_score": int (0-100),
-            "ats_score": int (0-100),
-            "role_match": int (0-100),
-            "completeness": int (0-100),
-            "technical_skills": [list of strings],
-            "soft_skills": [list of strings],
-            "experience": [
-                {"title": "string", "company": "string", "duration": "string", "description": "string"}
-            ],
-            "education": [
-                {"degree": "string", "institution": "string", "year": "string"}
-            ],
-            "projects": [
-                {"name": "string", "description": "string"}
-            ],
-            "missing_skills": [list of strings],
-            "certifications": [list of strings],
-            "languages_known": [list of strings],
-            "radar_data": [
-                {"subject": "Frontend", "A": int(0-100), "fullMark": 100},
-                {"subject": "Backend", "A": int(0-100), "fullMark": 100},
-                {"subject": "Architecture", "A": int(0-100), "fullMark": 100},
-                {"subject": "Cloud/DevOps", "A": int(0-100), "fullMark": 100},
-                {"subject": "Databases", "A": int(0-100), "fullMark": 100}
-            ],
-            "strengths": [list of strings (3 max)],
-            "weaknesses": [list of strings (2 max)],
-            "improve_ats": string (one sentence advice),
-            "missing_keywords": [list of strings],
-            "grammar_score": int (0-100),
-            "formatting_score": int (0-100)
-        }
+        You are an expert ATS (Applicant Tracking System). Analyze the following resume text and extract the information into the required structured format.
         
         Resume text:
         ---
@@ -179,14 +190,41 @@ class ResumeProcessingService:
         ---
         """
         
-        # Using Llama 3 8b for fast, cheap structuring
+        # Enforce Groq's strict schema requirement (additionalProperties: False)
+        def _enforce_strict_schema(schema: dict) -> dict:
+            if isinstance(schema, dict):
+                if schema.get("type") == "object":
+                    schema["additionalProperties"] = False
+                    if "properties" not in schema:
+                        schema["properties"] = {}
+                for k, v in schema.items():
+                    _enforce_strict_schema(v)
+            elif isinstance(schema, list):
+                for item in schema:
+                    _enforce_strict_schema(item)
+            return schema
+
+        raw_schema = ResumeStructuredOutput.model_json_schema()
+        if "$defs" in raw_schema:
+            for def_name, def_schema in raw_schema["$defs"].items():
+                _enforce_strict_schema(def_schema)
+        _enforce_strict_schema(raw_schema)
+        
+        # Using configured model for fast, cheap structuring
         completion = await self.groq_client.chat.completions.create(
-            model="llama3-8b-8192",
+            model=settings.GROQ_MODEL,
             messages=[
-                {"role": "system", "content": "You output ONLY valid JSON."},
+                {"role": "system", "content": "You extract information based on the provided JSON schema."},
                 {"role": "user", "content": prompt.replace("{text}", text[:6000])} # limit text size just in case
             ],
-            response_format={"type": "json_object"}
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "resume_analysis",
+                    "strict": True,
+                    "schema": raw_schema
+                }
+            }
         )
         
         try:

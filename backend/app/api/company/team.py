@@ -244,6 +244,28 @@ async def invite_team_member(
 
 
 # ──────────────────────────────────────────────────────────────────────
+# GET /company/team/{member_id}
+# ──────────────────────────────────────────────────────────────────────
+
+@router.get("/{member_id}", response_model=TeamMemberResponse, summary="Get Team Member")
+async def get_team_member(
+    member_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.COMPANY)),
+):
+    """
+    Return a single recruiter (team member) belonging to this company.
+    Validates the recruiter belongs to this company, same as update/delete.
+    """
+    repo = RecruiterRepository()
+    member = await repo.get_by_id(member_id)
+
+    if not member or member.get("company_id") != current_user.sub:
+        raise HTTPException(status_code=404, detail="Team member not found.")
+
+    return _format_member(member)
+
+
+# ──────────────────────────────────────────────────────────────────────
 # PATCH /company/team/{member_id}
 # ──────────────────────────────────────────────────────────────────────
 
@@ -528,6 +550,12 @@ async def assign_recruiter_campaigns(
         
     campaign_repo = CampaignRepository()
     
+    # Self-heal any legacy campaigns where assigned_recruiter_ids is null
+    await campaign_repo.collection.update_many(
+        {"company_id": ObjectId(current_user.sub), "assigned_recruiter_ids": None},
+        {"$set": {"assigned_recruiter_ids": []}}
+    )
+
     # Remove this recruiter from all campaigns they were assigned to
     await campaign_repo.collection.update_many(
         {"company_id": ObjectId(current_user.sub), "assigned_recruiter_ids": ObjectId(member_id)},
@@ -537,6 +565,13 @@ async def assign_recruiter_campaigns(
     # Add recruiter to the selected campaigns
     if payload.campaign_ids:
         object_ids = [ObjectId(cid) for cid in payload.campaign_ids]
+        
+        # Self-heal any legacy campaigns where assigned_recruiter_ids is null
+        await campaign_repo.collection.update_many(
+            {"_id": {"$in": object_ids}, "company_id": ObjectId(current_user.sub), "assigned_recruiter_ids": None},
+            {"$set": {"assigned_recruiter_ids": []}}
+        )
+        
         await campaign_repo.collection.update_many(
             {"_id": {"$in": object_ids}, "company_id": ObjectId(current_user.sub)},
             {"$addToSet": {"assigned_recruiter_ids": ObjectId(member_id)}}

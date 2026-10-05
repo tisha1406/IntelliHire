@@ -179,14 +179,36 @@ export function useCompletePractice() {
     });
 }
 
-export function useStartInterview() {
+export const useStartInterview = () => {
     const { token } = useAuthContext();
     const queryClient = useQueryClient();
-    
+
     return useMutation({
         mutationFn: (campaignId) => api.startInterview(token, campaignId),
         onSuccess: () => {
             queryClient.invalidateQueries(["candidate_dashboard"]);
         },
+    });
+}
+
+export function useCompleteInterview() {
+    const { token } = useAuthContext();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: () => api.completeInterview(token),
+        onSuccess: () => {
+            queryClient.invalidateQueries(["candidate_dashboard"]);
+        },
+    });
+}
+
+export function useInterviewReport(sessionId) {
+    const { token } = useAuthContext();
+    return useQuery({
+        queryKey: ["candidate_report", sessionId],
+        queryFn: () => api.getInterviewReport(token, sessionId),
+        enabled: !!token && !!sessionId,
+        retry: false, // Do not retry 404s endlessly
     });
 }

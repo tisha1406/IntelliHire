@@ -14,6 +14,10 @@ import AdminCandidates from "../pages/admin/AdminCandidates";
 import AdminCandidateDetail from "../pages/admin/AdminCandidateDetail";
 import Interviews from "../pages/admin/Interviews";
 import InterviewCalendar from "../pages/admin/InterviewCalendar";
+import Strategies from "../pages/admin/Strategies";
+import StrategyDetail from "../pages/admin/StrategyDetail";
+import NewStrategy from "../pages/admin/NewStrategy";
+import EditStrategy from "../pages/admin/EditStrategy";
 
 // AI Center
 import AIInsights from "../pages/admin/AIInsights";
@@ -55,6 +59,11 @@ export default function AdminRoutes() {
 
             <Route path="interviews" element={<Interviews />} />
             <Route path="interview-calendar" element={<InterviewCalendar />} />
+
+            <Route path="strategies" element={<Strategies />} />
+            <Route path="strategies/new" element={<NewStrategy />} />
+            <Route path="strategies/:strategyId" element={<StrategyDetail />} />
+            <Route path="strategies/edit/:strategyId" element={<EditStrategy />} />
 
             {/* ─── AI CENTER ─── */}
             <Route path="ai-insights" element={<AIInsights />} />

@@ -8,7 +8,7 @@ from app.ai_interview.speech_infrastructure.resilience import TTSResiliencePolic
 
 @pytest.fixture
 def adapter():
-    return SarvamBulbulAdapter(api_key="test_key", model="bulbul:v1")
+    return SarvamBulbulAdapter(api_key="test_key", model="bulbul:v3", language_code="en-IN", speaker="shubh")
 
 @pytest.mark.asyncio
 async def test_sarvam_tts_success(adapter):
@@ -28,6 +28,23 @@ async def test_sarvam_tts_success(adapter):
         assert result.mime_type == "audio/wav"
         assert result.provider == "sarvam"
         assert result.duration_ms >= 0
+
+@pytest.mark.asyncio
+async def test_sarvam_tts_payload_parameters(adapter):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"audios": [base64.b64encode(b"audio").decode("utf-8")]}
+    
+    with patch("httpx.AsyncClient.post", return_value=mock_response) as mock_post:
+        await adapter.synthesize("Hello world", language="en-IN")
+        
+        mock_post.assert_called_once()
+        call_kwargs = mock_post.call_args.kwargs
+        assert "json" in call_kwargs
+        payload = call_kwargs["json"]
+        assert payload["target_language_code"] == "en-IN"
+        assert payload["speaker"] == "shubh"
+        assert payload["model"] == "bulbul:v3"
 
 @pytest.mark.asyncio
 async def test_sarvam_tts_empty_text(adapter):
