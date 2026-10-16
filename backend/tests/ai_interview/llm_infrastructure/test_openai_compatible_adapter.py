@@ -19,6 +19,7 @@ class MockResponse:
         self._json_data = json_data
         self.text = text
         self.elapsed = MockElapsed()
+        self.headers = {}
         
     def raise_for_status(self):
         if self.status_code >= 400:
@@ -131,6 +132,83 @@ def test_openai_adapter_omits_token_budget_when_not_supplied(monkeypatch):
 
     assert "max_completion_tokens" not in captured_payload
     assert "max_tokens" not in captured_payload
+
+
+def test_openai_adapter_429_carries_groq_retry_after_hint(monkeypatch):
+    """
+    Groq's 429 response includes an x-ratelimit-reset-tokens header telling
+    us exactly how long until its per-minute token budget resets. This must
+    be parsed and attached to the raised LLMTransientError so callers can
+    wait the precise amount instead of guessing with a fixed delay (a fixed
+    delay shorter than this window just retries into the same rate limit).
+    """
+    adapter = OpenAICompatibleAdapter(api_key="test")
+
+    class RateLimitResponse(MockResponse):
+        def __init__(self):
+            super().__init__(429, text='{"error":{"message":"rate_limit_exceeded"}}')
+            self.headers = {"x-ratelimit-reset-tokens": "3.337s"}
+
+    def mock_post(*args, **kwargs):
+        return RateLimitResponse()
+
+    monkeypatch.setattr(httpx.Client, "post", mock_post)
+
+    with pytest.raises(LLMTransientError) as exc_info:
+        adapter.generate_structured("sys", "user", DummyResponse)
+
+    assert exc_info.value.retry_after_seconds == pytest.approx(3.337)
+
+
+def test_openai_adapter_429_prefers_precise_message_hint_over_full_reset_header(monkeypatch):
+    """
+    Groq's x-ratelimit-reset-tokens header reflects the time until the
+    ENTIRE per-minute budget is back to its max, which can be far longer
+    than necessary. The error message's own "Please try again in Ns" is the
+    precise amount needed for the NEXT request to fit, and must be preferred
+    -- confirmed live: a real 429 reported a 54s full-reset header but only
+    a 6.15s message hint, and retrying after 54s would be a needlessly long
+    wait for a live interview.
+    """
+    adapter = OpenAICompatibleAdapter(api_key="test")
+
+    class RateLimitResponse(MockResponse):
+        def __init__(self):
+            super().__init__(
+                429,
+                text=(
+                    '{"error":{"message":"Rate limit reached ... '
+                    'Please try again in 6.149999999s. Need more tokens?",'
+                    '"code":"rate_limit_exceeded"}}'
+                ),
+            )
+            self.headers = {"x-ratelimit-reset-tokens": "54.075s"}
+
+    def mock_post(*args, **kwargs):
+        return RateLimitResponse()
+
+    monkeypatch.setattr(httpx.Client, "post", mock_post)
+
+    with pytest.raises(LLMTransientError) as exc_info:
+        adapter.generate_structured("sys", "user", DummyResponse)
+
+    assert exc_info.value.retry_after_seconds == pytest.approx(6.149999999)
+
+
+def test_openai_adapter_429_without_header_has_no_retry_hint(monkeypatch):
+    """No x-ratelimit-reset-tokens header (e.g. a 500/502/503/504, or a 429
+    from a different provider shape) must not fabricate a wait time."""
+    adapter = OpenAICompatibleAdapter(api_key="test")
+
+    def mock_post(*args, **kwargs):
+        return MockResponse(500, text="Internal Server Error")
+
+    monkeypatch.setattr(httpx.Client, "post", mock_post)
+
+    with pytest.raises(LLMTransientError) as exc_info:
+        adapter.generate_structured("sys", "user", DummyResponse)
+
+    assert exc_info.value.retry_after_seconds is None
 
 
 def test_openai_adapter_classifies_groq_json_validate_failed_as_fatal(monkeypatch):

@@ -56,6 +56,142 @@ def test_adapter_json_format_not_sent_when_false(mock_httpx_client):
     
     assert "response_format" not in payload
 
+def test_question_generator_retries_transient_error_with_backoff(monkeypatch):
+    """
+    Live testing against the real Groq account surfaced HTTP 429
+    rate_limit_exceeded as a real, recurring failure mode (the account's low
+    tokens-per-minute cap is regularly exceeded by a real interview's
+    generation+evaluation calls). The adapter already classifies this as
+    LLMTransientError, but LLMQuestionGenerator previously called the
+    provider directly with no retry/backoff of its own, relying entirely on
+    QuestionEngine's OUTER loop (which retries immediately, with zero delay,
+    hitting the exact same still-active rate-limit window). This test proves
+    generate() now retries a transient failure itself, with a real delay,
+    before giving up -- using the existing (previously unused)
+    ResiliencePolicy.
+    """
+    from app.ai_interview.llm_infrastructure.exceptions import LLMTransientError
+
+    sleep_calls = []
+    monkeypatch.setattr("app.ai_interview.llm_infrastructure.resilience.time.sleep", lambda s: sleep_calls.append(s))
+
+    mock_provider = MagicMock()
+    mock_provider.generate_structured.side_effect = [
+        LLMTransientError("429 - rate_limit_exceeded"),
+        GeneratedQuestion(
+            question_text="test",
+            question_type=QuestionType.INITIAL,
+            topic_id="8706f2ac-a3c0-4469-ab3d-79dac8b8c8b7",
+            difficulty=DifficultyLevel.MEDIUM,
+        ),
+    ]
+    generator = LLMQuestionGenerator(provider=mock_provider)
+
+    request = QuestionGenerationRequest(
+        session_id="test_sess",
+        turn_number=1,
+        topic_id="8706f2ac-a3c0-4469-ab3d-79dac8b8c8b7",
+        topic_name="TypeScript fluency",
+        difficulty=DifficultyLevel.MEDIUM,
+        allowed_question_types=[QuestionType.INITIAL],
+        selected_question_type=QuestionType.INITIAL,
+        relevant_skills=[],
+        relevant_projects=[],
+        relevant_experience=[],
+        previous_questions=[],
+        question_number=1,
+        max_questions_for_topic=2,
+    )
+
+    result = generator.generate(request, attempt_number=1)
+
+    assert result.question_text == "test"
+    assert mock_provider.generate_structured.call_count == 2
+    assert sleep_calls == [2.0]  # one backoff delay before the second internal attempt
+
+
+def test_question_generator_honors_groq_retry_after_hint(monkeypatch):
+    """
+    A fixed short backoff can still retry into the SAME still-active
+    rate-limit window Groq reported. Groq's x-ratelimit-reset-tokens response
+    header tells us precisely how long until the window resets -- this test
+    proves that precise hint (carried on LLMTransientError.retry_after_seconds)
+    is what actually gets waited, not the generic fixed base delay.
+    """
+    from app.ai_interview.llm_infrastructure.exceptions import LLMTransientError
+
+    sleep_calls = []
+    monkeypatch.setattr("app.ai_interview.llm_infrastructure.resilience.time.sleep", lambda s: sleep_calls.append(s))
+
+    mock_provider = MagicMock()
+    mock_provider.generate_structured.side_effect = [
+        LLMTransientError("429 - rate_limit_exceeded", retry_after_seconds=5.5),
+        GeneratedQuestion(
+            question_text="test",
+            question_type=QuestionType.INITIAL,
+            topic_id="8706f2ac-a3c0-4469-ab3d-79dac8b8c8b7",
+            difficulty=DifficultyLevel.MEDIUM,
+        ),
+    ]
+    generator = LLMQuestionGenerator(provider=mock_provider)
+
+    request = QuestionGenerationRequest(
+        session_id="test_sess",
+        turn_number=1,
+        topic_id="8706f2ac-a3c0-4469-ab3d-79dac8b8c8b7",
+        topic_name="TypeScript fluency",
+        difficulty=DifficultyLevel.MEDIUM,
+        allowed_question_types=[QuestionType.INITIAL],
+        selected_question_type=QuestionType.INITIAL,
+        relevant_skills=[],
+        relevant_projects=[],
+        relevant_experience=[],
+        previous_questions=[],
+        question_number=1,
+        max_questions_for_topic=2,
+    )
+
+    result = generator.generate(request, attempt_number=1)
+
+    assert result.question_text == "test"
+    assert sleep_calls == [5.5]  # the precise Groq hint, not the generic 2.0s default
+
+
+def test_question_generator_does_not_retry_fatal_error_internally():
+    """A fatal error (e.g. json_validate_failed) must NOT be retried inside
+    generate() itself -- it should propagate immediately as a
+    QuestionGenerationError, exactly once, so QuestionEngine's own
+    outer retry loop (with its own temperature variation) is what decides
+    whether to try again, not a duplicated retry layer here."""
+    from app.ai_interview.llm_infrastructure.exceptions import LLMFatalError
+    from app.ai_interview.question_engine.exceptions import QuestionGenerationError
+
+    mock_provider = MagicMock()
+    mock_provider.generate_structured.side_effect = LLMFatalError("400 - json_validate_failed")
+    generator = LLMQuestionGenerator(provider=mock_provider)
+
+    request = QuestionGenerationRequest(
+        session_id="test_sess",
+        turn_number=1,
+        topic_id="8706f2ac-a3c0-4469-ab3d-79dac8b8c8b7",
+        topic_name="TypeScript fluency",
+        difficulty=DifficultyLevel.MEDIUM,
+        allowed_question_types=[QuestionType.INITIAL],
+        selected_question_type=QuestionType.INITIAL,
+        relevant_skills=[],
+        relevant_projects=[],
+        relevant_experience=[],
+        previous_questions=[],
+        question_number=1,
+        max_questions_for_topic=2,
+    )
+
+    with pytest.raises(QuestionGenerationError):
+        generator.generate(request, attempt_number=1)
+
+    assert mock_provider.generate_structured.call_count == 1
+
+
 def test_question_generator_passes_explicit_max_tokens_to_provider():
     """
     Task 17: LLMQuestionGenerator must supply an explicit token budget on

@@ -15,6 +15,7 @@ let mockCompletePracticeMutate = vi.fn();
 let mockCompleteInterviewMutate = vi.fn();
 let mockStartInterviewMutate = vi.fn();
 let mockDashboardData = { interview_duration: 45 };
+let mockSessionError = null;
 
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {
@@ -37,7 +38,7 @@ vi.mock('../../hooks/candidate/useInterviewSession', () => ({
         currentQuestion: { record_id: "7d1c6529-2e17-429f-91b1-302e6233a09d", question_text: "Test question", topic_id: "Test Topic" },
         isEvaluating: false,
         isCompleted: mockIsCompleted,
-        error: null,
+        error: mockSessionError,
         submitAnswer: vi.fn()
     })
 }));
@@ -70,6 +71,7 @@ describe('InterviewRoom Component', () => {
         mockCompleteInterviewMutate = vi.fn();
         mockStartInterviewMutate = vi.fn();
         mockDashboardData = { interview_duration: 45 };
+        mockSessionError = null;
         mockNavigate.mockReset();
     });
 
@@ -259,6 +261,61 @@ describe('InterviewRoom Component', () => {
             expect(consoleErrorSpy).toHaveBeenCalled();
 
             consoleErrorSpy.mockRestore();
+        });
+    });
+
+    describe('Mid-interview failure: View Report button', () => {
+        // A candidate has no way to discover a session's id on their own once
+        // generation fails mid-interview (the error banner previously showed
+        // only the error text, with no link anywhere to the report, even
+        // though a partial report now exists for any session with at least
+        // one evaluated answer). The route's own :id param IS the real
+        // session_id once live (set by handleStart's navigate(`/candidate/interview/${sessionId}`)),
+        // so it's available here without any extra plumbing.
+        it('shows a View Report button linking to this session\'s report when a live-session error occurs', () => {
+            mockSessionError = 'Question generation failed. The interview could not continue.';
+
+            render(
+                <MemoryRouter initialEntries={['/candidate/interview/real-session-abc']}>
+                    <Routes>
+                        <Route path="/candidate/interview/:id" element={<InterviewRoom />} />
+                    </Routes>
+                </MemoryRouter>
+            );
+
+            expect(screen.getByText(mockSessionError)).toBeTruthy();
+            fireEvent.click(screen.getByText('View Report'));
+
+            expect(mockNavigate).toHaveBeenCalledWith('/candidate/reports?session_id=real-session-abc');
+        });
+
+        it('does not show a View Report button for a practice session error', () => {
+            mockSessionError = 'Something went wrong.';
+
+            render(
+                <MemoryRouter initialEntries={['/candidate/interview/practice']}>
+                    <Routes>
+                        <Route path="/candidate/interview/:id" element={<InterviewRoom />} />
+                    </Routes>
+                </MemoryRouter>
+            );
+
+            // practiceSessionId is null until practice is explicitly started,
+            // so this renders the pre-interview screen, not the live error
+            // banner -- confirms no stray "View Report" button appears here.
+            expect(screen.queryByText('View Report')).toBeNull();
+        });
+
+        it('does not show a View Report button when there is no error', () => {
+            render(
+                <MemoryRouter initialEntries={['/candidate/interview/real-session-abc']}>
+                    <Routes>
+                        <Route path="/candidate/interview/:id" element={<InterviewRoom />} />
+                    </Routes>
+                </MemoryRouter>
+            );
+
+            expect(screen.queryByText('View Report')).toBeNull();
         });
     });
 });

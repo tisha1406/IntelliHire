@@ -230,6 +230,37 @@ class SessionCreationService:
                 ]
             )
         else:
+            # 5a. Read strategy snapshot early — needed to set the correct
+            # blueprint budget BEFORE calling self.planner.plan() below.
+            # Root-cause fix for the Question 6 failure:
+            #   CoveragePlanner derives total_question_budget from
+            #   interview_duration_minutes (hardcoded 30 → 30//5 = 6).
+            #   For official sessions with a strategy, strategy.max_questions
+            #   is the authoritative question ceiling.  Passing it via
+            #   PlanningConstraints means CoveragePlanner uses the strategy
+            #   value (e.g. 12) instead of the duration-derived 6, so the
+            #   blueprint's total_question_budget and the strategy's
+            #   max_questions stay in sync.  Without this, QuestionTurnPlanner
+            #   enforced budget=6 while CompletionEngine said the interview
+            #   should continue, making question 7 permanently unreachable.
+            early_strategy_def = None
+            early_snapshot_dict = campaign.get("strategy_snapshot")
+            if early_snapshot_dict and "definition" in early_snapshot_dict:
+                from app.ai_interview.schemas.strategy import StrategyDefinition
+                try:
+                    early_strategy_def = StrategyDefinition.model_validate(
+                        early_snapshot_dict["definition"]
+                    )
+                except Exception:
+                    pass
+
+            duration_minutes = (
+                campaign.get("interview_settings", {}).get("duration")
+                or campaign.get("settings", {}).get("duration_minutes")
+                or campaign.get("duration_minutes")
+                or 30
+            )
+
             job_context = JobRequirementContext(
                 role_title=candidate.get("target_role", campaign.get("role_target", campaign.get("name", "Unknown Role"))),
                 department=campaign.get("department"),
@@ -237,9 +268,23 @@ class SessionCreationService:
                 preferred_skills=[],
                 job_description=campaign.get("description"),
                 experience_expectations=candidate.get("experience_level"),
-                interview_duration_minutes=30
+                interview_duration_minutes=duration_minutes
             )
-            constraints = None
+            # When a strategy is present, pin the blueprint's
+            # total_question_budget to strategy.max_questions so the planner
+            # and turn planner always agree on the hard ceiling.
+            # Breadth Screening (budget_mode="distinct_topics") stores
+            # max_questions=0; fall back to the duration formula in that case.
+            if (
+                early_strategy_def is not None
+                and early_strategy_def.budget_mode != "distinct_topics"
+                and early_strategy_def.max_questions > 0
+            ):
+                constraints = PlanningConstraints(
+                    total_question_budget=early_strategy_def.max_questions
+                )
+            else:
+                constraints = None
 
             # Derive interview_type/mixed_composition here (not just later,
             # at step 6) -- D-03: TopicSelector needs them to decide whether
@@ -328,6 +373,12 @@ class SessionCreationService:
                     "target_questions": topic_count,
                     "max_questions": topic_count,
                 })
+                if blueprint.total_question_budget < topic_count:
+                    blueprint = blueprint.model_copy(update={
+                        "total_question_budget": topic_count,
+                        "max_questions": topic_count,
+                        "emergency_max_questions": topic_count + 2,
+                    })
 
             campaign_requirements = campaign.get("requirements", [])
 

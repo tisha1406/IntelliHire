@@ -163,15 +163,25 @@ class InterviewResultService:
         """
         session = await self._load_session(session_id)
 
-        # --- Incomplete session ---
+        # --- Incomplete / failed session ---
         from app.ai_interview.core.enums import InterviewState
-        if session.state not in (InterviewState.COMPLETED,):
+        is_failed = session.state == InterviewState.FAILED
+        if session.state not in (InterviewState.COMPLETED, InterviewState.FAILED):
             return {
                 "session_id": session_id,
                 "status": "IN_PROGRESS",
                 "has_report": False,
                 "message": "Interview is not yet completed.",
             }
+
+        # A FAILED session (e.g. the LLM provider exhausted all generation
+        # retries) with zero evaluations recorded has nothing to report on --
+        # same as a COMPLETED session with no evaluations, below. A FAILED
+        # session with at least one evaluation still has real, persisted
+        # answer data worth showing: it falls through to the normal report
+        # build below exactly like COMPLETED, just labelled "INCOMPLETE" so
+        # the UI can honestly say the interview ended early rather than
+        # claiming (falsely) that a report is still pending.
 
         # --- Build lookup indexes ---
         question_index: Dict[str, QuestionRecord] = {
@@ -189,9 +199,13 @@ class InterviewResultService:
         if not evaluations:
             return {
                 "session_id": session_id,
-                "status": "COMPLETED_NO_DATA",
+                "status": "FAILED_NO_DATA" if is_failed else "COMPLETED_NO_DATA",
                 "has_report": False,
-                "message": "Interview completed but no evaluations were recorded.",
+                "message": (
+                    "Interview ended before any answer was evaluated."
+                    if is_failed else
+                    "Interview completed but no evaluations were recorded."
+                ),
             }
 
         # --- Per-question feedback ---
@@ -236,7 +250,7 @@ class InterviewResultService:
 
         return {
             "session_id": session_id,
-            "status": "COMPLETED",
+            "status": "INCOMPLETE" if is_failed else "COMPLETED",
             "has_report": True,
             "overall_score": overall_score_100,
             "question_count": len(evaluations),
@@ -249,7 +263,12 @@ class InterviewResultService:
             "weaknesses": weaknesses,
             "improvement_suggestions": improvement_suggestions,
             # Kept for backward compatibility with transport_service caller
-            "company_remarks": "AI Evaluation Completed.",
+            "company_remarks": (
+                "Interview ended early; this report reflects only the questions "
+                "that were answered and evaluated before the session ended."
+                if is_failed else
+                "AI Evaluation Completed."
+            ),
             # D-01: session-level evidence/coverage summary (additive).
             "requirement_coverage": requirement_coverage,
             # D-01: per-topic evidence block (additive, separate from topic_scores).

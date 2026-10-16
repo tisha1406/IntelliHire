@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import re
 import httpx
 from typing import Type, TypeVar, Any, Optional
 from pydantic import BaseModel
@@ -15,6 +16,44 @@ from app.ai_interview.llm_infrastructure.parsers import StructuredOutputParser
 
 logger = logging.getLogger(__name__)
 T = TypeVar('T', bound=BaseModel)
+
+def _parse_groq_reset_header(value: Optional[str]) -> Optional[float]:
+    """
+    Parse Groq's `x-ratelimit-reset-tokens` header (e.g. "3.337s" or
+    "1m2.3s") into a plain number of seconds. Returns None if the header is
+    absent or doesn't match the expected format, rather than guessing.
+
+    NOTE: this is the time until the account's token bucket is FULLY back to
+    its max (8000/min here) -- it can be much longer than actually necessary
+    for the next request to fit. Prefer _parse_groq_message_retry_hint()
+    below when available; this header is only a fallback.
+    """
+    if not value:
+        return None
+    match = re.fullmatch(r"(?:(\d+)m)?(\d+(?:\.\d+)?)s", value.strip())
+    if not match:
+        return None
+    minutes, seconds = match.groups()
+    total = float(seconds)
+    if minutes:
+        total += int(minutes) * 60
+    return total
+
+
+def _parse_groq_message_retry_hint(error_body: str) -> Optional[float]:
+    """
+    Groq's 429 error message embeds the precise wait time needed for THIS
+    specific request to fit within the remaining budget, e.g.:
+    "...Please try again in 6.149999999s. Need more tokens?..." -- this is
+    usually much shorter than the full-bucket-reset header above (which
+    reflects waiting for the ENTIRE 8000/min budget to refill, not just
+    enough for one more request), so it's preferred when present.
+    """
+    match = re.search(r"try again in (\d+(?:\.\d+)?)s", error_body)
+    if not match:
+        return None
+    return float(match.group(1))
+
 
 class OpenAICompatibleAdapter(LLMProvider):
     """
@@ -87,8 +126,23 @@ class OpenAICompatibleAdapter(LLMProvider):
                 error_body = "<failed to read body>"
 
             if status in (429, 500, 502, 503, 504):
-                logger.warning(f"Transient HTTP {status} from provider {self.base_url}. Body: {error_body}")
-                raise LLMTransientError(f"Transient provider error: {status} - {error_body}") from e
+                # Groq's own x-ratelimit-reset-tokens header tells us exactly
+                # how long until its per-minute token budget frees up -- far
+                # more reliable than a fixed guess, since a short fixed delay
+                # often retries into the SAME still-active window and fails
+                # again (confirmed live: this was happening in production).
+                retry_after = (
+                    _parse_groq_message_retry_hint(error_body)
+                    or _parse_groq_reset_header(e.response.headers.get("x-ratelimit-reset-tokens"))
+                )
+                logger.warning(
+                    f"Transient HTTP {status} from provider {self.base_url}. "
+                    f"retry_after={retry_after}s. Body: {error_body}"
+                )
+                raise LLMTransientError(
+                    f"Transient provider error: {status} - {error_body}",
+                    retry_after_seconds=retry_after,
+                ) from e
             else:
                 logger.error(f"Fatal HTTP {status} from provider {self.base_url}. Body: {error_body}")
                 raise LLMFatalError(f"Fatal provider error: {status} - {error_body}") from e

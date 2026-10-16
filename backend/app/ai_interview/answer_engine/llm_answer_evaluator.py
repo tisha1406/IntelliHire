@@ -4,8 +4,28 @@ from app.ai_interview.answer_engine.schemas import EvaluationRequest, RawEvaluat
 from app.ai_interview.answer_engine.exceptions import EvaluationValidationError
 from app.ai_interview.llm_infrastructure.interfaces import LLMProvider
 from app.ai_interview.llm_infrastructure.prompts import PromptCompiler
+from app.ai_interview.llm_infrastructure.resilience import ResiliencePolicy
 
 logger = logging.getLogger(__name__)
+
+# Same Groq account/quota and reasoning model as question generation (see
+# llm_question_generator.py's QUESTION_GENERATION_MAX_TOKENS comment for the
+# live A/B test that showed a too-small budget causes empty-output failures
+# on longer/more complex prompts -- a smaller number does NOT meaningfully
+# help the account's actual tokens-per-minute headroom, which live checks
+# showed was not the dominant constraint). Kept generous for the same
+# reason, comfortably under the model's 65536 max.
+EVALUATION_MAX_TOKENS = 8192
+
+# Evaluation calls share the same account-level rate limit as question
+# generation and can hit the same HTTP 429 rate_limit_exceeded without any
+# retry delay previously existing here -- AnswerEngine's own outer retry loop
+# (MAX_EVALUATION_ATTEMPTS) retried immediately, hitting the same active
+# rate-limit window. Same fix as question generation: real backoff via the
+# existing ResiliencePolicy before AnswerEngine's own retry logic is involved.
+_EVALUATION_RESILIENCE_MAX_ATTEMPTS = 2
+_EVALUATION_RESILIENCE_BASE_DELAY_SECONDS = 2.0
+_EVALUATION_RESILIENCE_MAX_OPERATION_SECONDS = 20.0
 
 class LLMAnswerEvaluator(AnswerEvaluator):
     """
@@ -43,11 +63,16 @@ class LLMAnswerEvaluator(AnswerEvaluator):
             )
             
             # Use provider to parse and validate into RawEvaluation
-            raw_evaluation = self.provider.generate_structured(
+            raw_evaluation = ResiliencePolicy.execute_with_retry(
+                self.provider.generate_structured,
+                max_attempts=_EVALUATION_RESILIENCE_MAX_ATTEMPTS,
+                base_delay_seconds=_EVALUATION_RESILIENCE_BASE_DELAY_SECONDS,
+                max_operation_time_seconds=_EVALUATION_RESILIENCE_MAX_OPERATION_SECONDS,
                 system_prompt=sys_compiled,
                 user_prompt=user_compiled,
                 response_model=RawEvaluation,
-                temperature=0.3 # Low temp for deterministic evaluation
+                temperature=0.3, # Low temp for deterministic evaluation
+                max_tokens=EVALUATION_MAX_TOKENS,
             )
             
             return raw_evaluation

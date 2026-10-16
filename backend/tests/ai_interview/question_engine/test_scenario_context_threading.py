@@ -295,9 +295,10 @@ class TestPromptGenerationIntegration:
             question_number=1,
             max_questions_for_topic=2,
         )
-        system_prompt, _ = PromptResolver.resolve(request)
+        system_prompt, user_prompt = PromptResolver.resolve(request)
         expected_block = "<scenario_context_data>\n" + SCENARIO.scenario_context + "\n</scenario_context_data>"
-        assert expected_block in system_prompt
+        assert expected_block in user_prompt
+        assert expected_block not in system_prompt
 
     def test_prompt_resolver_renders_not_provided_when_scenario_context_is_none(self):
         """Sanity check on the other side of the fix: a situational-dimension
@@ -316,9 +317,10 @@ class TestPromptGenerationIntegration:
             question_number=1,
             max_questions_for_topic=2,
         )
-        system_prompt, _ = PromptResolver.resolve(request)
+        system_prompt, user_prompt = PromptResolver.resolve(request)
         not_provided_block = "<scenario_context_data>\nNOT_PROVIDED\n</scenario_context_data>"
-        assert not_provided_block in system_prompt
+        assert not_provided_block in user_prompt
+        assert not_provided_block not in system_prompt
 
 
 # ── E. Snapshot / immutability behavior ─────────────────────────────────────

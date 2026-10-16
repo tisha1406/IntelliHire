@@ -182,6 +182,14 @@ export default function Reports() {
                 </div>
             </motion.div>
 
+            {report.status === "INCOMPLETE" && (
+                <motion.div custom={0.5} variants={fadeUp} initial="hidden" animate="show"
+                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderRadius: 8, background: "rgba(245, 158, 11, 0.1)", color: "#F59E0B", marginBottom: 20, fontSize: 14 }}>
+                    <AlertTriangle size={18} />
+                    <span>This interview ended early. The report below reflects only the {report.question_count} question{report.question_count === 1 ? "" : "s"} that were answered and evaluated before the session ended.</span>
+                </motion.div>
+            )}
+
             {/* Top Stats */}
             <motion.div custom={1} variants={fadeUp} initial="hidden" animate="show"
                 style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 24 }}>
