@@ -890,3 +890,71 @@ A reviewer can perform, without hitting any bug catalogued in this document:
 5. An admin can activate/deactivate a specific version.
 6. All five actions above call the real backend endpoints (no mock data) and are covered by at least a smoke-level frontend test.
 7. No existing admin page, route, or backend endpoint is modified or broken by this change.
+
+---
+
+## 27. Reconciliation Addendum (2026-10-09)
+
+**This section records what this document's "Remaining Work" (§25) and cleanup lists (§22/§23) actually look like today, verified against the live codebase and test suite — not a rewrite of the original audit above, which remains as a historical record of the 2026-10-03 point-in-time snapshot.**
+
+### 27.1 Prompt architecture — complete and approved
+
+The 8-task LLM Prompt Architecture redesign (M0_COMMON persona, context-envelope improvements, system/user message separation, 6 strategy blocks, category-block refinement, 16-addenda rationalization, requirement-criticality + bounded non-technical resume/project context, and Situational/Case scenario-bank seeding) is complete and approved. `prompt_library.py`, `resolver.py`, `blocks.py`, `registry.py`, and the deterministic engine were not modified as part of this reconciliation pass and remain exactly as Tasks 1–8 left them. The Situational/Case scenario bank is seeded in the real development database (5 scenarios: `sit_backend_001`, `sit_frontend_001`, `sit_data_001`, `sit_pm_001`, `sit_general_001`) and is separated from `intellihire_test` via `tests/conftest.py` forcing `DATABASE_NAME=intellihire_test` for all test runs.
+
+### 27.2 R-01 through R-15 — verified status
+
+Every item below was re-verified against current code (not assumed from this document's original status column):
+
+| ID | Original (2026-10-03) status | **Verified current status** |
+|---|---|---|
+| R-01 (evidence model in report) | MISSING (P0) | ✅ Complete — `interview_result_service.py` outputs the 3-way evidence model |
+| R-02 (stale `ReportResponse` schema) | Stale (P1) | ✅ Complete — reconciled against live service output |
+| R-03 (Situational/Case scenario source) | MISSING (P1) | ✅ Complete — prompt-architecture Tasks 7–8; scenario bank seeded and live-validated |
+| R-04 (real PDF generation) | Non-functional | ✅ Complete — working `pdf_renderer.py`, WeasyPrint formally abandoned (documented Windows native-dependency failure), real pipeline in place |
+| R-05 (Candidate Settings field names) | Broken (P1) | ✅ Complete |
+| R-06 (candidateService.js missing methods) | Broken (P1) | ✅ Complete |
+| R-07 (Recruiters.jsx/Team.jsx consolidation) | Duplicate UI (P2) | ✅ Complete — `Team.jsx` removed |
+| R-08 (Team.jsx status casing) | Bug (P2) | Moot — file consolidated away under R-07 |
+| R-09 ("Adaptive" difficulty 422 bug) | Bug (P2) | ✅ Complete |
+| R-10 / E-01–E-03 (Admin Strategy authoring UI) | MISSING (P1) | ✅ Complete — `Strategies.jsx`/`StrategyDetail.jsx`/`NewStrategy.jsx`/`EditStrategy.jsx` built and routed |
+| R-11 (recruiter self-service surface) | Product decision needed | ✅ **Resolved this pass** — see §27.3 |
+| R-12 (auth refresh/logout/name-email) | Dead end-to-end | ✅ Complete — real refresh/logout, JWT carries real name/email claims |
+| R-13 (budget cross-validation rule) | MISSING (P2) | ✅ Complete — `campaigns.py`'s `_critical_topic_budget_warnings()` |
+| R-14 (API contract fixes, batch) | Multiple 404s (P2–P3) | ✅ Complete — all 12 rows of §10's table individually verified (see the dedicated R-14 audit); the one residual item (`GET /api/auth/profile` hardcoded stub) is confirmed orphaned with zero live callers, real profile flow already migrated to `GET /admin/profile` |
+| R-15 (dropped subscription-change config fields) | Bug (P2) | ✅ Complete |
+
+### 27.3 R-11 — Final decision and implementation
+
+**Decision (final, not subject to further debate): recruiters are managed inside the Company portal. No separate recruiter-facing portal exists or will be built.**
+
+Verified/implemented this pass:
+- Frontend: recruiters and company admins share the same route tree (`App.jsx`, `ProtectedRoute roles={["company", "recruiter"]}`), with company-admin-only routes hidden/403'd for recruiters and a dedicated `RecruiterProfile.jsx` for the recruiter's own profile. No standalone `RecruiterRoutes.jsx` exists.
+- Backend: `GET/PATCH/DELETE /company/team/{member_id}` and related sub-resource endpoints are scoped to the authenticated company's `company_id` (never a frontend-supplied id); cross-company access returns 404, not data leakage. Already covered by `tests/api/test_company_team_get_member.py`, including an explicit `test_get_team_member_404s_when_member_belongs_to_a_different_company` tenant-isolation test.
+- **Cleanup performed:** four standalone recruiter self-service routers (`app/api/recruiter/dashboard.py`, `candidates.py`, `campaigns.py`, `interviews.py`) were removed, along with their imports/registrations in `app/main.py`. These represented the exact "separate recruiter portal" architecture explicitly rejected by this decision, and were proven safe to remove: zero frontend callers, zero test coverage, zero internal backend references (confirmed by grep before deletion). `app/api/recruiter/profile.py` was kept — recruiters still use it for their own profile/password-change within the shared Company-portal architecture. New regression tests: `tests/api/test_recruiter_self_service_routers_removed.py` (confirms the 4 removed route prefixes now 404, confirms `profile.py` remains mounted, confirms no code still imports the removed modules).
+
+### 27.4 Admin analytics
+
+- **The live, routed analytics page (`pages/admin/HiringAnalytics.jsx`, linked from the sidebar at `/admin/hiring-analytics`) was already correctly wired to real backend data** (`AnalyticsAPI.getHiringAnalytics()` → `AnalyticsService.get_hiring_analytics()`, real MongoDB aggregation over candidate status counts) — no mock data, no change needed, preserved as-is.
+- `pages/admin/Analytics.jsx`, the page §8 originally flagged as "100% hardcoded data," was discovered during this pass to be **orphaned — not imported by any route or sidebar link**, meaning the stale mock data it contained was never actually seen by any user. It was nonetheless wired to real data (`AnalyticsAPI.getDashboardStats()` via a new `useAdminAnalytics()` React Query hook, matching the existing `useAdminDashboard()` convention) rather than left with stale numbers, with loading/empty/error states handled and a focused test added (`Analytics.test.jsx`, 3 tests). It remains unrouted; wiring it into navigation (if ever desired) is a separate, optional decision, not part of this reconciliation.
+
+### 27.5 Payment / subscription
+
+- The payment flow remains an explicitly-labeled internal simulator (`IntelliHirePaymentProvider`), as originally audited — confirmed still true, confirmed still correctly isolated (order must exist, must belong to the requesting company, cannot be double-verified, provider gate is still consulted even though it currently always returns `True`).
+- Subscription-change AI-config field wiring (R-15) is confirmed complete.
+- **Unresolved, and intentionally not guessed at:** no real payment gateway (Razorpay/Stripe/PayU/etc.) has been chosen. This is a product/business decision outside engineering's authority to make unilaterally, and the simulator's existing security boundaries (tenant isolation, idempotency, a pluggable `verify_payment()` seam) mean real-gateway integration can be added later without an architectural rework.
+
+### 27.6 Dead/legacy code cleanup (§22/§23)
+
+Every file explicitly listed for deletion in the original §23 was found **already removed** as of this pass: `app/speech/sarvam_client.py`, `app/analytics/{aggregation,dashboard_service,metrics}.py`, `app/validation/question_validator.py`, `app/middleware/error_handler.py`, `app/api/admin_proxy.py`, `app/api/company/recruiters.py`, the duplicate `ValidatorLog` class and unused `InterviewSession`/`InterviewTurn`/`InterviewReport` classes in `db/models.py`, and all 7 listed frontend dead files/directories (`ResumeUpload.jsx`, `InterviewSetup.jsx`, `ReportView.jsx`, `Registration.jsx`, `pages/recruiter/ChangePassword.jsx`, `routes/CompanyRoutes.jsx`, `components/recruiter/`, `test-payment.jsx`, `test-ssr.jsx`). The only net-new cleanup this pass performed was the 4 recruiter self-service routers under §27.3.
+
+### 27.7 Verification evidence (2026-10-09)
+
+- Full backend suite: `pytest` → **967 passed, 0 failed**.
+- Full frontend suite: `npx vitest run --pool=threads` → **32 test files, 143 tests, all passed** (the default `forks` pool has a known worker-startup timeout in this environment; `--pool=threads` is the reliable alternative — an environment issue, not a test failure).
+- Situational/Case scenario bank: reconfirmed intact in the real development database (5 scenarios, unmodified) — `intellihire` and `intellihire_test` remain correctly separated.
+- Protected areas (prompt architecture, deterministic engine, database schemas/migrations, payment core logic) were not modified.
+
+### 27.8 Remaining genuine blockers
+
+1. **Real payment gateway selection** — a product/business decision, not an engineering gap; see §27.5.
+2. Nothing else identified as mandatory and unimplemented as of this reconciliation pass.

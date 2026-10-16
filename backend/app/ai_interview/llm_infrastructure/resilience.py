@@ -50,9 +50,18 @@ class ResiliencePolicy:
             except (LLMTransientError, LLMValidationError) as e:
                 last_exception = e
                 logger.warning(f"LLM operation failed (Attempt {attempt}/{max_attempts}): {e}")
-                
+
                 if attempt < max_attempts:
-                    delay = base_delay_seconds * attempt
+                    # Honor the provider's own rate-limit reset hint when it
+                    # gives one (e.g. Groq's x-ratelimit-reset-tokens) -- a
+                    # fixed short delay often retries into the same
+                    # still-active rate-limit window and fails again.
+                    provider_hint = getattr(e, "retry_after_seconds", None)
+                    delay = provider_hint if provider_hint is not None else base_delay_seconds * attempt
+                    # Still bounded by the operation's own time budget below,
+                    # but never wait longer than that remaining budget allows.
+                    remaining_budget = max_operation_time_seconds - (time.time() - start_time)
+                    delay = min(delay, max(remaining_budget - 0.1, 0))
                     if time.time() - start_time + delay >= max_operation_time_seconds:
                         logger.error(f"Next retry delay ({delay}s) would exceed max operation time budget ({max_operation_time_seconds}s). Aborting retries.")
                         break

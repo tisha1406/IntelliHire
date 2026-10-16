@@ -10,14 +10,19 @@ from app.ai_interview.llm_infrastructure.exceptions import LLMTransientError
 class RecoveringMockProvider:
     def __init__(self):
         self.calls = 0
-        
+
     def generate_structured(self, system_prompt, user_prompt, response_model, **kwargs):
         self.calls += 1
-        if self.calls == 1:
-            # Fail the first time
+        if self.calls <= 2:
+            # Fail the first two calls. LLMAnswerEvaluator now wraps the
+            # provider call in ResiliencePolicy (max 2 internal attempts) to
+            # give transient errors real backoff -- see llm_answer_evaluator.py
+            # -- so a single cross-request "ATTEMPT 1" below now consumes 2
+            # calls (both internal retries) before giving up, and the 3rd
+            # call (ATTEMPT 2's own first internal try) is what succeeds.
             raise LLMTransientError("API down")
-        
-        # Succeed the second time
+
+        # Succeed from the third call onward
         return RawEvaluation(
             relevance_score=0.8,
             correctness_score=0.8,
@@ -36,6 +41,7 @@ class RecoveringMockProvider:
         return ""
 
 def test_failure_recovery_allows_retry_from_pending(monkeypatch):
+    monkeypatch.setattr("app.ai_interview.llm_infrastructure.resilience.time.sleep", lambda s: None)
     session = InterviewSessionSchema(
         session_id="s1",
         candidate_id="c1",

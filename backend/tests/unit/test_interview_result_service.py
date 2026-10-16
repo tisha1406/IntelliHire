@@ -274,6 +274,50 @@ async def test_09_incomplete_session_returns_in_progress():
 
 
 # ---------------------------------------------------------------------------
+# TEST 10 - FAILED session with recorded evaluations still produces a
+# partial report (the real-world case: question-generation exhausted all
+# retries on, say, question 7, but questions 1-6 were fully answered and
+# evaluated). Previously this returned has_report=False with a message
+# falsely implying the interview would still finish ("report will be
+# generated automatically once your session is finished") -- it never will,
+# since FAILED is terminal. The report must now be built from whatever real
+# evaluation data exists, honestly labelled as incomplete.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_10_failed_session_with_evaluations_produces_partial_report():
+    q = _qr("q1", "py", "Explain decorators")
+    ev = _er("q1", "py", 0.8)
+    tp = _mtp("py", 1, 0.8, strong=1)
+    s = _make_session(state=InterviewState.FAILED, question_history=[q],
+                      evaluation_history=[ev], topic_progress=[tp],
+                      blueprint_topics=[_tb("py", "Python")], completed_at=None)
+
+    r = await _svc(s).generate_result_report("s1")
+
+    assert r["has_report"] is True
+    assert r["status"] == "INCOMPLETE"
+    assert r["overall_score"] == 80
+    assert r["question_feedback"][0]["question"] == "Explain decorators"
+    assert "ended early" in r["company_remarks"]
+
+
+# ---------------------------------------------------------------------------
+# TEST 11 - FAILED session with zero evaluations (e.g. generation failed on
+# the very first question) has genuinely nothing to report -- distinct
+# status/message from the COMPLETED_NO_DATA case, but still has_report=False.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_11_failed_session_with_no_evaluations_has_no_report():
+    s = _make_session(state=InterviewState.FAILED, completed_at=None)
+    r = await _svc(s).generate_result_report("s1")
+    assert r["has_report"] is False
+    assert r["status"] == "FAILED_NO_DATA"
+    assert "before any answer was evaluated" in r["message"]
+
+
+# ---------------------------------------------------------------------------
 # Unit test: _to_100 conversion helper
 # ---------------------------------------------------------------------------
 

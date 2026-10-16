@@ -204,6 +204,11 @@ export default function CandidateReport() {
             {/* Score breakdown & Real Evaluation */}
             {report && report.has_report && (
                 <>
+                    {report.status === "INCOMPLETE" && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderRadius: 8, background: "rgba(245, 158, 11, 0.1)", color: "#F59E0B", marginBottom: 20, fontSize: 14 }}>
+                            This interview ended early. The report below reflects only the {report.question_count} question{report.question_count === 1 ? "" : "s"} answered and evaluated before the session ended.
+                        </div>
+                    )}
                     {scoreData.length > 0 && (
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}

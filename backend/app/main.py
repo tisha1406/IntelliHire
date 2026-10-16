@@ -62,11 +62,15 @@ from app.api.interview import router as interview_router
 
 # ===========================
 # Recruiter APIs
+#
+# R-11: recruiters are managed inside the Company portal, not a separate
+# recruiter-facing workflow (final product decision). The standalone
+# self-service dashboard/candidates/campaigns/interviews routers that would
+# have backed a dedicated recruiter portal were removed after confirming
+# zero frontend callers, zero tests, and zero internal references -- see
+# docs/specs.md's R-11 reconciliation. profile.py is kept: recruiters still
+# use it for their own profile/password-change within the shared portal.
 # ===========================
-from app.api.recruiter.dashboard import router as recruiter_dashboard_router
-from app.api.recruiter.candidates import router as recruiter_candidates_router
-from app.api.recruiter.campaigns import router as recruiter_campaigns_router
-from app.api.recruiter.interviews import router as recruiter_interviews_router
 from app.api.recruiter.profile import router as recruiter_profile_router
 
 # ===========================
@@ -205,10 +209,6 @@ app.include_router(resume_router)
 app.include_router(interview_router)
 
 # ---------- Recruiter ----------
-app.include_router(recruiter_dashboard_router, prefix="/api/recruiter")
-app.include_router(recruiter_candidates_router, prefix="/api/recruiter")
-app.include_router(recruiter_campaigns_router, prefix="/api/recruiter")
-app.include_router(recruiter_interviews_router, prefix="/api/recruiter")
 app.include_router(recruiter_profile_router, prefix="/api/recruiter")
 
 # ---------- WebSockets ----------

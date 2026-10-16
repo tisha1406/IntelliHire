@@ -172,8 +172,8 @@ class TestDownstreamSemantics:
     def test_prompt_shows_the_partial_state(self):
         session, ctx, p = _session(REQUIRED)
         request = QuestionRequestBuilder.build(_plan(session, p["Docker"]), ctx, _mode(), [], [])
-        system_prompt, _ = PromptResolver.resolve(request)
-        assert "<resume_evidence_data>\npartial\n</resume_evidence_data>" in system_prompt
+        system_prompt, user_prompt = PromptResolver.resolve(request)
+        assert "<resume_evidence_data>\npartial\n</resume_evidence_data>" in user_prompt
         assert "Addendum: AD_TECH" in system_prompt
 
 

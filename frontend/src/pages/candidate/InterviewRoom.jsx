@@ -281,8 +281,23 @@ export default function InterviewRoom() {
                     /* Active Live Interview */
                     <div className="c-active-area">
                         {error && (
-                            <div style={{ padding: 16, background: "rgba(239, 68, 68, 0.1)", color: "#EF4444", borderRadius: 8, marginBottom: 24, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <AlertCircle size={20} /> {error}
+                            <div style={{ padding: 16, background: "rgba(239, 68, 68, 0.1)", color: "#EF4444", borderRadius: 8, marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <AlertCircle size={20} /> {error}
+                                </div>
+                                {/* The interview may have ended here with some questions already
+                                    answered and evaluated -- the candidate otherwise has no way to
+                                    find the report URL on their own (it requires knowing this
+                                    session's id, which is not shown anywhere in this error state). */}
+                                {!isPractice && sessionIdToUse && (
+                                    <button
+                                        className="c-btn c-btn-ghost"
+                                        style={{ borderColor: "#EF4444", color: "#EF4444", whiteSpace: "nowrap" }}
+                                        onClick={() => navigate(`/candidate/reports?session_id=${sessionIdToUse}`)}
+                                    >
+                                        View Report
+                                    </button>
+                                )}
                             </div>
                         )}
                         

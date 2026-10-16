@@ -11,7 +11,8 @@ question saw only the resume-evidence enum.
 Fix: ENV_TECHNICAL gains a `Relevant Resume Context` line, and for the
 technical effective dimension PromptResolver fills it from those existing
 relevant_* fields (bounded, deterministic, "NOT_PROVIDED" when nothing is
-relevant). Every other dimension keeps its previous behaviour.
+relevant). (Task 7 later extended RESUME/BEHAVIORAL/SITUATIONAL to the same
+bounded Experience+Projects context -- see TestOtherDimensionsUnchanged.)
 
 These tests drive the real chain: persisted resume shape -> ResumeContextBridge
 -> planner -> session -> QuestionTurnPlanner -> QuestionRequestBuilder ->
@@ -102,25 +103,25 @@ def _request_for(topic_name, strategy_id="adaptive_depth"):
     return QuestionRequestBuilder.build(plan, ctx, _mode(), [], [])
 
 
-def _context_block(system_prompt):
-    start = system_prompt.index("Relevant Resume Context:")
-    return system_prompt[start:system_prompt.index("Previous Answer:", start)]
+def _context_block(user_prompt):
+    start = user_prompt.index("Relevant Resume Context:")
+    return user_prompt[start:user_prompt.index("Previous Answer:", start)]
 
 
 class TestRelevantResumeContextReachesTheTechnicalPrompt:
     def test_relevant_skill_is_included(self):
-        system_prompt, _ = PromptResolver.resolve(_request_for("Python"))
-        block = _context_block(system_prompt)
+        _, user_prompt = PromptResolver.resolve(_request_for("Python"))
+        block = _context_block(user_prompt)
         assert "<relevant_resume_context_data>" in block
         assert "Relevant Skills: Python" in block
 
     def test_relevant_experience_is_included(self):
-        block = _context_block(PromptResolver.resolve(_request_for("Python"))[0])
+        block = _context_block(PromptResolver.resolve(_request_for("Python"))[1])
         assert "Relevant Experience:" in block
         assert "- Backend Engineer at Acme Corp: Built Python microservices for billing." in block
 
     def test_relevant_project_is_included(self):
-        block = _context_block(PromptResolver.resolve(_request_for("Python"))[0])
+        block = _context_block(PromptResolver.resolve(_request_for("Python"))[1])
         assert "Relevant Projects:" in block
         assert "- Inventory App: Python stock tracking web app." in block
 
@@ -132,14 +133,15 @@ class TestRelevantResumeContextReachesTheTechnicalPrompt:
             assert unrelated not in user_prompt
 
     def test_missing_required_skill_shows_absent_evidence_and_no_fabricated_context(self):
-        system_prompt, _ = PromptResolver.resolve(_request_for("Kubernetes"))
-        assert "<resume_evidence_data>\nabsent\n</resume_evidence_data>" in system_prompt
-        assert "<relevant_resume_context_data>\nNOT_PROVIDED\n</relevant_resume_context_data>" in system_prompt
+        system_prompt, user_prompt = PromptResolver.resolve(_request_for("Kubernetes"))
+        assert "<resume_evidence_data>\nabsent\n</resume_evidence_data>" in user_prompt
+        assert "<relevant_resume_context_data>\nNOT_PROVIDED\n</relevant_resume_context_data>" in user_prompt
         assert "Relevant Skills" not in system_prompt
+        assert "Relevant Skills" not in user_prompt
 
     def test_present_skill_keeps_strong_evidence_status(self):
-        system_prompt, _ = PromptResolver.resolve(_request_for("Python"))
-        assert "<resume_evidence_data>\nstrong\n</resume_evidence_data>" in system_prompt
+        _, user_prompt = PromptResolver.resolve(_request_for("Python"))
+        assert "<resume_evidence_data>\nstrong\n</resume_evidence_data>" in user_prompt
 
 
 class TestExistingPromptStructureIsPreserved:
@@ -147,17 +149,19 @@ class TestExistingPromptStructureIsPreserved:
         system_prompt, user_prompt = PromptResolver.resolve(_request_for("Python", "adaptive_depth"))
         assert "Strategy: Adaptive Depth" in system_prompt
         assert "Dimension: TECHNICAL" in system_prompt
-        assert "Campaign Requirement:" in system_prompt
         assert "Category: NEW" in system_prompt
         assert "Addendum: AD_TECH" in system_prompt
         assert "Return ONLY the candidate-facing question text." in system_prompt
-        assert user_prompt == "Generate exactly one candidate-facing interview question now. Return only the question text."
+        assert "Campaign Requirement:" in user_prompt
+        assert user_prompt.startswith(
+            "Generate exactly one candidate-facing interview question now. Return only the question text."
+        )
 
     def test_other_strategy_keeps_its_own_blocks(self):
-        system_prompt, _ = PromptResolver.resolve(_request_for("Python", "fixed_coverage"))
+        system_prompt, user_prompt = PromptResolver.resolve(_request_for("Python", "fixed_coverage"))
         assert "Addendum: FC_TECH" in system_prompt
         assert "Strategy: Fixed Coverage" in system_prompt
-        assert "Relevant Skills: Python" in system_prompt
+        assert "Relevant Skills: Python" in user_prompt
 
     def test_generated_question_contract_is_unchanged(self):
         assert set(GeneratedQuestion.model_fields) >= {"question_text", "question_type"}
@@ -173,7 +177,7 @@ class TestExistingPromptStructureIsPreserved:
         LLMQuestionGenerator(CapturingProvider()).generate(_request_for("Python"))
 
         assert captured["model"] is GeneratedQuestion
-        assert "Relevant Skills: Python" in captured["system"]  # context actually reaches the LLM call
+        assert "Relevant Skills: Python" in captured["user"]  # context actually reaches the LLM call
 
 
 class TestBoundsAndSafety:
@@ -217,15 +221,34 @@ class TestOtherDimensionsUnchanged:
             relevant_skills=["Python"], relevant_projects=["Inventory App: x"],
             relevant_experience=["Dev at Acme: built things"], **kw)
 
-    def test_resume_dimension_still_uses_experience_only(self):
-        system_prompt, _ = PromptResolver.resolve(self._req(InterviewType.RESUME_EXPERIENCE, "fixed_coverage"))
-        assert "<relevant_resume_context_data>\nDev at Acme: built things\n</relevant_resume_context_data>" in system_prompt
+    def test_resume_dimension_includes_experience_and_projects_but_not_skills(self):
+        """Task 7 (Issue B): the Resume dimension is project-centric per the
+        strategy docs, but previously only got a flat, joined
+        relevant_experience string with projects silently dropped. It now
+        gets the same bounded Experience + Projects structure the technical
+        dimension already had (skills excluded -- that's technical-only)."""
+        system_prompt, user_prompt = PromptResolver.resolve(self._req(InterviewType.RESUME_EXPERIENCE, "fixed_coverage"))
+        assert "Relevant Experience:" in user_prompt
+        assert "- Dev at Acme: built things" in user_prompt
+        assert "Relevant Projects:" in user_prompt
+        assert "- Inventory App: x" in user_prompt
         assert "Relevant Skills" not in system_prompt
+        assert "Relevant Skills" not in user_prompt
 
-    def test_behavioral_and_situational_prompts_have_no_resume_context(self):
-        behavioral, _ = PromptResolver.resolve(self._req(InterviewType.HR_BEHAVIORAL, "fixed_coverage"))
-        situational, _ = PromptResolver.resolve(self._req(InterviewType.SITUATIONAL_CASE, "fixed_coverage"))
-        for prompt in (behavioral, situational):
-            assert "Relevant Resume Context" not in prompt
-            assert "Python" not in prompt
-            assert "Acme" not in prompt
+    def test_behavioral_and_situational_prompts_get_bounded_experience_and_project_context(self):
+        """Task 7 (Issue B): ENV_BEHAVIORAL/ENV_SITUATIONAL previously had no
+        {relevant_resume_context} placeholder at all, so the already-computed
+        value was silently dropped -- these dimensions got NOTHING, not just
+        an experience-only subset. They now receive the same bounded
+        Experience + Projects context as Resume (never skills, which is
+        technical-specific), matching the audit's "resume is supporting/
+        secondary context" guidance for these two dimensions."""
+        behavioral = PromptResolver.resolve(self._req(InterviewType.HR_BEHAVIORAL, "fixed_coverage"))
+        situational = PromptResolver.resolve(self._req(InterviewType.SITUATIONAL_CASE, "fixed_coverage"))
+        for system_prompt, user_prompt in (behavioral, situational):
+            assert "Relevant Resume Context" not in system_prompt
+            assert "Relevant Resume Context:" in user_prompt
+            assert "- Dev at Acme: built things" in user_prompt
+            assert "- Inventory App: x" in user_prompt
+            assert "Python" not in system_prompt
+            assert "Python" not in user_prompt
